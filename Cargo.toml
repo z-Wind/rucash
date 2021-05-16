@@ -1,0 +1,23 @@
+[package]
+name = "rucash"
+version = "0.1.0"
+authors = ["zWindr <zpsyhapcst@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sqlx = { version = "0.5", features = [ "runtime-async-std-native-tls", "sqlite", "chrono", "decimal" ] }
+futures = "0.3"
+chrono = "0.4"
+rust_decimal = "1.13"
+rust_decimal_macros = "1.13"
+criterion = "0.3"
+
+[lib]
+name = "rucash"
+crate-type = ["cdylib", "rlib"]
+
+[[bench]]
+name = "benchmark"
+harness = false
