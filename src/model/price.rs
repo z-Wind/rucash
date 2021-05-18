@@ -1,4 +1,3 @@
-use chrono;
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
@@ -16,7 +15,7 @@ pub struct Price {
 }
 
 impl<'q> Price {
-    pub fn query() -> sqlx::query::Map<
+    pub(crate) fn query() -> sqlx::query::Map<
         'q,
         sqlx::Sqlite,
         fn(sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error>,
@@ -40,7 +39,7 @@ impl<'q> Price {
         )
     }
 
-    pub fn query_by_guid(
+    pub(crate) fn query_by_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -62,7 +61,7 @@ impl<'q> Price {
         .bind(guid)
     }
 
-    pub fn query_by_commodity_guid(
+    pub(crate) fn query_by_commodity_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -84,7 +83,7 @@ impl<'q> Price {
         .bind(guid)
     }
 
-    pub fn query_by_currency_guid(
+    pub(crate) fn query_by_currency_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -106,7 +105,7 @@ impl<'q> Price {
         .bind(guid)
     }
 
-    pub fn query_by_commodity_or_currency_guid(
+    pub(crate) fn query_by_commodity_or_currency_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -140,6 +139,8 @@ impl<'q> Price {
 mod tests {
     use super::*;
     use futures::executor::block_on;
+
+    const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
     mod sqlite {
         use super::*;
 
@@ -157,14 +158,14 @@ mod tests {
 
         #[test]
         fn query() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async { Price::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(5, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Price::query_by_guid("0d6684f44fb018e882de76094ed9c433")
                     .fetch_one(&pool)
@@ -177,7 +178,7 @@ mod tests {
 
         #[test]
         fn query_by_commodity_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Price::query_by_commodity_guid("d821d6776fde9f7c2d01b67876406fd3")
                     .fetch_one(&pool)
@@ -190,7 +191,7 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Price::query_by_currency_guid("5f586908098232e67edb1371408bfaa8")
                     .fetch_one(&pool)
@@ -203,7 +204,7 @@ mod tests {
 
         #[test]
         fn query_by_commodity_or_currency_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Price::query_by_commodity_or_currency_guid("5f586908098232e67edb1371408bfaa8")
                     .fetch_all(&pool)

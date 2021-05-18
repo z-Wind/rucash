@@ -1,5 +1,3 @@
-use chrono;
-
 #[derive(Clone, Debug, sqlx::FromRow)]
 pub struct Transaction {
     pub guid: String,
@@ -11,7 +9,7 @@ pub struct Transaction {
 }
 
 impl<'q> Transaction {
-    pub fn query() -> sqlx::query::Map<
+    pub(crate) fn query() -> sqlx::query::Map<
         'q,
         sqlx::Sqlite,
         fn(sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error>,
@@ -32,7 +30,7 @@ impl<'q> Transaction {
         )
     }
 
-    pub fn query_by_guid(
+    pub(crate) fn query_by_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -51,7 +49,7 @@ impl<'q> Transaction {
         .bind(guid)
     }
 
-    pub fn query_by_currency_guid(
+    pub(crate) fn query_by_currency_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -75,6 +73,8 @@ impl<'q> Transaction {
 mod tests {
     use super::*;
     use futures::executor::block_on;
+
+    const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
     mod sqlite {
         use chrono::NaiveDateTime;
 
@@ -94,14 +94,14 @@ mod tests {
 
         #[test]
         fn query() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async { Transaction::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(11, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1")
                     .fetch_one(&pool)
@@ -121,7 +121,7 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69")
                     .fetch_all(&pool)

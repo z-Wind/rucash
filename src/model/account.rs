@@ -14,7 +14,7 @@ pub struct Account {
 }
 
 impl<'q> Account {
-    pub fn query() -> sqlx::query::Map<
+    pub(crate) fn query() -> sqlx::query::Map<
         'q,
         sqlx::Sqlite,
         fn(sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error>,
@@ -40,7 +40,7 @@ impl<'q> Account {
         )
     }
 
-    pub fn query_by_guid(
+    pub(crate) fn query_by_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -64,7 +64,7 @@ impl<'q> Account {
         .bind(guid)
     }
 
-    pub fn query_by_commodity_guid(
+    pub(crate) fn query_by_commodity_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -88,7 +88,7 @@ impl<'q> Account {
         .bind(guid)
     }
 
-    pub fn query_by_parent_guid(
+    pub(crate) fn query_by_parent_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -112,7 +112,7 @@ impl<'q> Account {
         .bind(guid)
     }
 
-    pub fn query_by_name(
+    pub(crate) fn query_by_name(
         name: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -136,7 +136,7 @@ impl<'q> Account {
         .bind(name)
     }
 
-    pub fn query_like_name(
+    pub(crate) fn query_like_name(
         name: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -165,6 +165,8 @@ impl<'q> Account {
 mod tests {
     use super::*;
     use futures::executor::block_on;
+
+    const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
     mod sqlite {
         use super::*;
 
@@ -182,14 +184,14 @@ mod tests {
 
         #[test]
         fn query() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async { Account::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(21, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Account::query_by_guid("fcd795021c976ba75621ec39e75f6214")
                     .fetch_one(&pool)
@@ -201,7 +203,7 @@ mod tests {
 
         #[test]
         fn query_by_commodity_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69")
                     .fetch_all(&pool)
@@ -213,7 +215,7 @@ mod tests {
 
         #[test]
         fn query_by_parent_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214")
                     .fetch_all(&pool)
@@ -225,7 +227,7 @@ mod tests {
 
         #[test]
         fn query_by_name() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result =
                 block_on(async { Account::query_by_name("Asset").fetch_one(&pool).await }).unwrap();
             assert_eq!("fcd795021c976ba75621ec39e75f6214", result.guid);
@@ -233,7 +235,7 @@ mod tests {
 
         #[test]
         fn query_like_name() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result =
                 block_on(async { Account::query_like_name("%AS%").fetch_all(&pool).await })
                     .unwrap();

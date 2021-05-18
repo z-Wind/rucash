@@ -1,6 +1,4 @@
 use std::str::FromStr;
-
-use chrono;
 use rust_decimal::Decimal;
 
 #[derive(Clone, Debug, sqlx::FromRow)]
@@ -22,7 +20,7 @@ pub struct Split {
 }
 
 impl<'q> Split {
-    pub fn query() -> sqlx::query::Map<
+    pub(crate) fn query() -> sqlx::query::Map<
         'q,
         sqlx::Sqlite,
         fn(sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error>,
@@ -51,7 +49,7 @@ impl<'q> Split {
         )
     }
 
-    pub fn query_by_guid(
+    pub(crate) fn query_by_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -78,7 +76,7 @@ impl<'q> Split {
         .bind(guid)
     }
 
-    pub fn query_by_account_guid(
+    pub(crate) fn query_by_account_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -105,7 +103,7 @@ impl<'q> Split {
         .bind(guid)
     }
 
-    pub fn query_by_tx_guid(
+    pub(crate) fn query_by_tx_guid(
         guid: &'q str,
     ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
         sqlx::query_as::<_, Self>(
@@ -147,6 +145,8 @@ impl<'q> Split {
 mod tests {
     use super::*;
     use futures::executor::block_on;
+
+    const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
     mod sqlite {
         use super::*;
 
@@ -164,14 +164,14 @@ mod tests {
 
         #[test]
         fn query() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async { Split::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(25, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Split::query_by_guid("de832fe97e37811a7fff7e28b3a43425")
                     .fetch_one(&pool)
@@ -184,7 +184,7 @@ mod tests {
 
         #[test]
         fn query_by_account_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Split::query_by_account_guid("93fc043c3062aaa1297b30e543d2cd0d")
                     .fetch_all(&pool)
@@ -196,7 +196,7 @@ mod tests {
 
         #[test]
         fn query_by_tx_guid() {
-            let pool = setup("sqlite://tests/sample/complex_sample.gnucash");
+            let pool = setup(URI);
             let result = block_on(async {
                 Split::query_by_tx_guid("6c8876003c4a6026e38e3afb67d6f2b1")
                     .fetch_all(&pool)
