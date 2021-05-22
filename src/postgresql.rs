@@ -9,7 +9,7 @@ use super::model::transaction::Transaction as _Transaction;
 use super::Book;
 use super::Item;
 
-type DB = sqlx::Sqlite;
+type DB = sqlx::Postgres;
 pub type Account = Item<_Account, DB>;
 pub type Split = Item<_Split, DB>;
 pub type Transaction = Item<_Transaction, DB>;
@@ -17,18 +17,44 @@ pub type Price = Item<_Price, DB>;
 pub type Commodity = Item<_Commodity, DB>;
 
 impl Book<DB> {
-    /// | URI | Description |
-    /// | -- | -- |
-    /// sqlite::memory: | Open an in-memory database. |
-    /// sqlite:data.db | Open the file data.db in the current directory. |
-    /// sqlite://data.db | Open the file data.db in the current directory. |
-    /// sqlite:///data.db | Open the file data.db from the root (/) directory. |
-    /// sqlite://data.db?mode=ro` | Open the file `data.db` for read-only access. |
+    /// The general form for a connection URI is:
+    ///
+    /// ```text
+    /// postgresql://[user[:password]@][host][:port][/dbname][?param1=value1&...]
+    /// ```
+    ///
+    /// ## Parameters
+    ///
+    /// |Parameter|Default|Description|
+    /// |---------|-------|-----------|
+    /// | `sslmode` | `prefer` | Determines whether or with what priority a secure SSL TCP/IP connection will be negotiated. |
+    /// | `sslrootcert` | `None` | Sets the name of a file containing a list of trusted SSL Certificate Authorities. |
+    /// | `statement-cache-capacity` | `100` | The maximum number of prepared statements stored in the cache. Set to `0` to disable. |
+    /// | `host` | `None` | Path to the directory containing a PostgreSQL unix domain socket, which will be used instead of TCP if set. |
+    /// | `hostaddr` | `None` | Same as `host`, but only accepts IP addresses. |
+    /// | `application-name` | `None` | The name will be displayed in the pg_stat_activity view and included in CSV log entries. |
+    /// | `user` | result of `whoami` | PostgreSQL user name to connect as. |
+    /// | `password` | `None` | Password to be used if the server demands password authentication. |
+    /// | `port` | `5432` | Port number to connect to at the server host, or socket file name extension for Unix-domain connections. |
+    /// | `dbname` | `None` | The database name. |
+    ///
+    /// The URI scheme designator can be either `postgresql://` or `postgres://`.
+    /// Each of the URI parts is optional.
+    ///
+    /// ```text
+    /// postgresql://
+    /// postgresql://localhost
+    /// postgresql://localhost:5433
+    /// postgresql://localhost/mydb
+    /// postgresql://user@localhost
+    /// postgresql://user:secret@localhost
+    /// postgresql://localhost?dbname=mydb&user=postgres&password=postgres
+    /// ```
     pub fn new(uri: &str) -> Result<Book<DB>, sqlx::Error> {
         let pool = block_on(async {
-            sqlx::sqlite::SqlitePoolOptions::new()
+            sqlx::postgres::PgPoolOptions::new()
                 .max_connections(5)
-                .connect(uri) // read only
+                .connect(uri)
                 .await
         });
         let pool = Rc::new(pool?);
@@ -46,7 +72,7 @@ impl Book<DB> {
     pub fn accounts_contains_name(&self, name: &str) -> Result<Vec<Account>, sqlx::Error> {
         let name = format!("%{}%", name);
         block_on(async {
-            _Account::query_like_name_question_mark(&name)
+            _Account::query_like_name_money_mark(&name)
                 .fetch_all(&*self.pool)
                 .await
         })
@@ -88,7 +114,7 @@ impl Book<DB> {
 
     pub fn currencies(&self) -> Result<Vec<Commodity>, sqlx::Error> {
         block_on(async {
-            _Commodity::query_by_namespace_question_mark("CURRENCY")
+            _Commodity::query_by_namespace_money_mark("CURRENCY")
                 .fetch_all(&*self.pool)
                 .await
         })
@@ -111,7 +137,7 @@ impl Book<DB> {
 impl Account {
     pub fn splits(&self) -> Result<Vec<Split>, sqlx::Error> {
         block_on(async {
-            _Split::query_by_account_guid_question_mark(&self.guid)
+            _Split::query_by_account_guid_money_mark(&self.guid)
                 .fetch_all(&*self.pool)
                 .await
         })
@@ -124,7 +150,7 @@ impl Account {
     pub fn parent(&self) -> Option<Account> {
         let guid = self.parent_guid.as_ref()?;
         block_on(async {
-            _Account::query_by_guid_question_mark(guid)
+            _Account::query_by_guid_money_mark(guid)
                 .fetch_optional(&*self.pool)
                 .await
                 .unwrap()
@@ -133,7 +159,7 @@ impl Account {
     }
     pub fn children(&self) -> Result<Vec<Account>, sqlx::Error> {
         block_on(async {
-            _Account::query_by_parent_guid_question_mark(&self.guid)
+            _Account::query_by_parent_guid_money_mark(&self.guid)
                 .fetch_all(&*self.pool)
                 .await
         })
@@ -146,7 +172,7 @@ impl Account {
     pub fn commodity(&self) -> Option<Commodity> {
         let guid = self.commodity_guid.as_ref()?;
         block_on(async {
-            _Commodity::query_by_guid_question_mark(guid)
+            _Commodity::query_by_guid_money_mark(guid)
                 .fetch_optional(&*self.pool)
                 .await
                 .unwrap()
@@ -186,7 +212,7 @@ impl Split {
     pub fn transaction(&self) -> Result<Transaction, sqlx::Error> {
         let guid = &self.tx_guid;
         block_on(async {
-            _Transaction::query_by_guid_question_mark(guid)
+            _Transaction::query_by_guid_money_mark(guid)
                 .fetch_one(&*self.pool)
                 .await
         })
@@ -196,7 +222,7 @@ impl Split {
     pub fn account(&self) -> Result<Account, sqlx::Error> {
         let guid = &self.account_guid;
         block_on(async {
-            _Account::query_by_guid_question_mark(guid)
+            _Account::query_by_guid_money_mark(guid)
                 .fetch_one(&*self.pool)
                 .await
         })
@@ -208,7 +234,7 @@ impl Transaction {
     pub fn currency(&self) -> Result<Commodity, sqlx::Error> {
         let guid = &self.currency_guid;
         block_on(async {
-            _Commodity::query_by_guid_question_mark(guid)
+            _Commodity::query_by_guid_money_mark(guid)
                 .fetch_one(&*self.pool)
                 .await
         })
@@ -218,7 +244,7 @@ impl Transaction {
     pub fn splits(&self) -> Result<Vec<Split>, sqlx::Error> {
         let guid = &self.guid;
         block_on(async {
-            _Split::query_by_tx_guid_question_mark(guid)
+            _Split::query_by_tx_guid_money_mark(guid)
                 .fetch_all(&*self.pool)
                 .await
         })
@@ -234,7 +260,7 @@ impl Price {
     pub fn commodity(&self) -> Result<Commodity, sqlx::Error> {
         let guid = &self.commodity_guid;
         block_on(async {
-            _Commodity::query_by_guid_question_mark(guid)
+            _Commodity::query_by_guid_money_mark(guid)
                 .fetch_one(&*self.pool)
                 .await
         })
@@ -244,7 +270,7 @@ impl Price {
     pub fn currency(&self) -> Result<Commodity, sqlx::Error> {
         let guid = &self.currency_guid;
         block_on(async {
-            _Commodity::query_by_guid_question_mark(guid)
+            _Commodity::query_by_guid_money_mark(guid)
                 .fetch_one(&*self.pool)
                 .await
         })
@@ -256,7 +282,7 @@ impl Commodity {
     pub fn accounts(&self) -> Result<Vec<Account>, sqlx::Error> {
         let guid = &self.guid;
         block_on(async {
-            _Account::query_by_commodity_guid_question_mark(guid)
+            _Account::query_by_commodity_guid_money_mark(guid)
                 .fetch_all(&*self.pool)
                 .await
         })
@@ -270,7 +296,7 @@ impl Commodity {
     pub fn transactions(&self) -> Result<Vec<Transaction>, sqlx::Error> {
         let guid = &self.guid;
         block_on(async {
-            _Transaction::query_by_currency_guid_question_mark(guid)
+            _Transaction::query_by_currency_guid_money_mark(guid)
                 .fetch_all(&*self.pool)
                 .await
         })
@@ -284,7 +310,7 @@ impl Commodity {
     pub fn as_commodity_prices(&self) -> Result<Vec<Price>, sqlx::Error> {
         let guid = &self.guid;
         block_on(async {
-            _Price::query_by_commodity_guid_question_mark(guid)
+            _Price::query_by_commodity_guid_money_mark(guid)
                 .fetch_all(&*self.pool)
                 .await
         })
@@ -298,7 +324,7 @@ impl Commodity {
     pub fn as_currency_prices(&self) -> Result<Vec<Price>, sqlx::Error> {
         let guid = &self.guid;
         block_on(async {
-            _Price::query_by_currency_guid_question_mark(guid)
+            _Price::query_by_currency_guid_money_mark(guid)
                 .fetch_all(&*self.pool)
                 .await
         })
@@ -312,7 +338,7 @@ impl Commodity {
     pub fn as_commodity_or_currency_prices(&self) -> Result<Vec<Price>, sqlx::Error> {
         let guid = &self.guid;
         block_on(async {
-            _Price::query_by_commodity_or_currency_guid_question_mark(guid)
+            _Price::query_by_commodity_or_currency_guid_money_mark(guid)
                 .fetch_all(&*self.pool)
                 .await
         })
@@ -360,7 +386,6 @@ impl Commodity {
 // mod tests {
 //     use super::*;
 
-//     const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
 //     mod book {
 //         use super::*;
 //     }

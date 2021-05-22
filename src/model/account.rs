@@ -4,17 +4,19 @@ pub struct Account {
     pub name: String,
     pub account_type: String,
     pub commodity_guid: Option<String>,
-    pub commodity_scu: i64,
-    pub non_std_scu: i64,
+    pub commodity_scu: i32,
+    pub non_std_scu: i32,
     pub parent_guid: Option<String>,
     pub code: Option<String>,
     pub description: Option<String>,
-    pub hidden: Option<bool>,
-    pub placeholder: Option<bool>,
+    pub hidden: Option<i32>,
+    pub placeholder: Option<i32>,
 }
 
 impl<'q> Account {
-    pub(crate) fn query() -> sqlx::query::Map<
+    // test schemas on compile time
+    #[allow(dead_code)]
+    fn test_schemas() -> sqlx::query::Map<
         'q,
         sqlx::Sqlite,
         fn(sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error>,
@@ -28,22 +30,52 @@ impl<'q> Account {
             name,
             account_type,
             commodity_guid,
-            commodity_scu,
-            non_std_scu,
+            commodity_scu as "commodity_scu: i32",
+            non_std_scu as "non_std_scu: i32",
             parent_guid,
             code,
             description,
-            hidden as "hidden: bool",
-            placeholder as "placeholder: bool"
+            hidden as "hidden: i32",
+            placeholder as "placeholder: i32"
             FROM accounts
             "#,
         )
     }
 
-    pub(crate) fn query_by_guid(
-        guid: &'q str,
-    ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
-        sqlx::query_as::<_, Self>(
+    pub(crate) fn query<DB, O>(
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+    {
+        sqlx::query_as(
+            r#"
+            SELECT 
+            guid, 
+            name,
+            account_type,
+            commodity_guid,
+            commodity_scu,
+            non_std_scu,
+            parent_guid,
+            code,
+            description,
+            hidden,
+            placeholder
+            FROM accounts
+            "#,
+        )
+    }
+
+    pub(crate) fn query_by_guid_question_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
             r#"
             SELECT 
             guid, 
@@ -64,10 +96,44 @@ impl<'q> Account {
         .bind(guid)
     }
 
-    pub(crate) fn query_by_commodity_guid(
-        guid: &'q str,
-    ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
-        sqlx::query_as::<_, Self>(
+    pub(crate) fn query_by_guid_money_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
+            r#"
+            SELECT 
+            guid, 
+            name,
+            account_type,
+            commodity_guid,
+            commodity_scu,
+            non_std_scu,
+            parent_guid,
+            code,
+            description,
+            hidden,
+            placeholder
+            FROM accounts
+            WHERE guid = $1
+            "#,
+        )
+        .bind(guid)
+    }
+
+    pub(crate) fn query_by_commodity_guid_question_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
             r#"
             SELECT 
             guid, 
@@ -88,10 +154,44 @@ impl<'q> Account {
         .bind(guid)
     }
 
-    pub(crate) fn query_by_parent_guid(
-        guid: &'q str,
-    ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
-        sqlx::query_as::<_, Self>(
+    pub(crate) fn query_by_commodity_guid_money_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
+            r#"
+            SELECT 
+            guid, 
+            name,
+            account_type,
+            commodity_guid,
+            commodity_scu,
+            non_std_scu,
+            parent_guid,
+            code,
+            description,
+            hidden,
+            placeholder
+            FROM accounts
+            WHERE commodity_guid = $1
+            "#,
+        )
+        .bind(guid)
+    }
+
+    pub(crate) fn query_by_parent_guid_question_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
             r#"
             SELECT 
             guid, 
@@ -112,10 +212,44 @@ impl<'q> Account {
         .bind(guid)
     }
 
-    pub(crate) fn query_by_name(
-        name: &'q str,
-    ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
-        sqlx::query_as::<_, Self>(
+    pub(crate) fn query_by_parent_guid_money_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
+            r#"
+            SELECT 
+            guid, 
+            name,
+            account_type,
+            commodity_guid,
+            commodity_scu,
+            non_std_scu,
+            parent_guid,
+            code,
+            description,
+            hidden,
+            placeholder
+            FROM accounts
+            WHERE parent_guid = $1
+            "#,
+        )
+        .bind(guid)
+    }
+
+    pub(crate) fn query_by_name_question_mark<DB, O, T>(
+        name: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
             r#"
             SELECT 
             guid, 
@@ -136,10 +270,44 @@ impl<'q> Account {
         .bind(name)
     }
 
-    pub(crate) fn query_like_name(
-        name: &'q str,
-    ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
-        sqlx::query_as::<_, Self>(
+    pub(crate) fn query_by_name_money_mark<DB, O, T>(
+        name: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
+            r#"
+            SELECT 
+            guid, 
+            name,
+            account_type,
+            commodity_guid,
+            commodity_scu,
+            non_std_scu,
+            parent_guid,
+            code,
+            description,
+            hidden,
+            placeholder
+            FROM accounts
+            WHERE name = $1
+            "#,
+        )
+        .bind(name)
+    }
+
+    pub(crate) fn query_like_name_question_mark<DB, O, T>(
+        name: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
             r#"
             SELECT 
             guid, 
@@ -159,6 +327,35 @@ impl<'q> Account {
         )
         .bind(name)
     }
+
+    pub(crate) fn query_like_name_money_mark<DB, O, T>(
+        name: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
+            r#"
+            SELECT 
+            guid, 
+            name,
+            account_type,
+            commodity_guid,
+            commodity_scu,
+            non_std_scu,
+            parent_guid,
+            code,
+            description,
+            hidden,
+            placeholder
+            FROM accounts
+            WHERE LOWER(name) LIKE LOWER($1)
+            "#,
+        )
+        .bind(name)
+    }
 }
 
 #[cfg(test)]
@@ -166,10 +363,10 @@ mod tests {
     use super::*;
     use futures::executor::block_on;
 
-    const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
     mod sqlite {
         use super::*;
 
+        const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
         fn setup(uri: &str) -> sqlx::Pool<DB> {
@@ -185,15 +382,16 @@ mod tests {
         #[test]
         fn query() {
             let pool = setup(URI);
-            let result = block_on(async { Account::query().fetch_all(&pool).await }).unwrap();
+            let result: Vec<Account> =
+                block_on(async { Account::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(21, result.len());
         }
 
         #[test]
         fn query_by_guid() {
             let pool = setup(URI);
-            let result = block_on(async {
-                Account::query_by_guid("fcd795021c976ba75621ec39e75f6214")
+            let result: Account = block_on(async {
+                Account::query_by_guid_question_mark("fcd795021c976ba75621ec39e75f6214")
                     .fetch_one(&pool)
                     .await
             })
@@ -204,8 +402,8 @@ mod tests {
         #[test]
         fn query_by_commodity_guid() {
             let pool = setup(URI);
-            let result = block_on(async {
-                Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69")
+            let result: Vec<Account> = block_on(async {
+                Account::query_by_commodity_guid_question_mark("346629655191dcf59a7e2c2a85b70f69")
                     .fetch_all(&pool)
                     .await
             })
@@ -216,8 +414,8 @@ mod tests {
         #[test]
         fn query_by_parent_guid() {
             let pool = setup(URI);
-            let result = block_on(async {
-                Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214")
+            let result: Vec<Account> = block_on(async {
+                Account::query_by_parent_guid_question_mark("fcd795021c976ba75621ec39e75f6214")
                     .fetch_all(&pool)
                     .await
             })
@@ -228,17 +426,108 @@ mod tests {
         #[test]
         fn query_by_name() {
             let pool = setup(URI);
-            let result =
-                block_on(async { Account::query_by_name("Asset").fetch_one(&pool).await }).unwrap();
+            let result: Account = block_on(async {
+                Account::query_by_name_question_mark("Asset")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
             assert_eq!("fcd795021c976ba75621ec39e75f6214", result.guid);
         }
 
         #[test]
         fn query_like_name() {
             let pool = setup(URI);
-            let result =
-                block_on(async { Account::query_like_name("%AS%").fetch_all(&pool).await })
-                    .unwrap();
+            let result: Vec<Account> = block_on(async {
+                Account::query_like_name_question_mark("%AS%")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(3, result.len());
+        }
+    }
+    mod postgresql {
+        use super::*;
+
+        const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+        type DB = sqlx::Postgres;
+
+        fn setup(uri: &str) -> sqlx::Pool<DB> {
+            block_on(async {
+                sqlx::postgres::PgPoolOptions::new()
+                    .max_connections(5)
+                    .connect(uri) // read only
+                    .await
+                    .unwrap()
+            })
+        }
+
+        #[test]
+        fn query() {
+            let pool = setup(URI);
+            let result: Vec<Account> =
+                block_on(async { Account::query().fetch_all(&pool).await }).unwrap();
+            assert_eq!(21, result.len());
+        }
+
+        #[test]
+        fn query_by_guid() {
+            let pool = setup(URI);
+            let result: Account = block_on(async {
+                Account::query_by_guid_money_mark("fcd795021c976ba75621ec39e75f6214")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!("Asset", result.name);
+        }
+
+        #[test]
+        fn query_by_commodity_guid() {
+            let pool = setup(URI);
+            let result: Vec<Account> = block_on(async {
+                Account::query_by_commodity_guid_money_mark("346629655191dcf59a7e2c2a85b70f69")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(14, result.len());
+        }
+
+        #[test]
+        fn query_by_parent_guid() {
+            let pool = setup(URI);
+            let result: Vec<Account> = block_on(async {
+                Account::query_by_parent_guid_money_mark("fcd795021c976ba75621ec39e75f6214")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(3, result.len());
+        }
+
+        #[test]
+        fn query_by_name() {
+            let pool = setup(URI);
+            let result: Account = block_on(async {
+                Account::query_by_name_money_mark("Asset")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!("fcd795021c976ba75621ec39e75f6214", result.guid);
+        }
+
+        #[test]
+        fn query_like_name() {
+            let pool = setup(URI);
+            let result: Vec<Account> = block_on(async {
+                Account::query_like_name_money_mark("%AS%")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
             assert_eq!(3, result.len());
         }
     }

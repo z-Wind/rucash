@@ -1,9 +1,9 @@
-use rucash::sqlite::Account;
+use rucash::postgresql::Account;
 use rucash::Book;
 
-const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
+const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
 
-type DB = sqlx::Sqlite;
+type DB = sqlx::Postgres;
 mod book {
     use super::*;
 
@@ -15,7 +15,7 @@ mod book {
     #[test]
     #[should_panic]
     fn new_fail() {
-        Book::<DB>::new("sqlite://tests/sample/no.gnucash").unwrap();
+        Book::<DB>::new("postgresql://complex_sample.gnucash").unwrap();
     }
 
     #[test]

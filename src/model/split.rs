@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use rust_decimal::Decimal;
+use std::str::FromStr;
 
 #[derive(Clone, Debug, sqlx::FromRow)]
 pub struct Split {
@@ -20,7 +20,9 @@ pub struct Split {
 }
 
 impl<'q> Split {
-    pub(crate) fn query() -> sqlx::query::Map<
+    // test schemas on compile time
+    #[allow(dead_code)]
+    fn test_schemas() -> sqlx::query::Map<
         'q,
         sqlx::Sqlite,
         fn(sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error>,
@@ -49,10 +51,43 @@ impl<'q> Split {
         )
     }
 
-    pub(crate) fn query_by_guid(
-        guid: &'q str,
-    ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
-        sqlx::query_as::<_, Self>(
+    pub(crate) fn query<DB, O>(
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+    {
+        sqlx::query_as(
+            r#"
+            SELECT 	
+            guid,
+            tx_guid,
+            account_guid,
+            memo,
+            action,
+            reconcile_state,
+            reconcile_date,
+            value_num,
+            value_denom,
+            CAST(value_num AS float)/ CAST(value_denom AS float) as value,
+            quantity_num,
+            quantity_denom,
+            CAST(quantity_num AS float) / CAST(quantity_denom AS float) as quantity,
+            lot_guid
+            FROM splits
+            "#,
+        )
+    }
+
+    pub(crate) fn query_by_guid_question_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
             r#"
             SELECT 	
             guid,
@@ -76,10 +111,47 @@ impl<'q> Split {
         .bind(guid)
     }
 
-    pub(crate) fn query_by_account_guid(
-        guid: &'q str,
-    ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
-        sqlx::query_as::<_, Self>(
+    pub(crate) fn query_by_guid_money_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
+            r#"
+            SELECT 	
+            guid,
+            tx_guid,
+            account_guid,
+            memo,
+            action,
+            reconcile_state,
+            reconcile_date,
+            value_num,
+            value_denom,
+            CAST(value_num AS float)/ CAST(value_denom AS float) as "value",
+            quantity_num,
+            quantity_denom,
+            CAST(quantity_num AS float) / CAST(quantity_denom AS float) as "quantity",
+            lot_guid
+            FROM splits
+            WHERE guid = $1
+            "#,
+        )
+        .bind(guid)
+    }
+
+    pub(crate) fn query_by_account_guid_question_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
             r#"
             SELECT 	
             guid,
@@ -103,10 +175,47 @@ impl<'q> Split {
         .bind(guid)
     }
 
-    pub(crate) fn query_by_tx_guid(
-        guid: &'q str,
-    ) -> sqlx::query::QueryAs<'q, sqlx::Sqlite, Self, sqlx::sqlite::SqliteArguments<'q>> {
-        sqlx::query_as::<_, Self>(
+    pub(crate) fn query_by_account_guid_money_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
+            r#"
+            SELECT 	
+            guid,
+            tx_guid,
+            account_guid,
+            memo,
+            action,
+            reconcile_state,
+            reconcile_date,
+            value_num,
+            value_denom,
+            CAST(value_num AS float)/ CAST(value_denom AS float) as "value" ,
+            quantity_num,
+            quantity_denom,
+            CAST(quantity_num AS float) / CAST(quantity_denom AS float) as "quantity",
+            lot_guid
+            FROM splits
+            WHERE account_guid = $1
+            "#,
+        )
+        .bind(guid)
+    }
+
+    pub(crate) fn query_by_tx_guid_question_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
             r#"
             SELECT 	
             guid,
@@ -130,6 +239,38 @@ impl<'q> Split {
         .bind(guid)
     }
 
+    pub(crate) fn query_by_tx_guid_money_mark<DB, O, T>(
+        guid: T,
+    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
+    where
+        DB: sqlx::Database,
+        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
+        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
+    {
+        sqlx::query_as(
+            r#"
+            SELECT 	
+            guid,
+            tx_guid,
+            account_guid,
+            memo,
+            action,
+            reconcile_state,
+            reconcile_date,
+            value_num,
+            value_denom,
+            CAST(value_num AS float)/ CAST(value_denom AS float) as "value" ,
+            quantity_num,
+            quantity_denom,
+            CAST(quantity_num AS float) / CAST(quantity_denom AS float) as "quantity",
+            lot_guid
+            FROM splits
+            WHERE tx_guid = $1
+            "#,
+        )
+        .bind(guid)
+    }
+
     pub fn value(&self) -> Decimal {
         Decimal::from_str(&self.value_num.to_string()).unwrap()
             / Decimal::from_str(&self.value_denom.to_string()).unwrap()
@@ -146,10 +287,10 @@ mod tests {
     use super::*;
     use futures::executor::block_on;
 
-    const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
     mod sqlite {
         use super::*;
 
+        const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
         fn setup(uri: &str) -> sqlx::Pool<DB> {
@@ -165,15 +306,16 @@ mod tests {
         #[test]
         fn query() {
             let pool = setup(URI);
-            let result = block_on(async { Split::query().fetch_all(&pool).await }).unwrap();
+            let result: Vec<Split> =
+                block_on(async { Split::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(25, result.len());
         }
 
         #[test]
         fn query_by_guid() {
             let pool = setup(URI);
-            let result = block_on(async {
-                Split::query_by_guid("de832fe97e37811a7fff7e28b3a43425")
+            let result: Split = block_on(async {
+                Split::query_by_guid_question_mark("de832fe97e37811a7fff7e28b3a43425")
                     .fetch_one(&pool)
                     .await
             })
@@ -185,8 +327,8 @@ mod tests {
         #[test]
         fn query_by_account_guid() {
             let pool = setup(URI);
-            let result = block_on(async {
-                Split::query_by_account_guid("93fc043c3062aaa1297b30e543d2cd0d")
+            let result: Vec<Split> = block_on(async {
+                Split::query_by_account_guid_question_mark("93fc043c3062aaa1297b30e543d2cd0d")
                     .fetch_all(&pool)
                     .await
             })
@@ -197,8 +339,70 @@ mod tests {
         #[test]
         fn query_by_tx_guid() {
             let pool = setup(URI);
-            let result = block_on(async {
-                Split::query_by_tx_guid("6c8876003c4a6026e38e3afb67d6f2b1")
+            let result: Vec<Split> = block_on(async {
+                Split::query_by_tx_guid_question_mark("6c8876003c4a6026e38e3afb67d6f2b1")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(2, result.len());
+        }
+    }
+
+    mod postgresql {
+        use super::*;
+
+        const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+        type DB = sqlx::Postgres;
+
+        fn setup(uri: &str) -> sqlx::Pool<DB> {
+            block_on(async {
+                sqlx::postgres::PgPoolOptions::new()
+                    .max_connections(5)
+                    .connect(uri) // read only
+                    .await
+                    .unwrap()
+            })
+        }
+
+        #[test]
+        fn query() {
+            let pool = setup(URI);
+            let result: Vec<Split> =
+                block_on(async { Split::query().fetch_all(&pool).await }).unwrap();
+            assert_eq!(25, result.len());
+        }
+
+        #[test]
+        fn query_by_guid() {
+            let pool = setup(URI);
+            let result: Split = block_on(async {
+                Split::query_by_guid_money_mark("de832fe97e37811a7fff7e28b3a43425")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(150.0, result.value);
+            assert_eq!(Decimal::new(150, 0), result.value());
+        }
+
+        #[test]
+        fn query_by_account_guid() {
+            let pool = setup(URI);
+            let result: Vec<Split> = block_on(async {
+                Split::query_by_account_guid_money_mark("93fc043c3062aaa1297b30e543d2cd0d")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(3, result.len());
+        }
+
+        #[test]
+        fn query_by_tx_guid() {
+            let pool = setup(URI);
+            let result: Vec<Split> = block_on(async {
+                Split::query_by_tx_guid_money_mark("6c8876003c4a6026e38e3afb67d6f2b1")
                     .fetch_all(&pool)
                     .await
             })

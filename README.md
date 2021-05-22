@@ -27,7 +27,7 @@
 
 <br/>
 
-rucash provides a simple interface to GnuCash files stored in SQL (sqlite3, Postgres(undo) and MySQL(undo)).
+rucash provides a simple interface to GnuCash files stored in SQL (sqlite3, PostgreSQL and MySQL(undo)).
 
 ## Example
 ```rust
