@@ -17,6 +17,11 @@ pub type Price = Item<_Price, DB>;
 pub type Commodity = Item<_Commodity, DB>;
 
 impl Book<DB> {
+    /// Options and flags which can be used to configure a PostgreSQL connection.
+    ///
+    /// A value of `PgConnectOptions` can be parsed from a connection URI,
+    /// as described by [libpq](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).
+    ///
     /// The general form for a connection URI is:
     ///
     /// ```text
@@ -27,7 +32,7 @@ impl Book<DB> {
     ///
     /// |Parameter|Default|Description|
     /// |---------|-------|-----------|
-    /// | `sslmode` | `prefer` | Determines whether or with what priority a secure SSL TCP/IP connection will be negotiated. |
+    /// | `sslmode` | `prefer` | Determines whether or with what priority a secure SSL TCP/IP connection will be negotiated. See [`PgSslMode`]. |
     /// | `sslrootcert` | `None` | Sets the name of a file containing a list of trusted SSL Certificate Authorities. |
     /// | `statement-cache-capacity` | `100` | The maximum number of prepared statements stored in the cache. Set to `0` to disable. |
     /// | `host` | `None` | Path to the directory containing a PostgreSQL unix domain socket, which will be used instead of TCP if set. |

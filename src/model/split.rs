@@ -290,7 +290,7 @@ mod tests {
     mod sqlite {
         use super::*;
 
-        const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
+        const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
         fn setup(uri: &str) -> sqlx::Pool<DB> {
@@ -403,6 +403,68 @@ mod tests {
             let pool = setup(URI);
             let result: Vec<Split> = block_on(async {
                 Split::query_by_tx_guid_money_mark("6c8876003c4a6026e38e3afb67d6f2b1")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(2, result.len());
+        }
+    }
+
+    mod mysql {
+        use super::*;
+
+        const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+        type DB = sqlx::MySql;
+
+        fn setup(uri: &str) -> sqlx::Pool<DB> {
+            block_on(async {
+                sqlx::mysql::MySqlPoolOptions::new()
+                    .max_connections(5)
+                    .connect(uri)
+                    .await
+                    .unwrap()
+            })
+        }
+
+        #[test]
+        fn query() {
+            let pool = setup(URI);
+            let result: Vec<Split> =
+                block_on(async { Split::query().fetch_all(&pool).await }).unwrap();
+            assert_eq!(25, result.len());
+        }
+
+        #[test]
+        fn query_by_guid() {
+            let pool = setup(URI);
+            let result: Split = block_on(async {
+                Split::query_by_guid_question_mark("de832fe97e37811a7fff7e28b3a43425")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(150.0, result.value);
+            assert_eq!(Decimal::new(150, 0), result.value());
+        }
+
+        #[test]
+        fn query_by_account_guid() {
+            let pool = setup(URI);
+            let result: Vec<Split> = block_on(async {
+                Split::query_by_account_guid_question_mark("93fc043c3062aaa1297b30e543d2cd0d")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(3, result.len());
+        }
+
+        #[test]
+        fn query_by_tx_guid() {
+            let pool = setup(URI);
+            let result: Vec<Split> = block_on(async {
+                Split::query_by_tx_guid_question_mark("6c8876003c4a6026e38e3afb67d6f2b1")
                     .fetch_all(&pool)
                     .await
             })

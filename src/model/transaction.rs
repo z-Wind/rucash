@@ -158,7 +158,7 @@ mod tests {
         use super::*;
         use chrono::NaiveDateTime;
 
-        const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
+        const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
         fn setup(uri: &str) -> sqlx::Pool<DB> {
@@ -265,6 +265,66 @@ mod tests {
                 Transaction::query_by_currency_guid_money_mark("346629655191dcf59a7e2c2a85b70f69")
                     .fetch_all(&pool)
                     .await
+            })
+            .unwrap();
+            assert_eq!(11, result.len());
+        }
+    }
+
+    mod mysql {
+        use super::*;
+        use chrono::NaiveDateTime;
+
+        const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+        type DB = sqlx::MySql;
+
+        fn setup(uri: &str) -> sqlx::Pool<DB> {
+            block_on(async {
+                sqlx::mysql::MySqlPoolOptions::new()
+                    .max_connections(5)
+                    .connect(uri)
+                    .await
+                    .unwrap()
+            })
+        }
+
+        #[test]
+        fn query() {
+            let pool = setup(URI);
+            let result: Vec<Transaction> =
+                block_on(async { Transaction::query().fetch_all(&pool).await }).unwrap();
+            assert_eq!(11, result.len());
+        }
+
+        #[test]
+        fn query_by_guid() {
+            let pool = setup(URI);
+            let result: Transaction = block_on(async {
+                Transaction::query_by_guid_question_mark("6c8876003c4a6026e38e3afb67d6f2b1")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap(),
+                result.post_date.unwrap()
+            );
+
+            assert_eq!(
+                NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S").unwrap(),
+                result.enter_date.unwrap()
+            );
+        }
+
+        #[test]
+        fn query_by_currency_guid() {
+            let pool = setup(URI);
+            let result: Vec<Transaction> = block_on(async {
+                Transaction::query_by_currency_guid_question_mark(
+                    "346629655191dcf59a7e2c2a85b70f69",
+                )
+                .fetch_all(&pool)
+                .await
             })
             .unwrap();
             assert_eq!(11, result.len());

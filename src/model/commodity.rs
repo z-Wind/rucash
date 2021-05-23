@@ -178,7 +178,7 @@ mod tests {
     mod sqlite {
         use super::*;
 
-        const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
+        const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
         fn setup(uri: &str) -> sqlx::Pool<DB> {
@@ -265,6 +265,55 @@ mod tests {
             let pool = setup(URI);
             let result: Vec<Commodity> = block_on(async {
                 Commodity::query_by_namespace_money_mark("CURRENCY")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(4, result.len());
+        }
+    }
+
+    mod mysql {
+        use super::*;
+
+        const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+        type DB = sqlx::MySql;
+
+        fn setup(uri: &str) -> sqlx::Pool<DB> {
+            block_on(async {
+                sqlx::mysql::MySqlPoolOptions::new()
+                    .max_connections(5)
+                    .connect(uri)
+                    .await
+                    .unwrap()
+            })
+        }
+
+        #[test]
+        fn query() {
+            let pool = setup(URI);
+            let result: Vec<Commodity> =
+                block_on(async { Commodity::query().fetch_all(&pool).await }).unwrap();
+            assert_eq!(5, result.len());
+        }
+
+        #[test]
+        fn query_by_guid() {
+            let pool = setup(URI);
+            let result: Commodity = block_on(async {
+                Commodity::query_by_guid_question_mark("346629655191dcf59a7e2c2a85b70f69")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!("Euro", result.fullname.unwrap());
+        }
+
+        #[test]
+        fn query_by_namespace() {
+            let pool = setup(URI);
+            let result: Vec<Commodity> = block_on(async {
+                Commodity::query_by_namespace_question_mark("CURRENCY")
                     .fetch_all(&pool)
                     .await
             })

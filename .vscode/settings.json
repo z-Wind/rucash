@@ -1,3 +1,16 @@
 {
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "cSpell.words": [
+        "Postgres",
+        "Sqlite",
+        "cdylib",
+        "chrono",
+        "cusip",
+        "fullname",
+        "gnucash",
+        "postgresql",
+        "rlib",
+        "rucash",
+        "sqlx"
+    ]
 }

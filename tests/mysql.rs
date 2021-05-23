@@ -1,9 +1,9 @@
-use rucash::sqlite::Account;
+use rucash::mysql::Account;
 use rucash::Book;
 
-const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
+const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
 
-type DB = sqlx::Sqlite;
+type DB = sqlx::MySql;
 mod book {
     use super::*;
 
@@ -15,7 +15,7 @@ mod book {
     #[test]
     #[should_panic]
     fn new_fail() {
-        Book::<DB>::new("sqlite://tests/sample/no.gnucash").unwrap();
+        Book::<DB>::new("mysql://user@localhost").unwrap();
     }
 
     #[test]
@@ -41,7 +41,7 @@ mod book {
     fn account_by_name() {
         let book = Book::<DB>::new(URI).unwrap();
         let account = book.account_by_name("as").unwrap().unwrap();
-        assert_eq!(account.name, "NASDAQ");
+        assert_eq!(account.name, "Asset");
     }
 
     #[test]

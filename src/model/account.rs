@@ -366,7 +366,7 @@ mod tests {
     mod sqlite {
         use super::*;
 
-        const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
+        const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
         fn setup(uri: &str) -> sqlx::Pool<DB> {
@@ -524,6 +524,91 @@ mod tests {
             let pool = setup(URI);
             let result: Vec<Account> = block_on(async {
                 Account::query_like_name_money_mark("%AS%")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(3, result.len());
+        }
+    }
+
+    mod mysql {
+        use super::*;
+
+        const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+        type DB = sqlx::MySql;
+
+        fn setup(uri: &str) -> sqlx::Pool<DB> {
+            block_on(async {
+                sqlx::mysql::MySqlPoolOptions::new()
+                    .max_connections(5)
+                    .connect(uri)
+                    .await
+                    .unwrap()
+            })
+        }
+
+        #[test]
+        fn query() {
+            let pool = setup(URI);
+            let result: Vec<Account> =
+                block_on(async { Account::query().fetch_all(&pool).await }).unwrap();
+            assert_eq!(21, result.len());
+        }
+
+        #[test]
+        fn query_by_guid() {
+            let pool = setup(URI);
+            let result: Account = block_on(async {
+                Account::query_by_guid_question_mark("fcd795021c976ba75621ec39e75f6214")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!("Asset", result.name);
+        }
+
+        #[test]
+        fn query_by_commodity_guid() {
+            let pool = setup(URI);
+            let result: Vec<Account> = block_on(async {
+                Account::query_by_commodity_guid_question_mark("346629655191dcf59a7e2c2a85b70f69")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(14, result.len());
+        }
+
+        #[test]
+        fn query_by_parent_guid() {
+            let pool = setup(URI);
+            let result: Vec<Account> = block_on(async {
+                Account::query_by_parent_guid_question_mark("fcd795021c976ba75621ec39e75f6214")
+                    .fetch_all(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(3, result.len());
+        }
+
+        #[test]
+        fn query_by_name() {
+            let pool = setup(URI);
+            let result: Account = block_on(async {
+                Account::query_by_name_question_mark("Asset")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!("fcd795021c976ba75621ec39e75f6214", result.guid);
+        }
+
+        #[test]
+        fn query_like_name() {
+            let pool = setup(URI);
+            let result: Vec<Account> = block_on(async {
+                Account::query_like_name_question_mark("%AS%")
                     .fetch_all(&pool)
                     .await
             })

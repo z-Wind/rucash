@@ -1,6 +1,6 @@
 [package]
 name = "rucash"
-version = "0.1.1"
+version = "0.1.2"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/z-Wind/rucash"
@@ -13,7 +13,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sqlx = { version = "0.5", features = [ "runtime-async-std-native-tls", "sqlite", "postgres", "chrono", "decimal" ] }
+sqlx = { version = "0.5", features = [ "runtime-async-std-native-tls", "sqlite", "postgres", "mysql", "chrono", "decimal" ] }
 futures = "0.3"
 chrono = "0.4"
 rust_decimal = "1.13"

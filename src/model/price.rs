@@ -297,7 +297,7 @@ mod tests {
     mod sqlite {
         use super::*;
 
-        const URI: &str = "sqlite://tests/sqlite/sample/complex_sample.gnucash";
+        const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
         fn setup(uri: &str) -> sqlx::Pool<DB> {
@@ -440,6 +440,84 @@ mod tests {
             let pool = setup(URI);
             let result: Vec<Price> = block_on(async {
                 Price::query_by_commodity_or_currency_guid_money_mark(
+                    "5f586908098232e67edb1371408bfaa8",
+                )
+                .fetch_all(&pool)
+                .await
+            })
+            .unwrap();
+            assert_eq!(4, result.len());
+        }
+    }
+
+    mod mysql {
+        use super::*;
+
+        const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+        type DB = sqlx::MySql;
+
+        fn setup(uri: &str) -> sqlx::Pool<DB> {
+            block_on(async {
+                sqlx::mysql::MySqlPoolOptions::new()
+                    .max_connections(5)
+                    .connect(uri)
+                    .await
+                    .unwrap()
+            })
+        }
+
+        #[test]
+        fn query() {
+            let pool = setup(URI);
+            let result: Vec<Price> =
+                block_on(async { Price::query().fetch_all(&pool).await }).unwrap();
+            assert_eq!(5, result.len());
+        }
+
+        #[test]
+        fn query_by_guid() {
+            let pool = setup(URI);
+            let result: Price = block_on(async {
+                Price::query_by_guid_question_mark("0d6684f44fb018e882de76094ed9c433")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(1.5, result.value);
+            assert_eq!(Decimal::new(15, 1), result.value());
+        }
+
+        #[test]
+        fn query_by_commodity_guid() {
+            let pool = setup(URI);
+            let result: Price = block_on(async {
+                Price::query_by_commodity_guid_question_mark("d821d6776fde9f7c2d01b67876406fd3")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(1.5, result.value);
+            assert_eq!(Decimal::new(15, 1), result.value());
+        }
+
+        #[test]
+        fn query_by_currency_guid() {
+            let pool = setup(URI);
+            let result: Price = block_on(async {
+                Price::query_by_currency_guid_question_mark("5f586908098232e67edb1371408bfaa8")
+                    .fetch_one(&pool)
+                    .await
+            })
+            .unwrap();
+            assert_eq!(1.5, result.value);
+            assert_eq!(Decimal::new(15, 1), result.value());
+        }
+
+        #[test]
+        fn query_by_commodity_or_currency_guid() {
+            let pool = setup(URI);
+            let result: Vec<Price> = block_on(async {
+                Price::query_by_commodity_or_currency_guid_question_mark(
                     "5f586908098232e67edb1371408bfaa8",
                 )
                 .fetch_all(&pool)

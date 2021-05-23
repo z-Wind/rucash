@@ -2,6 +2,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 
 pub mod model;
+pub mod mysql;
 pub mod postgresql;
 pub mod sqlite;
 

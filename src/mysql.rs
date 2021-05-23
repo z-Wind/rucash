@@ -9,7 +9,7 @@ use super::model::transaction::Transaction as _Transaction;
 use super::Book;
 use super::Item;
 
-type DB = sqlx::Sqlite;
+type DB = sqlx::MySql;
 pub type Account = Item<_Account, DB>;
 pub type Split = Item<_Split, DB>;
 pub type Transaction = Item<_Transaction, DB>;
@@ -17,21 +17,32 @@ pub type Price = Item<_Price, DB>;
 pub type Commodity = Item<_Commodity, DB>;
 
 impl Book<DB> {
-    /// Options and flags which can be used to configure a SQLite connection.
+    /// Options and flags which can be used to configure a MySQL connection.
     ///
-    /// A value of `SqliteConnectOptions` can be parsed from a connection URI,
-    /// as described by [SQLite](https://www.sqlite.org/uri.html).
+    /// A value of `MySqlConnectOptions` can be parsed from a connection URI,
+    /// as described by [MySQL](https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html).
     ///
-    /// | URI | Description |
-    /// | -- | -- |
-    /// `sqlite::memory:` | Open an in-memory database. |
-    /// `sqlite:data.db` | Open the file `data.db` in the current directory. |
-    /// `sqlite://data.db` | Open the file `data.db` in the current directory. |
-    /// `sqlite:///data.db` | Open the file `data.db` from the root (`/`) directory. |
-    /// `sqlite://data.db?mode=ro` | Open the file `data.db` for read-only access. |
+    /// The generic format of the connection URL:
+    ///
+    /// ```text
+    /// mysql://[host][/database][?properties]
+    /// ```
+    ///
+    /// ## Properties
+    ///
+    /// |Parameter|Default|Description|
+    /// |---------|-------|-----------|
+    /// | `ssl-mode` | `PREFERRED` | Determines whether or with what priority a secure SSL TCP/IP connection will be negotiated. See [`MySqlSslMode`]. |
+    /// | `ssl-ca` | `None` | Sets the name of a file containing a list of trusted SSL Certificate Authorities. |
+    /// | `statement-cache-capacity` | `100` | The maximum number of prepared statements stored in the cache. Set to `0` to disable. |
+    /// | `socket` | `None` | Path to the unix domain socket, which will be used instead of TCP if set. |
+    ///
+    /// ```text
+    /// mysql://root:password@localhost/db
+    /// ```
     pub fn new(uri: &str) -> Result<Book<DB>, sqlx::Error> {
         let pool = block_on(async {
-            sqlx::sqlite::SqlitePoolOptions::new()
+            sqlx::mysql::MySqlPoolOptions::new()
                 .max_connections(5)
                 .connect(uri) // read only
                 .await
