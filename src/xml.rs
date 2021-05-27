@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::fs::File;
 use std::io::Read;
 use std::rc::Rc;
@@ -68,23 +69,32 @@ impl Book<DB, RAW> {
         Ok(v.pop())
     }
 
-    // pub fn splits(&self) -> Result<Vec<Split>, Error> {
-    //     let result = self
-    //         .pool
-    //         .as_ref()
-    //         .unwrap_right()
-    //         .children
-    //         .iter()
-    //         .filter(|x| x.as_element().unwrap().name == "account")
-    //         .map(|x| {
-    //             let e = x.as_element().unwrap();
-    //             let content = _Account::new_by_element(e);
-    //             Account::new(content, &self.pool)
-    //         })
-    //         .collect();
+    pub fn splits(&self) -> Result<Vec<Split>, Error> {
+        let result = self
+            .pool
+            .as_ref()
+            .unwrap_right()
+            .children
+            .iter()
+            .filter(|x| x.as_element().unwrap().name == "transaction")
+            .flat_map(|x| {
+                let e = x.as_element().unwrap();
+                let tx_guid = e.get_child("id").unwrap().get_text().unwrap().into_owned();
 
-    //     Ok(result)
-    // }
+                e.get_child("splits")
+                    .unwrap()
+                    .children
+                    .iter()
+                    .map(move |x| {
+                        let e = x.as_element().unwrap();
+                        let content = _Split::new_by_element(tx_guid.clone(), e);
+                        Split::new(content, &self.pool)
+                    })
+            })
+            .collect();
+
+        Ok(result)
+    }
 
     pub fn transactions(&self) -> Result<Vec<Transaction>, Error> {
         let result = self
@@ -104,24 +114,37 @@ impl Book<DB, RAW> {
         Ok(result)
     }
 
-    // pub fn prices(&self) -> Result<Vec<Price>, Error> {
-    //     let pool = self.pool.as_ref().unwrap_left();
-    //     block_on(async { _Price::query().fetch_all(&**pool).await })
-    //         .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
-    // }
+    pub fn prices(&self) -> Result<Vec<Price>, Error> {
+        let result = self
+            .pool
+            .as_ref()
+            .unwrap_right()
+            .get_child("pricedb")
+            .expect("pricedb")
+            .children
+            .iter()
+            .filter(|x| x.as_element().unwrap().name == "price")
+            .map(|x| {
+                let e = x.as_element().unwrap();
+                let content = _Price::new_by_element(e);
+                Price::new(content, &self.pool)
+            })
+            .collect();
 
-    // pub fn currencies(&self) -> Result<Vec<Commodity>, Error> {
-    //     let pool = self.pool.as_ref().unwrap_left();
-    //     block_on(async {
-    //         _Commodity::query_by_namespace_question_mark("CURRENCY")
-    //             .fetch_all(&**pool)
-    //             .await
-    //     })
-    //     .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
-    // }
+        Ok(result)
+    }
+
+    pub fn currencies(&self) -> Result<Vec<Commodity>, Error> {
+        let result = self
+            .commodities()?
+            .into_iter()
+            .filter(|x| x.namespace == "CURRENCY")
+            .collect();
+        Ok(result)
+    }
 
     pub fn commodities(&self) -> Result<Vec<Commodity>, Error> {
-        let result = self
+        let commodity_chain = self
             .pool
             .as_ref()
             .unwrap_right()
@@ -132,7 +155,38 @@ impl Book<DB, RAW> {
                 let e = x.as_element().unwrap();
                 let content = _Commodity::new_by_element(e);
                 Commodity::new(content, &self.pool)
-            })
+            });
+
+        let price_chain = self
+            .pool
+            .as_ref()
+            .unwrap_right()
+            .get_child("pricedb")
+            .expect("pricedb")
+            .children
+            .iter()
+            .filter(|x| x.as_element().unwrap().name == "price")
+            .flat_map(|x| {
+                let e = x.as_element().unwrap();
+
+                let cmdty = e.get_child("commodity").unwrap();
+                let content = _Commodity::new_by_element(cmdty);
+                let cmdty = Commodity::new(content, &self.pool);
+
+                let crncy = e.get_child("currency").unwrap();
+                let content = _Commodity::new_by_element(crncy);
+                let crncy = Commodity::new(content, &self.pool);
+
+                vec![cmdty, crncy]
+            });
+
+        let mut result = commodity_chain
+            .chain(price_chain)
+            .collect::<Vec<Commodity>>();
+        result.sort_by(|d1, d2| d1.guid.cmp(&d2.guid));
+        let result = result
+            .into_iter()
+            .dedup_by(|x, y| x.guid == y.guid)
             .collect();
 
         Ok(result)
@@ -296,7 +350,7 @@ impl Account {
 }
 
 impl _Split {
-    fn new_by_element(e: &Element) -> Self {
+    fn new_by_element(tx_guid: String, e: &Element) -> Self {
         let guid = e
             .get_child("id")
             .and_then(|x| x.get_text())
@@ -843,10 +897,11 @@ mod tests {
                 .take_child("split")
                 .unwrap();
 
-            let split = _Split::new_by_element(&e);
+            let split =
+                _Split::new_by_element(String::from("6c8876003c4a6026e38e3afb67d6f2b1"), &e);
 
             assert_eq!(split.guid, "de832fe97e37811a7fff7e28b3a43425");
-            assert_eq!(split.tx_guid, "");
+            assert_eq!(split.tx_guid, "6c8876003c4a6026e38e3afb67d6f2b1");
             assert_eq!(split.account_guid, "93fc043c3062aaa1297b30e543d2cd0d");
             assert_eq!(split.memo, "");
             assert_eq!(split.action, "");

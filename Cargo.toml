@@ -21,6 +21,7 @@ rust_decimal_macros = "1.13"
 criterion = "0.3"
 xmltree = "0.10"
 either = "1.6"
+itertools = "0.10"
 
 [lib]
 name = "rucash"

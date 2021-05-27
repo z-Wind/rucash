@@ -45,12 +45,12 @@ mod book {
         assert_eq!(account.name, "NASDAQ");
     }
 
-    // #[test]
-    // fn splits() {
-    //     let book = Book::<DB, RAW>::new(URI).unwrap();
-    //     let splits = book.splits().unwrap();
-    //     assert_eq!(splits.len(), 25);
-    // }
+    #[test]
+    fn splits() {
+        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let splits = book.splits().unwrap();
+        assert_eq!(splits.len(), 25);
+    }
 
     #[test]
     fn transactions() {
@@ -59,26 +59,27 @@ mod book {
         assert_eq!(transactions.len(), 11);
     }
 
-    // #[test]
-    // fn prices() {
-    //     let book = Book::<DB, RAW>::new(URI).unwrap();
-    //     let prices = book.prices().unwrap();
-    //     assert_eq!(prices.len(), 5);
-    // }
+    #[test]
+    fn prices() {
+        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let prices = book.prices().unwrap();
+        assert_eq!(prices.len(), 5);
+    }
 
     #[test]
     fn commodities() {
         let book = Book::<DB, RAW>::new(URI).unwrap();
         let commodities = book.commodities().unwrap();
-        assert_eq!(commodities.len(), 5);
+        //  6 = 5 + 1 template
+        assert_eq!(commodities.len(), 6);
     }
 
-    // #[test]
-    // fn currencies() {
-    //     let book = Book::<DB, RAW>::new(URI).unwrap();
-    //     let currencies = book.currencies().unwrap();
-    //     assert_eq!(currencies.len(), 4);
-    // }
+    #[test]
+    fn currencies() {
+        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let currencies = book.currencies().unwrap();
+        assert_eq!(currencies.len(), 4);
+    }
 }
 // mod account {
 //     use super::*;
