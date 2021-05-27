@@ -457,7 +457,7 @@ mod tests {
             block_on(async {
                 sqlx::postgres::PgPoolOptions::new()
                     .max_connections(5)
-                    .connect(uri) // read only
+                    .connect(uri)
                     .await
                     .unwrap()
             })

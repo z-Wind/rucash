@@ -5,14 +5,14 @@ use rucash;
 const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
 
 fn benchmark_sql_query(c: &mut Criterion) {
-    let book = rucash::Book::<sqlx::Sqlite>::new(URI).unwrap();
+    let book = rucash::Book::<sqlx::Sqlite, rucash::Ignore>::new(URI).unwrap();
     c.bench_function("sql query", |b| {
         b.iter(|| book.accounts_contains_name(black_box("as")));
     });
 }
 
 fn benchmark_vec_filter(c: &mut Criterion) {
-    let book = rucash::Book::<sqlx::Sqlite>::new(URI).unwrap();
+    let book = rucash::Book::<sqlx::Sqlite, rucash::Ignore>::new(URI).unwrap();
     c.bench_function("vec filter", |b| {
         b.iter(|| {
             let vec = book.accounts().unwrap();

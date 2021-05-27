@@ -10,13 +10,16 @@ use super::Book;
 use super::Item;
 
 type DB = sqlx::Postgres;
-pub type Account = Item<_Account, DB>;
-pub type Split = Item<_Split, DB>;
-pub type Transaction = Item<_Transaction, DB>;
-pub type Price = Item<_Price, DB>;
-pub type Commodity = Item<_Commodity, DB>;
+type RAW = super::Ignore;
+type Error = sqlx::Error;
 
-impl Book<DB> {
+pub type Account = Item<_Account, DB, RAW>;
+pub type Split = Item<_Split, DB, RAW>;
+pub type Transaction = Item<_Transaction, DB, RAW>;
+pub type Price = Item<_Price, DB, RAW>;
+pub type Commodity = Item<_Commodity, DB, RAW>;
+
+impl Book<DB, RAW> {
     /// Options and flags which can be used to configure a PostgreSQL connection.
     ///
     /// A value of `PgConnectOptions` can be parsed from a connection URI,
@@ -55,136 +58,116 @@ impl Book<DB> {
     /// postgresql://user:secret@localhost
     /// postgresql://localhost?dbname=mydb&user=postgres&password=postgres
     /// ```
-    pub fn new(uri: &str) -> Result<Book<DB>, sqlx::Error> {
+    pub fn new(uri: &str) -> Result<Book<DB, RAW>, Error> {
         let pool = block_on(async {
             sqlx::postgres::PgPoolOptions::new()
                 .max_connections(5)
                 .connect(uri)
                 .await
         });
-        let pool = Rc::new(pool?);
+        let pool = either::Left(Rc::new(pool?));
         Ok(Book { pool })
     }
 
-    pub fn accounts(&self) -> Result<Vec<Account>, sqlx::Error> {
-        block_on(async { _Account::query().fetch_all(&*self.pool).await }).map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+    pub fn accounts(&self) -> Result<Vec<Account>, Error> {
+        let pool = self.pool.as_ref().unwrap_left();
+        block_on(async { _Account::query().fetch_all(&**pool).await })
+            .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 
-    pub fn accounts_contains_name(&self, name: &str) -> Result<Vec<Account>, sqlx::Error> {
+    pub fn accounts_contains_name(&self, name: &str) -> Result<Vec<Account>, Error> {
         let name = format!("%{}%", name);
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Account::query_like_name_money_mark(&name)
-                .fetch_all(&*self.pool)
+                .fetch_all(&**pool)
                 .await
         })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 
-    pub fn account_by_name(&self, name: &str) -> Result<Option<Account>, sqlx::Error> {
+    pub fn account_by_name(&self, name: &str) -> Result<Option<Account>, Error> {
         let mut v = self.accounts_contains_name(name)?;
         Ok(v.pop())
     }
 
-    pub fn splits(&self) -> Result<Vec<Split>, sqlx::Error> {
-        block_on(async { _Split::query().fetch_all(&*self.pool).await }).map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+    pub fn splits(&self) -> Result<Vec<Split>, Error> {
+        let pool = self.pool.as_ref().unwrap_left();
+        block_on(async { _Split::query().fetch_all(&**pool).await })
+            .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 
-    pub fn transactions(&self) -> Result<Vec<Transaction>, sqlx::Error> {
-        block_on(async { _Transaction::query().fetch_all(&*self.pool).await }).map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+    pub fn transactions(&self) -> Result<Vec<Transaction>, Error> {
+        let pool = self.pool.as_ref().unwrap_left();
+        block_on(async { _Transaction::query().fetch_all(&**pool).await })
+            .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 
-    pub fn prices(&self) -> Result<Vec<Price>, sqlx::Error> {
-        block_on(async { _Price::query().fetch_all(&*self.pool).await }).map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+    pub fn prices(&self) -> Result<Vec<Price>, Error> {
+        let pool = self.pool.as_ref().unwrap_left();
+        block_on(async { _Price::query().fetch_all(&**pool).await })
+            .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 
-    pub fn currencies(&self) -> Result<Vec<Commodity>, sqlx::Error> {
+    pub fn currencies(&self) -> Result<Vec<Commodity>, Error> {
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Commodity::query_by_namespace_money_mark("CURRENCY")
-                .fetch_all(&*self.pool)
+                .fetch_all(&**pool)
                 .await
         })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 
-    pub fn commodities(&self) -> Result<Vec<Commodity>, sqlx::Error> {
-        block_on(async { _Commodity::query().fetch_all(&*self.pool).await }).map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+    pub fn commodities(&self) -> Result<Vec<Commodity>, Error> {
+        let pool = self.pool.as_ref().unwrap_left();
+        block_on(async { _Commodity::query().fetch_all(&**pool).await })
+            .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 }
 
 impl Account {
-    pub fn splits(&self) -> Result<Vec<Split>, sqlx::Error> {
+    pub fn splits(&self) -> Result<Vec<Split>, Error> {
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Split::query_by_account_guid_money_mark(&self.guid)
-                .fetch_all(&*self.pool)
+                .fetch_all(&**pool)
                 .await
         })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
     pub fn parent(&self) -> Option<Account> {
         let guid = self.parent_guid.as_ref()?;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Account::query_by_guid_money_mark(guid)
-                .fetch_optional(&*self.pool)
+                .fetch_optional(&**pool)
                 .await
                 .unwrap()
         })
-        .map(|x| Item::new(x, Rc::clone(&self.pool)))
+        .map(|x| Item::new(x, &self.pool))
     }
-    pub fn children(&self) -> Result<Vec<Account>, sqlx::Error> {
+    pub fn children(&self) -> Result<Vec<Account>, Error> {
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Account::query_by_parent_guid_money_mark(&self.guid)
-                .fetch_all(&*self.pool)
+                .fetch_all(&**pool)
                 .await
         })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
     pub fn commodity(&self) -> Option<Commodity> {
         let guid = self.commodity_guid.as_ref()?;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Commodity::query_by_guid_money_mark(guid)
-                .fetch_optional(&*self.pool)
+                .fetch_optional(&**pool)
                 .await
                 .unwrap()
         })
-        .map(|x| Item::new(x, Rc::clone(&self.pool)))
+        .map(|x| Item::new(x, &self.pool))
     }
-    pub fn balance(&self) -> Result<f64, sqlx::Error> {
+    pub fn balance(&self) -> Result<f64, Error> {
         let splits = self.splits()?;
         let mut net = splits.iter().fold(0.0, |acc, x| acc + x.quantity);
 
@@ -214,147 +197,134 @@ impl Account {
 }
 
 impl Split {
-    pub fn transaction(&self) -> Result<Transaction, sqlx::Error> {
+    pub fn transaction(&self) -> Result<Transaction, Error> {
         let guid = &self.tx_guid;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Transaction::query_by_guid_money_mark(guid)
-                .fetch_one(&*self.pool)
+                .fetch_one(&**pool)
                 .await
         })
-        .map(|x| Item::new(x, Rc::clone(&self.pool)))
+        .map(|x| Item::new(x, &self.pool))
     }
 
-    pub fn account(&self) -> Result<Account, sqlx::Error> {
+    pub fn account(&self) -> Result<Account, Error> {
         let guid = &self.account_guid;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Account::query_by_guid_money_mark(guid)
-                .fetch_one(&*self.pool)
+                .fetch_one(&**pool)
                 .await
         })
-        .map(|x| Item::new(x, Rc::clone(&self.pool)))
+        .map(|x| Item::new(x, &self.pool))
     }
 }
 
 impl Transaction {
-    pub fn currency(&self) -> Result<Commodity, sqlx::Error> {
+    pub fn currency(&self) -> Result<Commodity, Error> {
         let guid = &self.currency_guid;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Commodity::query_by_guid_money_mark(guid)
-                .fetch_one(&*self.pool)
+                .fetch_one(&**pool)
                 .await
         })
-        .map(|x| Item::new(x, Rc::clone(&self.pool)))
+        .map(|x| Item::new(x, &self.pool))
     }
 
-    pub fn splits(&self) -> Result<Vec<Split>, sqlx::Error> {
+    pub fn splits(&self) -> Result<Vec<Split>, Error> {
         let guid = &self.guid;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Split::query_by_tx_guid_money_mark(guid)
-                .fetch_all(&*self.pool)
+                .fetch_all(&**pool)
                 .await
         })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 }
 
 impl Price {
-    pub fn commodity(&self) -> Result<Commodity, sqlx::Error> {
+    pub fn commodity(&self) -> Result<Commodity, Error> {
         let guid = &self.commodity_guid;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Commodity::query_by_guid_money_mark(guid)
-                .fetch_one(&*self.pool)
+                .fetch_one(&**pool)
                 .await
         })
-        .map(|x| Item::new(x, Rc::clone(&self.pool)))
+        .map(|x| Item::new(x, &self.pool))
     }
 
-    pub fn currency(&self) -> Result<Commodity, sqlx::Error> {
+    pub fn currency(&self) -> Result<Commodity, Error> {
         let guid = &self.currency_guid;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Commodity::query_by_guid_money_mark(guid)
-                .fetch_one(&*self.pool)
+                .fetch_one(&**pool)
                 .await
         })
-        .map(|x| Item::new(x, Rc::clone(&self.pool)))
+        .map(|x| Item::new(x, &self.pool))
     }
 }
 
 impl Commodity {
-    pub fn accounts(&self) -> Result<Vec<Account>, sqlx::Error> {
+    pub fn accounts(&self) -> Result<Vec<Account>, Error> {
         let guid = &self.guid;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Account::query_by_commodity_guid_money_mark(guid)
-                .fetch_all(&*self.pool)
+                .fetch_all(&**pool)
                 .await
         })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 
-    pub fn transactions(&self) -> Result<Vec<Transaction>, sqlx::Error> {
+    pub fn transactions(&self) -> Result<Vec<Transaction>, Error> {
         let guid = &self.guid;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Transaction::query_by_currency_guid_money_mark(guid)
-                .fetch_all(&*self.pool)
+                .fetch_all(&**pool)
                 .await
         })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 
-    pub fn as_commodity_prices(&self) -> Result<Vec<Price>, sqlx::Error> {
+    pub fn as_commodity_prices(&self) -> Result<Vec<Price>, Error> {
         let guid = &self.guid;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Price::query_by_commodity_guid_money_mark(guid)
-                .fetch_all(&*self.pool)
+                .fetch_all(&**pool)
                 .await
         })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 
-    pub fn as_currency_prices(&self) -> Result<Vec<Price>, sqlx::Error> {
+    pub fn as_currency_prices(&self) -> Result<Vec<Price>, Error> {
         let guid = &self.guid;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Price::query_by_currency_guid_money_mark(guid)
-                .fetch_all(&*self.pool)
+                .fetch_all(&**pool)
                 .await
         })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 
-    pub fn as_commodity_or_currency_prices(&self) -> Result<Vec<Price>, sqlx::Error> {
+    pub fn as_commodity_or_currency_prices(&self) -> Result<Vec<Price>, Error> {
         let guid = &self.guid;
+        let pool = self.pool.as_ref().unwrap_left();
         block_on(async {
             _Price::query_by_commodity_or_currency_guid_money_mark(guid)
-                .fetch_all(&*self.pool)
+                .fetch_all(&**pool)
                 .await
         })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| Item::new(x, Rc::clone(&self.pool)))
-                .collect()
-        })
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
     }
 
-    pub fn sell(&self, currency: &Commodity) -> Result<Option<f64>, sqlx::Error> {
+    pub fn sell(&self, currency: &Commodity) -> Result<Option<f64>, Error> {
         if self.guid == currency.guid {
             return Ok(Some(1.0));
         }
@@ -379,7 +349,7 @@ impl Commodity {
             None => Ok(None),
         }
     }
-    pub fn buy(&self, commodity: &Commodity) -> Result<Option<f64>, sqlx::Error> {
+    pub fn buy(&self, commodity: &Commodity) -> Result<Option<f64>, Error> {
         match commodity.sell(&self) {
             Ok(Some(value)) => Ok(Some(1.0 / value)),
             x => x,
