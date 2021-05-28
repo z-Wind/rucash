@@ -13,7 +13,7 @@ use super::model::transaction::Transaction as _Transaction;
 use super::Book;
 use super::Item;
 
-type DB = sqlx::Sqlite;
+type DB = super::IgnoreDB;
 pub type RAW = Element;
 type Error = xmltree::Error;
 
@@ -37,9 +37,7 @@ impl Book<DB, RAW> {
         Ok(Book { pool })
     }
 
-    fn _accounts(
-        pool: &either::Either<Rc<sqlx::Pool<DB>>, Rc<RAW>>,
-    ) -> Result<Vec<Account>, Error> {
+    fn _accounts(pool: &either::Either<Rc<DB>, Rc<RAW>>) -> Result<Vec<Account>, Error> {
         let result = pool
             .as_ref()
             .unwrap_right()
@@ -73,7 +71,7 @@ impl Book<DB, RAW> {
         self.accounts_contains_name(name).map(|mut x| x.pop())
     }
 
-    fn _splits(pool: &either::Either<Rc<sqlx::Pool<DB>>, Rc<RAW>>) -> Result<Vec<Split>, Error> {
+    fn _splits(pool: &either::Either<Rc<DB>, Rc<RAW>>) -> Result<Vec<Split>, Error> {
         let result = pool
             .as_ref()
             .unwrap_right()
@@ -103,9 +101,7 @@ impl Book<DB, RAW> {
         Book::_splits(&self.pool)
     }
 
-    fn _transactions(
-        pool: &either::Either<Rc<sqlx::Pool<DB>>, Rc<RAW>>,
-    ) -> Result<Vec<Transaction>, Error> {
+    fn _transactions(pool: &either::Either<Rc<DB>, Rc<RAW>>) -> Result<Vec<Transaction>, Error> {
         let result = pool
             .as_ref()
             .unwrap_right()
@@ -126,7 +122,7 @@ impl Book<DB, RAW> {
         Book::_transactions(&self.pool)
     }
 
-    fn _prices(pool: &either::Either<Rc<sqlx::Pool<DB>>, Rc<RAW>>) -> Result<Vec<Price>, Error> {
+    fn _prices(pool: &either::Either<Rc<DB>, Rc<RAW>>) -> Result<Vec<Price>, Error> {
         let result = pool
             .as_ref()
             .unwrap_right()
@@ -158,9 +154,7 @@ impl Book<DB, RAW> {
         Ok(result)
     }
 
-    fn _commodities(
-        pool: &either::Either<Rc<sqlx::Pool<DB>>, Rc<RAW>>,
-    ) -> Result<Vec<Commodity>, Error> {
+    fn _commodities(pool: &either::Either<Rc<DB>, Rc<RAW>>) -> Result<Vec<Commodity>, Error> {
         let commodity_chain = pool
             .as_ref()
             .unwrap_right()

@@ -3,7 +3,7 @@ use rucash::Book;
 
 const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
 
-type DB = sqlx::Postgres;
+type DB = sqlx::Pool<sqlx::Postgres>;
 type RAW = rucash::Ignore;
 mod book {
     use super::*;

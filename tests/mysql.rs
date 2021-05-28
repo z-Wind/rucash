@@ -3,7 +3,7 @@ use rucash::Book;
 
 const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
 
-type DB = sqlx::MySql;
+type DB = sqlx::Pool<sqlx::MySql>;
 type RAW = rucash::Ignore;
 mod book {
     use super::*;

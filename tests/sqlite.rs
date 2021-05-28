@@ -3,7 +3,7 @@ use rucash::Book;
 
 const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
 
-type DB = sqlx::Sqlite;
+type DB = sqlx::Pool<sqlx::Sqlite>;
 type RAW = rucash::Ignore;
 mod book {
     use super::*;

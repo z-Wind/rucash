@@ -9,7 +9,7 @@ use super::model::transaction::Transaction as _Transaction;
 use super::Book;
 use super::Item;
 
-type DB = sqlx::Sqlite;
+type DB = sqlx::Pool<sqlx::Sqlite>;
 type RAW = super::Ignore;
 type Error = sqlx::Error;
 

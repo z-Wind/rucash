@@ -3,7 +3,7 @@ use rucash::Book;
 
 const URI: &str = "tests/db/xml/complex_sample";
 
-type DB = sqlx::Sqlite;
+type DB = rucash::IgnoreDB;
 type RAW = rucash::xml::RAW;
 mod book {
     use super::*;
