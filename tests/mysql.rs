@@ -26,7 +26,7 @@ mod book {
             .accounts()
             .unwrap()
             .into_iter()
-            .filter(|x| x.name.to_lowercase().contains("as"))
+            .filter(|x| x.name.to_lowercase().contains(&"aS".to_lowercase()))
             .collect();
         assert_eq!(accounts.len(), 3);
     }
@@ -34,14 +34,14 @@ mod book {
     #[test]
     fn accounts_by_name() {
         let book = Book::<DB, RAW>::new(URI).unwrap();
-        let accounts = book.accounts_contains_name("as").unwrap();
+        let accounts = book.accounts_contains_name("aS").unwrap();
         assert_eq!(accounts.len(), 3);
     }
 
     #[test]
     fn account_by_name() {
         let book = Book::<DB, RAW>::new(URI).unwrap();
-        let account = book.account_by_name("as").unwrap().unwrap();
+        let account = book.account_by_name("aS").unwrap().unwrap();
         assert_eq!(account.name, "Asset");
     }
 

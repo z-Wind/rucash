@@ -27,8 +27,8 @@
 
 <br/>
 
-rucash provides a simple interface to GnuCash files stored in SQL (sqlite3, PostgreSQL and MySQL).
-
+rucash provides a simple interface to GnuCash files stored in xml and SQL (sqlite3, PostgreSQL and MySQL).
+xml file should be decompressed to real xml file.
 ## Example
 ```rust
 let book = rucash::Book::new("sqlite://money.gnucash").unwrap();

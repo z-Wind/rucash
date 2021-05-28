@@ -7,7 +7,7 @@ const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
 fn benchmark_sql_query(c: &mut Criterion) {
     let book = rucash::Book::<sqlx::Sqlite, rucash::Ignore>::new(URI).unwrap();
     c.bench_function("sql query", |b| {
-        b.iter(|| book.accounts_contains_name(black_box("as")));
+        b.iter(|| book.accounts_contains_name(black_box("aS")));
     });
 }
 
@@ -18,7 +18,7 @@ fn benchmark_vec_filter(c: &mut Criterion) {
             let vec = book.accounts().unwrap();
             let _: Vec<rucash::sqlite::Account> = vec
                 .into_iter()
-                .filter(|x| x.name.to_lowercase().contains(black_box("as")))
+                .filter(|x| x.name.to_lowercase().contains(black_box("aS")))
                 .collect();
         })
     });
