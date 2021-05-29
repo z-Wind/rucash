@@ -1,4 +1,9 @@
-#[derive(Clone, Debug, sqlx::FromRow)]
+#[derive(Clone, Debug)]
+#[cfg_attr(any(
+    feature = "sqlite",
+    feature = "postgres",
+    feature = "mysql",
+), derive(sqlx::FromRow))]
 pub struct Transaction {
     pub guid: String,
     pub currency_guid: String,
@@ -8,9 +13,15 @@ pub struct Transaction {
     pub description: Option<String>,
 }
 
+#[cfg(any(
+    feature = "sqlite",
+    feature = "postgres",
+    feature = "mysql",
+))]
 impl<'q> Transaction {
     // test schemas on compile time
     #[allow(dead_code)]
+    #[cfg(feature = "sqlite")]
     fn test_schemas() -> sqlx::query::Map<
         'q,
         sqlx::Sqlite,
@@ -153,7 +164,7 @@ impl<'q> Transaction {
 mod tests {
     use super::*;
     use futures::executor::block_on;
-
+    #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
         use chrono::NaiveDateTime;
@@ -213,6 +224,8 @@ mod tests {
             assert_eq!(11, result.len());
         }
     }
+
+    #[cfg(feature = "postgres")]
     mod postgresql {
         use super::*;
         use chrono::NaiveDateTime;
@@ -271,6 +284,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
         use chrono::NaiveDateTime;

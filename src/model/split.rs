@@ -1,7 +1,12 @@
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
-#[derive(Clone, Debug, sqlx::FromRow)]
+#[derive(Clone, Debug)]
+#[cfg_attr(any(
+    feature = "sqlite",
+    feature = "postgres",
+    feature = "mysql",
+), derive(sqlx::FromRow))]
 pub struct Split {
     pub guid: String,
     pub tx_guid: String,
@@ -19,9 +24,15 @@ pub struct Split {
     pub lot_guid: Option<String>,
 }
 
+#[cfg(any(
+    feature = "sqlite",
+    feature = "postgres",
+    feature = "mysql",
+))]
 impl<'q> Split {
     // test schemas on compile time
     #[allow(dead_code)]
+    #[cfg(feature = "sqlite")]
     fn test_schemas() -> sqlx::query::Map<
         'q,
         sqlx::Sqlite,
@@ -287,6 +298,7 @@ mod tests {
     use super::*;
     use futures::executor::block_on;
 
+    #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
 
@@ -349,6 +361,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "postgres")]
     mod postgresql {
         use super::*;
 
@@ -411,6 +424,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
 

@@ -1,6 +1,6 @@
 [package]
 name = "rucash"
-version = "0.1.3"
+version = "0.1.4"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/z-Wind/rucash"
@@ -13,20 +13,50 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sqlx = { version = "0.5", features = [ "runtime-async-std-native-tls", "sqlite", "postgres", "mysql", "chrono", "decimal" ] }
+sqlx = { version = "0.5", default-features = false, features = ["macros", "runtime-async-std-native-tls"] }
 futures = "0.3"
 chrono = "0.4"
 rust_decimal = "1.13"
-rust_decimal_macros = "1.13"
-criterion = "0.3"
-xmltree = "0.10"
-either = "1.6"
+#rust_decimal_macros = "1.13"
+xmltree =  { version = "0.10", optional = true }
 itertools = "0.10"
 
 [lib]
 name = "rucash"
 crate-type = ["cdylib", "rlib"]
 
+[dev-dependencies]
+criterion = "0.3"
+
 [[bench]]
 name = "benchmark"
 harness = false
+required-features = ["sqlite"]
+
+[features]
+default = []
+sqlx_common = [ "sqlx/chrono", "sqlx/decimal" ]
+sqlite = [ "sqlx_common", "sqlx/sqlite" ]
+postgres = [ "sqlx_common", "sqlx/postgres" ]
+mysql = [ "sqlx_common", "sqlx/mysql" ]
+xml = [ "xmltree"]
+
+[[test]]
+name = "sqlite"
+path = "tests/sqlite.rs"
+required-features = ["sqlite"]
+
+[[test]]
+name = "postgresql"
+path = "tests/postgresql.rs"
+required-features = ["postgres"]
+
+[[test]]
+name = "mysql"
+path = "tests/mysql.rs"
+required-features = ["mysql"]
+
+[[test]]
+name = "xml"
+path = "tests/xml.rs"
+required-features = ["xml"]

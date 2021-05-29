@@ -1,4 +1,9 @@
-#[derive(Clone, Debug, sqlx::FromRow)]
+#[derive(Clone, Debug)]
+#[cfg_attr(any(
+    feature = "sqlite",
+    feature = "postgres",
+    feature = "mysql",
+), derive(sqlx::FromRow))]
 pub struct Commodity {
     pub guid: String,
     pub namespace: String,
@@ -11,9 +16,15 @@ pub struct Commodity {
     pub quote_tz: Option<String>,
 }
 
+#[cfg(any(
+    feature = "sqlite",
+    feature = "postgres",
+    feature = "mysql",
+))]
 impl<'q> Commodity {
     // test schemas on compile time
     #[allow(dead_code)]
+    #[cfg(feature = "sqlite")]
     fn test_schemas() -> sqlx::query::Map<
         'q,
         sqlx::Sqlite,
@@ -175,6 +186,7 @@ mod tests {
     use super::*;
     use futures::executor::block_on;
 
+    #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
 
@@ -224,6 +236,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "postgres")]
     mod postgresql {
         use super::*;
 
@@ -273,6 +286,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
 
