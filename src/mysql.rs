@@ -1,25 +1,32 @@
 use futures::executor::block_on;
 use std::rc::Rc;
 
-use super::model::account::Account as _Account;
-use super::model::commodity::Commodity as _Commodity;
-use super::model::price::Price as _Price;
-use super::model::split::Split as _Split;
-use super::model::transaction::Transaction as _Transaction;
-use super::Book;
-use super::Item;
+use super::template::AccountT;
+use super::template::Book;
+use super::template::BookT;
+use super::template::CommodityT;
+use super::template::Item;
+use super::template::PriceT;
+use super::template::SplitT;
+use super::template::TransactionT;
+use super::template::_Account;
+use super::template::_Commodity;
+use super::template::_Price;
+use super::template::_Split;
+use super::template::_Transaction;
 
 type DB = sqlx::Pool<sqlx::MySql>;
-type RAW = super::Ignore;
-type Error = sqlx::Error;
+type Error = Box<dyn std::error::Error>;
 
-pub type Account = Item<_Account, DB, RAW>;
-pub type Split = Item<_Split, DB, RAW>;
-pub type Transaction = Item<_Transaction, DB, RAW>;
-pub type Price = Item<_Price, DB, RAW>;
-pub type Commodity = Item<_Commodity, DB, RAW>;
+pub type Account = Item<_Account, DB>;
+pub type Split = Item<_Split, DB>;
+pub type Transaction = Item<_Transaction, DB>;
+pub type Price = Item<_Price, DB>;
+pub type Commodity = Item<_Commodity, DB>;
 
-impl Book<DB, RAW> {
+impl BookT for Book<DB> {
+    type DB = DB;
+
     /// Options and flags which can be used to configure a MySQL connection.
     ///
     /// A value of `MySqlConnectOptions` can be parsed from a connection URI,
@@ -43,116 +50,160 @@ impl Book<DB, RAW> {
     /// ```text
     /// mysql://root:password@localhost/db
     /// ```
-    pub fn new(uri: &str) -> Result<Book<DB, RAW>, Error> {
+    fn new(uri: &str) -> Result<Book<DB>, Error> {
         let pool = block_on(async {
             sqlx::mysql::MySqlPoolOptions::new()
                 .max_connections(5)
                 .connect(uri)
                 .await
         });
-        let pool = either::Left(Rc::new(pool?));
-        Ok(Book { pool })
+        let db = Rc::new(pool?);
+        Ok(Book { db })
     }
 
-    pub fn accounts(&self) -> Result<Vec<Account>, Error> {
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async { _Account::query().fetch_all(&**pool).await })
-            .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+    fn accounts(&self) -> Result<Vec<Account>, Error> {
+        let pool = self.db.as_ref();
+        let result = block_on(async { _Account::query().fetch_all(&*pool).await })
+            .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn accounts_contains_name(&self, name: &str) -> Result<Vec<Account>, Error> {
+    fn accounts_contains_name(&self, name: &str) -> Result<Vec<Account>, Error> {
         let name = format!("%{}%", name);
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Account::query_like_name_question_mark(&name)
-                .fetch_all(&**pool)
+                .fetch_all(&*pool)
                 .await
         })
-        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn account_by_name(&self, name: &str) -> Result<Option<Account>, Error> {
-        let mut v = self.accounts_contains_name(name)?;
-        Ok(v.pop())
+    fn splits(&self) -> Result<Vec<Split>, Error> {
+        let pool = self.db.as_ref();
+        let result = block_on(async { _Split::query().fetch_all(&*pool).await })
+            .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn splits(&self) -> Result<Vec<Split>, Error> {
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async { _Split::query().fetch_all(&**pool).await })
-            .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+    fn transactions(&self) -> Result<Vec<Transaction>, Error> {
+        let pool = self.db.as_ref();
+        let result = block_on(async { _Transaction::query().fetch_all(&*pool).await })
+            .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn transactions(&self) -> Result<Vec<Transaction>, Error> {
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async { _Transaction::query().fetch_all(&**pool).await })
-            .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+    fn prices(&self) -> Result<Vec<Price>, Error> {
+        let pool = self.db.as_ref();
+        let result = block_on(async { _Price::query().fetch_all(&*pool).await })
+            .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn prices(&self) -> Result<Vec<Price>, Error> {
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async { _Price::query().fetch_all(&**pool).await })
-            .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
-    }
-
-    pub fn currencies(&self) -> Result<Vec<Commodity>, Error> {
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+    fn currencies(&self) -> Result<Vec<Commodity>, Error> {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Commodity::query_by_namespace_question_mark("CURRENCY")
-                .fetch_all(&**pool)
+                .fetch_all(&*pool)
                 .await
         })
-        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn commodities(&self) -> Result<Vec<Commodity>, Error> {
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async { _Commodity::query().fetch_all(&**pool).await })
-            .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+    fn commodities(&self) -> Result<Vec<Commodity>, Error> {
+        let pool = self.db.as_ref();
+        let result = block_on(async { _Commodity::query().fetch_all(&*pool).await })
+            .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 }
 
-impl Account {
-    pub fn splits(&self) -> Result<Vec<Split>, Error> {
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+impl AccountT for Account {
+    type DB = DB;
+
+    fn splits(&self) -> Result<Vec<Split>, Error> {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Split::query_by_account_guid_question_mark(&self.guid)
-                .fetch_all(&**pool)
+                .fetch_all(&*pool)
                 .await
         })
-        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
-    pub fn parent(&self) -> Option<Account> {
+
+    fn parent(&self) -> Option<Account> {
         let guid = self.parent_guid.as_ref()?;
-        let pool = self.pool.as_ref().unwrap_left();
+        let pool = self.db.as_ref();
         block_on(async {
             _Account::query_by_guid_question_mark(guid)
-                .fetch_optional(&**pool)
+                .fetch_optional(&*pool)
                 .await
                 .unwrap()
         })
-        .map(|x| Item::new(x, &self.pool))
+        .map(|x| Item::new(x, &self.db))
     }
-    pub fn children(&self) -> Result<Vec<Account>, Error> {
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+
+    fn children(&self) -> Result<Vec<Account>, Error> {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Account::query_by_parent_guid_question_mark(&self.guid)
-                .fetch_all(&**pool)
+                .fetch_all(&*pool)
                 .await
         })
-        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
-    pub fn commodity(&self) -> Option<Commodity> {
+    fn commodity(&self) -> Option<Commodity> {
         let guid = self.commodity_guid.as_ref()?;
-        let pool = self.pool.as_ref().unwrap_left();
+        let pool = self.db.as_ref();
         block_on(async {
             _Commodity::query_by_guid_question_mark(guid)
-                .fetch_optional(&**pool)
+                .fetch_optional(&*pool)
                 .await
                 .unwrap()
         })
-        .map(|x| Item::new(x, &self.pool))
+        .map(|x| Item::new(x, &self.db))
     }
-    pub fn balance(&self) -> Result<f64, Error> {
+    fn balance(&self) -> Result<f64, Error> {
         let splits = self.splits()?;
         let mut net = splits.iter().fold(0.0, |acc, x| acc + x.quantity);
 
@@ -181,135 +232,198 @@ impl Account {
     }
 }
 
-impl Split {
-    pub fn transaction(&self) -> Result<Transaction, Error> {
+impl SplitT for Split {
+    type DB = DB;
+
+    fn transaction(&self) -> Result<Transaction, Error> {
         let guid = &self.tx_guid;
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Transaction::query_by_guid_question_mark(guid)
-                .fetch_one(&**pool)
+                .fetch_one(&*pool)
                 .await
         })
-        .map(|x| Item::new(x, &self.pool))
+        .map(|x| Item::new(x, &self.db));
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn account(&self) -> Result<Account, Error> {
+    fn account(&self) -> Result<Account, Error> {
         let guid = &self.account_guid;
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Account::query_by_guid_question_mark(guid)
-                .fetch_one(&**pool)
+                .fetch_one(&*pool)
                 .await
         })
-        .map(|x| Item::new(x, &self.pool))
+        .map(|x| Item::new(x, &self.db));
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 }
 
-impl Transaction {
-    pub fn currency(&self) -> Result<Commodity, Error> {
+impl TransactionT for Transaction {
+    type DB = DB;
+
+    fn currency(&self) -> Result<Commodity, Error> {
         let guid = &self.currency_guid;
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Commodity::query_by_guid_question_mark(guid)
-                .fetch_one(&**pool)
+                .fetch_one(&*pool)
                 .await
         })
-        .map(|x| Item::new(x, &self.pool))
+        .map(|x| Item::new(x, &self.db));
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn splits(&self) -> Result<Vec<Split>, Error> {
+    fn splits(&self) -> Result<Vec<Split>, Error> {
         let guid = &self.guid;
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Split::query_by_tx_guid_question_mark(guid)
-                .fetch_all(&**pool)
+                .fetch_all(&*pool)
                 .await
         })
-        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 }
 
-impl Price {
-    pub fn commodity(&self) -> Result<Commodity, Error> {
+impl PriceT for Price {
+    type DB = DB;
+
+    fn commodity(&self) -> Result<Commodity, Error> {
         let guid = &self.commodity_guid;
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Commodity::query_by_guid_question_mark(guid)
-                .fetch_one(&**pool)
+                .fetch_one(&*pool)
                 .await
         })
-        .map(|x| Item::new(x, &self.pool))
+        .map(|x| Item::new(x, &self.db));
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn currency(&self) -> Result<Commodity, Error> {
+    fn currency(&self) -> Result<Commodity, Error> {
         let guid = &self.currency_guid;
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Commodity::query_by_guid_question_mark(guid)
-                .fetch_one(&**pool)
+                .fetch_one(&*pool)
                 .await
         })
-        .map(|x| Item::new(x, &self.pool))
+        .map(|x| Item::new(x, &self.db));
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 }
 
-impl Commodity {
-    pub fn accounts(&self) -> Result<Vec<Account>, Error> {
+impl CommodityT for Commodity {
+    type DB = DB;
+
+    fn accounts(&self) -> Result<Vec<Account>, Error> {
         let guid = &self.guid;
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Account::query_by_commodity_guid_question_mark(guid)
-                .fetch_all(&**pool)
+                .fetch_all(&*pool)
                 .await
         })
-        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn transactions(&self) -> Result<Vec<Transaction>, Error> {
+    fn transactions(&self) -> Result<Vec<Transaction>, Error> {
         let guid = &self.guid;
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Transaction::query_by_currency_guid_question_mark(guid)
-                .fetch_all(&**pool)
+                .fetch_all(&*pool)
                 .await
         })
-        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn as_commodity_prices(&self) -> Result<Vec<Price>, Error> {
+    fn as_commodity_prices(&self) -> Result<Vec<Price>, Error> {
         let guid = &self.guid;
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Price::query_by_commodity_guid_question_mark(guid)
-                .fetch_all(&**pool)
+                .fetch_all(&*pool)
                 .await
         })
-        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn as_currency_prices(&self) -> Result<Vec<Price>, Error> {
+    fn as_currency_prices(&self) -> Result<Vec<Price>, Error> {
         let guid = &self.guid;
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Price::query_by_currency_guid_question_mark(guid)
-                .fetch_all(&**pool)
+                .fetch_all(&*pool)
                 .await
         })
-        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn as_commodity_or_currency_prices(&self) -> Result<Vec<Price>, Error> {
+    fn as_commodity_or_currency_prices(&self) -> Result<Vec<Price>, Error> {
         let guid = &self.guid;
-        let pool = self.pool.as_ref().unwrap_left();
-        block_on(async {
+        let pool = self.db.as_ref();
+        let result = block_on(async {
             _Price::query_by_commodity_or_currency_guid_question_mark(guid)
-                .fetch_all(&**pool)
+                .fetch_all(&*pool)
                 .await
         })
-        .map(|v| v.into_iter().map(|x| Item::new(x, &self.pool)).collect())
+        .map(|v| v.into_iter().map(|x| Item::new(x, &self.db)).collect());
+
+        match result {
+            Ok(t) => Ok(t),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
-    pub fn sell(&self, currency: &Commodity) -> Result<Option<f64>, Error> {
+    fn sell(&self, currency: &Commodity) -> Result<Option<f64>, Error> {
         if self.guid == currency.guid {
             return Ok(Some(1.0));
         }
@@ -334,7 +448,7 @@ impl Commodity {
             None => Ok(None),
         }
     }
-    pub fn buy(&self, commodity: &Commodity) -> Result<Option<f64>, Error> {
+    fn buy(&self, commodity: &Commodity) -> Result<Option<f64>, Error> {
         match commodity.sell(&self) {
             Ok(Some(value)) => Ok(Some(1.0 / value)),
             x => x,

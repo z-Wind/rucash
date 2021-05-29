@@ -3,14 +3,21 @@
     "cSpell.words": [
         "Postgres",
         "Sqlite",
+        "billterm",
         "cdylib",
         "chrono",
         "cusip",
+        "cust",
+        "dedup",
         "fullname",
         "gnucash",
+        "itertools",
         "postgresql",
+        "pricedb",
         "rlib",
         "rucash",
-        "sqlx"
+        "sqlx",
+        "taxtable",
+        "xmltree"
     ]
 }

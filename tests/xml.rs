@@ -1,27 +1,32 @@
+use rucash::template::AccountT;
+use rucash::template::Book;
+use rucash::template::BookT;
+use rucash::template::CommodityT;
+use rucash::template::PriceT;
+use rucash::template::SplitT;
+use rucash::template::TransactionT;
 use rucash::xml::Account;
-use rucash::Book;
 
 const URI: &str = "tests/db/xml/complex_sample";
 
-type DB = rucash::IgnoreDB;
-type RAW = rucash::xml::RAW;
+type DB = rucash::xml::DB;
 mod book {
     use super::*;
 
     #[test]
     fn new() {
-        Book::<DB, RAW>::new(URI).unwrap();
+        Book::<DB>::new(URI).unwrap();
     }
 
     #[test]
     #[should_panic]
     fn new_fail() {
-        Book::<DB, RAW>::new("./tests/db/xml/aa").unwrap();
+        Book::<DB>::new("./tests/db/xml/aa").unwrap();
     }
 
     #[test]
     fn accounts_filter() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let accounts: Vec<Account> = book
             .accounts()
             .unwrap()
@@ -33,42 +38,42 @@ mod book {
 
     #[test]
     fn accounts_by_name() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let accounts = book.accounts_contains_name("aS").unwrap();
         assert_eq!(accounts.len(), 3);
     }
 
     #[test]
     fn account_by_name() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let account = book.account_by_name("aS").unwrap().unwrap();
         assert_eq!(account.name, "NASDAQ");
     }
 
     #[test]
     fn splits() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let splits = book.splits().unwrap();
         assert_eq!(splits.len(), 25);
     }
 
     #[test]
     fn transactions() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let transactions = book.transactions().unwrap();
         assert_eq!(transactions.len(), 11);
     }
 
     #[test]
     fn prices() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let prices = book.prices().unwrap();
         assert_eq!(prices.len(), 5);
     }
 
     #[test]
     fn commodities() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let commodities = book.commodities().unwrap();
         //  6 = 5 + 1 template
         assert_eq!(commodities.len(), 6);
@@ -76,7 +81,7 @@ mod book {
 
     #[test]
     fn currencies() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let currencies = book.currencies().unwrap();
         assert_eq!(currencies.len(), 4);
     }
@@ -85,7 +90,7 @@ mod account {
     use super::*;
     #[test]
     fn property() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let account = book
             .accounts()
             .unwrap()
@@ -112,7 +117,7 @@ mod account {
 
     #[test]
     fn balance() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let account = book
             .accounts()
             .unwrap()
@@ -125,7 +130,7 @@ mod account {
     }
     #[test]
     fn balance_diff_currency() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let account = book
             .accounts()
             .unwrap()
@@ -138,7 +143,7 @@ mod account {
     }
     #[test]
     fn splits() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let account = book.account_by_name("Cash").unwrap().unwrap();
         let splits = account.splits().unwrap();
         assert_eq!(splits.len(), 3);
@@ -146,7 +151,7 @@ mod account {
 
     #[test]
     fn parent() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let account = book.account_by_name("Cash").unwrap().unwrap();
         let parent = account.parent().unwrap();
         assert_eq!(parent.name, "Current");
@@ -154,7 +159,7 @@ mod account {
 
     #[test]
     fn no_parent() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let account = book.account_by_name("Root Account").unwrap().unwrap();
         let parent = account.parent();
         assert!(parent.is_none());
@@ -162,7 +167,7 @@ mod account {
 
     #[test]
     fn children() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let account = book.account_by_name("Current").unwrap().unwrap();
         let children = account.children().unwrap();
         assert_eq!(children.len(), 3);
@@ -170,7 +175,7 @@ mod account {
 
     #[test]
     fn commodity() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let account = book.account_by_name("Cash").unwrap().unwrap();
         let commodity = account.commodity().unwrap();
         assert_eq!(commodity.mnemonic, "EUR");
@@ -181,7 +186,7 @@ mod split {
     use super::*;
     #[test]
     fn property() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let split = book
             .splits()
             .unwrap()
@@ -207,7 +212,7 @@ mod split {
     }
     #[test]
     fn transaction() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let split = book
             .splits()
             .unwrap()
@@ -221,7 +226,7 @@ mod split {
 
     #[test]
     fn account() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let split = book
             .splits()
             .unwrap()
@@ -238,7 +243,7 @@ mod transaction {
     use super::*;
     #[test]
     fn property() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let transaction = book
             .transactions()
             .unwrap()
@@ -273,7 +278,7 @@ mod transaction {
 
     #[test]
     fn currency() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let transaction = book
             .transactions()
             .unwrap()
@@ -287,7 +292,7 @@ mod transaction {
 
     #[test]
     fn splits() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let transaction = book
             .transactions()
             .unwrap()
@@ -304,7 +309,7 @@ mod price {
     use super::*;
     #[test]
     fn property() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let price = book
             .prices()
             .unwrap()
@@ -329,7 +334,7 @@ mod price {
 
     #[test]
     fn commodity() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let price = book
             .prices()
             .unwrap()
@@ -343,7 +348,7 @@ mod price {
 
     #[test]
     fn currency() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let price = book
             .prices()
             .unwrap()
@@ -360,7 +365,7 @@ mod commodity {
     use super::*;
     #[test]
     fn property() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let commodity = book
             .commodities()
             .unwrap()
@@ -382,7 +387,7 @@ mod commodity {
 
     #[test]
     fn accounts() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let commodity = book
             .commodities()
             .unwrap()
@@ -396,7 +401,7 @@ mod commodity {
 
     #[test]
     fn transactions() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let commodity = book
             .commodities()
             .unwrap()
@@ -410,7 +415,7 @@ mod commodity {
 
     #[test]
     fn as_commodity_prices() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let commodity = book
             .commodities()
             .unwrap()
@@ -424,7 +429,7 @@ mod commodity {
 
     #[test]
     fn as_currency_prices() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let commodity = book
             .commodities()
             .unwrap()
@@ -438,7 +443,7 @@ mod commodity {
 
     #[test]
     fn as_commodity_or_currency_prices() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let commodity = book
             .commodities()
             .unwrap()
@@ -453,7 +458,7 @@ mod commodity {
     #[test]
     fn rate_direct() {
         // ADF => AED
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let commodity = book
             .commodities()
             .unwrap()
@@ -475,7 +480,7 @@ mod commodity {
         assert_eq!(rate, 1.0 / 1.5);
 
         // AED => EUR
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let commodity = book
             .commodities()
             .unwrap()
@@ -499,7 +504,7 @@ mod commodity {
 
     #[test]
     fn rate_indirect() {
-        let book = Book::<DB, RAW>::new(URI).unwrap();
+        let book = Book::<DB>::new(URI).unwrap();
         let commodity = book
             .commodities()
             .unwrap()

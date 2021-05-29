@@ -5,76 +5,47 @@ use std::rc::Rc;
 
 use xmltree::Element;
 
-use super::model::account::Account as _Account;
-use super::model::commodity::Commodity as _Commodity;
-use super::model::price::Price as _Price;
-use super::model::split::Split as _Split;
-use super::model::transaction::Transaction as _Transaction;
-use super::Book;
-use super::Item;
+use super::template::AccountT;
+use super::template::Book;
+use super::template::BookT;
+use super::template::CommodityT;
+use super::template::Item;
+use super::template::PriceT;
+use super::template::SplitT;
+use super::template::TransactionT;
+use super::template::_Account;
+use super::template::_Commodity;
+use super::template::_Price;
+use super::template::_Split;
+use super::template::_Transaction;
 
-type DB = super::IgnoreDB;
-pub type RAW = Element;
-type Error = xmltree::Error;
+pub type DB = Element;
+type Error = Box<dyn std::error::Error>;
 
-pub type Account = Item<_Account, DB, RAW>;
-pub type Split = Item<_Split, DB, RAW>;
-pub type Transaction = Item<_Transaction, DB, RAW>;
-pub type Price = Item<_Price, DB, RAW>;
-pub type Commodity = Item<_Commodity, DB, RAW>;
+pub type Account = Item<_Account, DB>;
+pub type Split = Item<_Split, DB>;
+pub type Transaction = Item<_Transaction, DB>;
+pub type Price = Item<_Price, DB>;
+pub type Commodity = Item<_Commodity, DB>;
 
-impl Book<DB, RAW> {
-    /// gnucash file should be decompressed to xml
-    pub fn new(uri: &str) -> Result<Book<DB, RAW>, Error> {
-        let mut file = File::open(uri).unwrap();
-        let mut data = String::new();
-        file.read_to_string(&mut data).unwrap();
-
-        let mut root: Element = Element::parse(data.as_bytes()).unwrap();
-        root = root.take_child("book").unwrap();
-
-        let pool = either::Right(Rc::new(root));
-        Ok(Book { pool })
-    }
-
-    fn _accounts(pool: &either::Either<Rc<DB>, Rc<RAW>>) -> Result<Vec<Account>, Error> {
-        let result = pool
-            .as_ref()
-            .unwrap_right()
+impl Book<DB> {
+    fn _accounts(db: &Rc<DB>) -> Result<Vec<Account>, Error> {
+        let result = db
             .children
             .iter()
             .filter(|x| x.as_element().unwrap().name == "account")
             .map(|x| {
                 let e = x.as_element().unwrap();
                 let content = _Account::new_by_element(e);
-                Account::new(content, pool)
+                Account::new(content, &db)
             })
             .collect();
 
         Ok(result)
     }
 
-    pub fn accounts(&self) -> Result<Vec<Account>, Error> {
-        Book::_accounts(&self.pool)
-    }
-
-    pub fn accounts_contains_name(&self, name: &str) -> Result<Vec<Account>, Error> {
-        let name = name.to_lowercase();
-        self.accounts().map(|x| {
-            x.into_iter()
-                .filter(|x| x.name.to_lowercase().contains(&name))
-                .collect()
-        })
-    }
-
-    pub fn account_by_name(&self, name: &str) -> Result<Option<Account>, Error> {
-        self.accounts_contains_name(name).map(|mut x| x.pop())
-    }
-
-    fn _splits(pool: &either::Either<Rc<DB>, Rc<RAW>>) -> Result<Vec<Split>, Error> {
-        let result = pool
-            .as_ref()
-            .unwrap_right()
+    fn _splits(db: &Rc<DB>) -> Result<Vec<Split>, Error> {
+        let result = db
             .children
             .iter()
             .filter(|x| x.as_element().unwrap().name == "transaction")
@@ -89,7 +60,7 @@ impl Book<DB, RAW> {
                     .map(move |x| {
                         let e = x.as_element().unwrap();
                         let content = _Split::new_by_element(tx_guid.clone(), e);
-                        Split::new(content, pool)
+                        Split::new(content, &db)
                     })
             })
             .collect();
@@ -97,35 +68,23 @@ impl Book<DB, RAW> {
         Ok(result)
     }
 
-    pub fn splits(&self) -> Result<Vec<Split>, Error> {
-        Book::_splits(&self.pool)
-    }
-
-    fn _transactions(pool: &either::Either<Rc<DB>, Rc<RAW>>) -> Result<Vec<Transaction>, Error> {
-        let result = pool
-            .as_ref()
-            .unwrap_right()
+    fn _transactions(db: &Rc<DB>) -> Result<Vec<Transaction>, Error> {
+        let result = db
             .children
             .iter()
             .filter(|x| x.as_element().unwrap().name == "transaction")
             .map(|x| {
                 let e = x.as_element().unwrap();
                 let content = _Transaction::new_by_element(e);
-                Transaction::new(content, pool)
+                Transaction::new(content, &db)
             })
             .collect();
 
         Ok(result)
     }
 
-    pub fn transactions(&self) -> Result<Vec<Transaction>, Error> {
-        Book::_transactions(&self.pool)
-    }
-
-    fn _prices(pool: &either::Either<Rc<DB>, Rc<RAW>>) -> Result<Vec<Price>, Error> {
-        let result = pool
-            .as_ref()
-            .unwrap_right()
+    fn _prices(db: &Rc<DB>) -> Result<Vec<Price>, Error> {
+        let result = db
             .get_child("pricedb")
             .expect("pricedb")
             .children
@@ -134,42 +93,25 @@ impl Book<DB, RAW> {
             .map(|x| {
                 let e = x.as_element().unwrap();
                 let content = _Price::new_by_element(e);
-                Price::new(content, pool)
+                Price::new(content, &db)
             })
             .collect();
 
         Ok(result)
     }
 
-    pub fn prices(&self) -> Result<Vec<Price>, Error> {
-        Book::_prices(&self.pool)
-    }
-
-    pub fn currencies(&self) -> Result<Vec<Commodity>, Error> {
-        let result = self
-            .commodities()?
-            .into_iter()
-            .filter(|x| x.namespace == "CURRENCY")
-            .collect();
-        Ok(result)
-    }
-
-    fn _commodities(pool: &either::Either<Rc<DB>, Rc<RAW>>) -> Result<Vec<Commodity>, Error> {
-        let commodity_chain = pool
-            .as_ref()
-            .unwrap_right()
+    fn _commodities(db: &Rc<DB>) -> Result<Vec<Commodity>, Error> {
+        let commodity_chain = db
             .children
             .iter()
             .filter(|x| x.as_element().unwrap().name == "commodity")
             .map(|x| {
                 let e = x.as_element().unwrap();
                 let content = _Commodity::new_by_element(e);
-                Commodity::new(content, pool)
+                Commodity::new(content, &db)
             });
 
-        let price_chain = pool
-            .as_ref()
-            .unwrap_right()
+        let price_chain = db
             .get_child("pricedb")
             .expect("pricedb")
             .children
@@ -180,11 +122,11 @@ impl Book<DB, RAW> {
 
                 let cmdty = e.get_child("commodity").unwrap();
                 let content = _Commodity::new_by_element(cmdty);
-                let cmdty = Commodity::new(content, pool);
+                let cmdty = Commodity::new(content, &db);
 
                 let crncy = e.get_child("currency").unwrap();
                 let content = _Commodity::new_by_element(crncy);
-                let crncy = Commodity::new(content, pool);
+                let crncy = Commodity::new(content, &db);
 
                 vec![cmdty, crncy]
             });
@@ -200,9 +142,51 @@ impl Book<DB, RAW> {
 
         Ok(result)
     }
+}
 
-    pub fn commodities(&self) -> Result<Vec<Commodity>, Error> {
-        Book::_commodities(&self.pool)
+impl BookT for Book<DB> {
+    type DB = DB;
+
+    /// gnucash file should be decompressed to xml
+    fn new(uri: &str) -> Result<Book<DB>, Error> {
+        let mut file = File::open(uri).unwrap();
+        let mut data = String::new();
+        file.read_to_string(&mut data).unwrap();
+
+        let mut root: Element = Element::parse(data.as_bytes()).unwrap();
+        root = root.take_child("book").unwrap();
+
+        let db = Rc::new(root);
+        Ok(Book { db })
+    }
+
+    fn accounts(&self) -> Result<Vec<Account>, Error> {
+        Book::_accounts(&self.db)
+    }
+
+    fn splits(&self) -> Result<Vec<Split>, Error> {
+        Book::_splits(&self.db)
+    }
+
+    fn transactions(&self) -> Result<Vec<Transaction>, Error> {
+        Book::_transactions(&self.db)
+    }
+
+    fn prices(&self) -> Result<Vec<Price>, Error> {
+        Book::_prices(&self.db)
+    }
+
+    fn currencies(&self) -> Result<Vec<Commodity>, Error> {
+        let result = self
+            .commodities()?
+            .into_iter()
+            .filter(|x| x.namespace == "CURRENCY")
+            .collect();
+        Ok(result)
+    }
+
+    fn commodities(&self) -> Result<Vec<Commodity>, Error> {
+        Book::_commodities(&self.db)
     }
 }
 
@@ -291,16 +275,18 @@ impl _Account {
     }
 }
 
-impl Account {
-    pub fn splits(&self) -> Result<Vec<Split>, Error> {
-        Book::_splits(&self.pool).map(|x| {
+impl AccountT for Account {
+    type DB = DB;
+
+    fn splits(&self) -> Result<Vec<Split>, Error> {
+        Book::_splits(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| x.account_guid == self.guid)
                 .collect()
         })
     }
-    pub fn parent(&self) -> Option<Account> {
-        Book::_accounts(&self.pool)
+    fn parent(&self) -> Option<Account> {
+        Book::_accounts(&self.db)
             .map(|x| {
                 x.into_iter()
                     .filter(|x| {
@@ -310,15 +296,15 @@ impl Account {
             })
             .unwrap_or(None)
     }
-    pub fn children(&self) -> Result<Vec<Account>, Error> {
-        Book::_accounts(&self.pool).map(|x| {
+    fn children(&self) -> Result<Vec<Account>, Error> {
+        Book::_accounts(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| x.parent_guid.as_ref().map_or("", |x| x.as_str()) == self.guid.as_str())
                 .collect()
         })
     }
-    pub fn commodity(&self) -> Option<Commodity> {
-        Book::_commodities(&self.pool)
+    fn commodity(&self) -> Option<Commodity> {
+        Book::_commodities(&self.db)
             .map(|x| {
                 x.into_iter()
                     .filter(|x| {
@@ -329,7 +315,7 @@ impl Account {
             .unwrap_or(None)
     }
 
-    pub fn balance(&self) -> Result<f64, Error> {
+    fn balance(&self) -> Result<f64, Error> {
         let splits = self.splits()?;
         let mut net = splits.iter().fold(0.0, |acc, x| acc + x.quantity);
 
@@ -435,9 +421,11 @@ impl _Split {
     }
 }
 
-impl Split {
-    pub fn transaction(&self) -> Result<Transaction, Error> {
-        Book::_transactions(&self.pool).map(|x| {
+impl SplitT for Split {
+    type DB = DB;
+
+    fn transaction(&self) -> Result<Transaction, Error> {
+        Book::_transactions(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| x.guid == self.tx_guid)
                 .next()
@@ -445,8 +433,8 @@ impl Split {
         })
     }
 
-    pub fn account(&self) -> Result<Account, Error> {
-        Book::_accounts(&self.pool).map(|x| {
+    fn account(&self) -> Result<Account, Error> {
+        Book::_accounts(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| x.guid == self.account_guid)
                 .next()
@@ -507,9 +495,11 @@ impl _Transaction {
     }
 }
 
-impl Transaction {
-    pub fn currency(&self) -> Result<Commodity, Error> {
-        Book::_commodities(&self.pool).map(|x| {
+impl TransactionT for Transaction {
+    type DB = DB;
+
+    fn currency(&self) -> Result<Commodity, Error> {
+        Book::_commodities(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| x.guid == self.currency_guid)
                 .next()
@@ -517,9 +507,8 @@ impl Transaction {
         })
     }
 
-    pub fn splits(&self) -> Result<Vec<Split>, Error> {
-        Book::_splits(&self.pool)
-            .map(|x| x.into_iter().filter(|x| x.tx_guid == self.guid).collect())
+    fn splits(&self) -> Result<Vec<Split>, Error> {
+        Book::_splits(&self.db).map(|x| x.into_iter().filter(|x| x.tx_guid == self.guid).collect())
     }
 }
 
@@ -586,9 +575,11 @@ impl _Price {
     }
 }
 
-impl Price {
-    pub fn commodity(&self) -> Result<Commodity, Error> {
-        Book::_commodities(&self.pool).map(|x| {
+impl PriceT for Price {
+    type DB = DB;
+
+    fn commodity(&self) -> Result<Commodity, Error> {
+        Book::_commodities(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| x.guid == self.commodity_guid)
                 .next()
@@ -596,8 +587,8 @@ impl Price {
         })
     }
 
-    pub fn currency(&self) -> Result<Commodity, Error> {
-        Book::_commodities(&self.pool).map(|x| {
+    fn currency(&self) -> Result<Commodity, Error> {
+        Book::_commodities(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| x.guid == self.currency_guid)
                 .next()
@@ -662,9 +653,11 @@ impl _Commodity {
     }
 }
 
-impl Commodity {
-    pub fn accounts(&self) -> Result<Vec<Account>, Error> {
-        Book::_accounts(&self.pool).map(|x| {
+impl CommodityT for Commodity {
+    type DB = DB;
+
+    fn accounts(&self) -> Result<Vec<Account>, Error> {
+        Book::_accounts(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| {
                     x.commodity_guid.as_ref().map_or("", |x| x.as_str()) == self.guid.as_str()
@@ -673,39 +666,39 @@ impl Commodity {
         })
     }
 
-    pub fn transactions(&self) -> Result<Vec<Transaction>, Error> {
-        Book::_transactions(&self.pool).map(|x| {
+    fn transactions(&self) -> Result<Vec<Transaction>, Error> {
+        Book::_transactions(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| x.currency_guid == self.guid)
                 .collect()
         })
     }
 
-    pub fn as_commodity_prices(&self) -> Result<Vec<Price>, Error> {
-        Book::_prices(&self.pool).map(|x| {
+    fn as_commodity_prices(&self) -> Result<Vec<Price>, Error> {
+        Book::_prices(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| x.commodity_guid == self.guid)
                 .collect()
         })
     }
 
-    pub fn as_currency_prices(&self) -> Result<Vec<Price>, Error> {
-        Book::_prices(&self.pool).map(|x| {
+    fn as_currency_prices(&self) -> Result<Vec<Price>, Error> {
+        Book::_prices(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| x.currency_guid == self.guid)
                 .collect()
         })
     }
 
-    pub fn as_commodity_or_currency_prices(&self) -> Result<Vec<Price>, Error> {
-        Book::_prices(&self.pool).map(|x| {
+    fn as_commodity_or_currency_prices(&self) -> Result<Vec<Price>, Error> {
+        Book::_prices(&self.db).map(|x| {
             x.into_iter()
                 .filter(|x| x.commodity_guid == self.guid || x.currency_guid == self.guid)
                 .collect()
         })
     }
 
-    pub fn sell(&self, currency: &Commodity) -> Result<Option<f64>, Error> {
+    fn sell(&self, currency: &Commodity) -> Result<Option<f64>, Error> {
         if self.guid == currency.guid {
             return Ok(Some(1.0));
         }
@@ -731,7 +724,7 @@ impl Commodity {
         }
     }
 
-    pub fn buy(&self, commodity: &Commodity) -> Result<Option<f64>, Error> {
+    fn buy(&self, commodity: &Commodity) -> Result<Option<f64>, Error> {
         match commodity.sell(&self) {
             Ok(Some(value)) => Ok(Some(1.0 / value)),
             x => x,
