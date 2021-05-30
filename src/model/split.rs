@@ -2,11 +2,10 @@ use rust_decimal::Decimal;
 use std::str::FromStr;
 
 #[derive(Clone, Debug)]
-#[cfg_attr(any(
-    feature = "sqlite",
-    feature = "postgres",
-    feature = "mysql",
-), derive(sqlx::FromRow))]
+#[cfg_attr(
+    any(feature = "sqlite", feature = "postgres", feature = "mysql",),
+    derive(sqlx::FromRow)
+)]
 pub struct Split {
     pub guid: String,
     pub tx_guid: String,
@@ -24,11 +23,7 @@ pub struct Split {
     pub lot_guid: Option<String>,
 }
 
-#[cfg(any(
-    feature = "sqlite",
-    feature = "postgres",
-    feature = "mysql",
-))]
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 impl<'q> Split {
     // test schemas on compile time
     #[allow(dead_code)]

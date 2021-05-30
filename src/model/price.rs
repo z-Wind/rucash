@@ -2,11 +2,10 @@ use rust_decimal::Decimal;
 use std::str::FromStr;
 
 #[derive(Clone, Debug)]
-#[cfg_attr(any(
-    feature = "sqlite",
-    feature = "postgres",
-    feature = "mysql",
-), derive(sqlx::FromRow))]
+#[cfg_attr(
+    any(feature = "sqlite", feature = "postgres", feature = "mysql",),
+    derive(sqlx::FromRow)
+)]
 pub struct Price {
     pub guid: String,
     pub commodity_guid: String,
@@ -19,11 +18,7 @@ pub struct Price {
     pub value: f64,
 }
 
-#[cfg(any(
-    feature = "sqlite",
-    feature = "postgres",
-    feature = "mysql",
-))]
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 impl<'q> Price {
     // test schemas on compile time
     #[allow(dead_code)]

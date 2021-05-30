@@ -1,11 +1,11 @@
 use std::ops::Deref;
 use std::rc::Rc;
 
-pub use super::model::account::Account as _Account;
-pub use super::model::commodity::Commodity as _Commodity;
-pub use super::model::price::Price as _Price;
-pub use super::model::split::Split as _Split;
-pub use super::model::transaction::Transaction as _Transaction;
+pub use super::model::Account as _Account;
+pub use super::model::Commodity as _Commodity;
+pub use super::model::Price as _Price;
+pub use super::model::Split as _Split;
+pub use super::model::Transaction as _Transaction;
 
 #[derive(Debug)]
 pub struct Book<DB> {

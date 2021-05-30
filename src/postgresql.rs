@@ -1,19 +1,10 @@
 use futures::executor::block_on;
 use std::rc::Rc;
 
-use super::template::AccountT;
-use super::template::Book;
 use super::template::BookT;
-use super::template::CommodityT;
-use super::template::Item;
-use super::template::PriceT;
-use super::template::SplitT;
-use super::template::TransactionT;
-use super::template::_Account;
-use super::template::_Commodity;
-use super::template::_Price;
-use super::template::_Split;
-use super::template::_Transaction;
+use super::template::{Book, Item};
+use super::template::{AccountT, CommodityT, PriceT, SplitT, TransactionT};
+use super::template::{_Account, _Commodity, _Price, _Split, _Transaction};
 
 type DB = sqlx::Pool<sqlx::Postgres>;
 type Error = Box<dyn std::error::Error>;
@@ -23,8 +14,9 @@ pub type Split = Item<_Split, DB>;
 pub type Transaction = Item<_Transaction, DB>;
 pub type Price = Item<_Price, DB>;
 pub type Commodity = Item<_Commodity, DB>;
+pub type PostgreSQLBook = Book<DB>;
 
-impl BookT for Book<DB> {
+impl BookT for PostgreSQLBook {
     type DB = DB;
 
     /// Options and flags which can be used to configure a PostgreSQL connection.
@@ -65,7 +57,7 @@ impl BookT for Book<DB> {
     /// postgresql://user:secret@localhost
     /// postgresql://localhost?dbname=mydb&user=postgres&password=postgres
     /// ```
-    fn new(uri: &str) -> Result<Book<DB>, Error> {
+    fn new(uri: &str) -> Result<Self, Error> {
         let pool = block_on(async {
             sqlx::postgres::PgPoolOptions::new()
                 .max_connections(5)

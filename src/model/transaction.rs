@@ -1,9 +1,8 @@
 #[derive(Clone, Debug)]
-#[cfg_attr(any(
-    feature = "sqlite",
-    feature = "postgres",
-    feature = "mysql",
-), derive(sqlx::FromRow))]
+#[cfg_attr(
+    any(feature = "sqlite", feature = "postgres", feature = "mysql",),
+    derive(sqlx::FromRow)
+)]
 pub struct Transaction {
     pub guid: String,
     pub currency_guid: String,
@@ -13,11 +12,7 @@ pub struct Transaction {
     pub description: Option<String>,
 }
 
-#[cfg(any(
-    feature = "sqlite",
-    feature = "postgres",
-    feature = "mysql",
-))]
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 impl<'q> Transaction {
     // test schemas on compile time
     #[allow(dead_code)]

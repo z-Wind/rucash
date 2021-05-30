@@ -1,9 +1,8 @@
 #[derive(Clone, Debug)]
-#[cfg_attr(any(
-    feature = "sqlite",
-    feature = "postgres",
-    feature = "mysql",
-), derive(sqlx::FromRow))]
+#[cfg_attr(
+    any(feature = "sqlite", feature = "postgres", feature = "mysql",),
+    derive(sqlx::FromRow)
+)]
 pub struct Account {
     pub guid: String,
     pub name: String,
@@ -18,11 +17,7 @@ pub struct Account {
     pub placeholder: Option<i32>,
 }
 
-#[cfg(any(
-    feature = "sqlite",
-    feature = "postgres",
-    feature = "mysql",
-))]
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 impl<'q> Account {
     // test schemas on compile time
     #[allow(dead_code)]

@@ -5,19 +5,10 @@ use std::rc::Rc;
 
 use xmltree::Element;
 
-use super::template::AccountT;
-use super::template::Book;
 use super::template::BookT;
-use super::template::CommodityT;
-use super::template::Item;
-use super::template::PriceT;
-use super::template::SplitT;
-use super::template::TransactionT;
-use super::template::_Account;
-use super::template::_Commodity;
-use super::template::_Price;
-use super::template::_Split;
-use super::template::_Transaction;
+use super::template::{AccountT, CommodityT, PriceT, SplitT, TransactionT};
+use super::template::{Book, Item};
+use super::template::{_Account, _Commodity, _Price, _Split, _Transaction};
 
 pub type DB = Element;
 type Error = Box<dyn std::error::Error>;
@@ -27,8 +18,9 @@ pub type Split = Item<_Split, DB>;
 pub type Transaction = Item<_Transaction, DB>;
 pub type Price = Item<_Price, DB>;
 pub type Commodity = Item<_Commodity, DB>;
+pub type XMLBook = Book<DB>;
 
-impl Book<DB> {
+impl XMLBook {
     fn _accounts(db: &Rc<DB>) -> Result<Vec<Account>, Error> {
         let result = db
             .children
@@ -144,11 +136,11 @@ impl Book<DB> {
     }
 }
 
-impl BookT for Book<DB> {
+impl BookT for XMLBook {
     type DB = DB;
 
     /// gnucash file should be decompressed to xml
-    fn new(uri: &str) -> Result<Book<DB>, Error> {
+    fn new(uri: &str) -> Result<Self, Error> {
         let mut file = File::open(uri).unwrap();
         let mut data = String::new();
         file.read_to_string(&mut data).unwrap();
@@ -736,7 +728,6 @@ impl CommodityT for Commodity {
 mod tests {
     use super::*;
 
-    //     const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
     //     mod book {
     //         use super::*;
     //     }

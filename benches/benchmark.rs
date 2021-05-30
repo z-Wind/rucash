@@ -2,7 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use rucash::{self, template::BookT};
 
-const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
+const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro";
 
 fn benchmark_sql_query(c: &mut Criterion) {
     let book = rucash::template::Book::<sqlx::Pool<sqlx::Sqlite>>::new(URI).unwrap();
