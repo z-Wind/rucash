@@ -12,5 +12,7 @@ clean:
 bench:
 	cargo bench --features sqlite
 check:
-	cargo check --features sqlite
-	cargo clippy --features sqlite
+	cargo check --all-features
+	cargo clippy --all-features
+publish:
+	cargo publish --all-features
