@@ -23,7 +23,6 @@ pub struct Split {
     pub lot_guid: Option<String>,
 }
 
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 impl<'q> Split {
     // test schemas on compile time
     #[allow(dead_code)]
@@ -57,6 +56,7 @@ impl<'q> Split {
         )
     }
 
+    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     pub(crate) fn query<DB, O>(
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
     where
@@ -85,6 +85,7 @@ impl<'q> Split {
         )
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_by_guid_question_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -117,6 +118,7 @@ impl<'q> Split {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_by_guid_money_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -149,6 +151,7 @@ impl<'q> Split {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_by_account_guid_question_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -181,6 +184,7 @@ impl<'q> Split {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_by_account_guid_money_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -213,6 +217,7 @@ impl<'q> Split {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_by_tx_guid_question_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -245,6 +250,7 @@ impl<'q> Split {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_by_tx_guid_money_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -289,6 +295,7 @@ impl<'q> Split {
 }
 
 #[cfg(test)]
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 mod tests {
     use super::*;
     use futures::executor::block_on;

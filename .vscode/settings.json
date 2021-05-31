@@ -9,6 +9,7 @@
         "cusip",
         "cust",
         "dedup",
+        "flate",
         "fullname",
         "gnucash",
         "itertools",

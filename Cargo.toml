@@ -1,6 +1,6 @@
 [package]
 name = "rucash"
-version = "0.1.5"
+version = "0.1.6"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/z-Wind/rucash"
@@ -20,6 +20,7 @@ rust_decimal = "1.13"
 #rust_decimal_macros = "1.13"
 xmltree =  { version = "0.10", optional = true }
 itertools = "0.10"
+flate2 = "1.0"
 
 [lib]
 name = "rucash"

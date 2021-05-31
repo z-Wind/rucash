@@ -17,7 +17,6 @@ pub struct Account {
     pub placeholder: Option<i32>,
 }
 
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 impl<'q> Account {
     // test schemas on compile time
     #[allow(dead_code)]
@@ -48,6 +47,7 @@ impl<'q> Account {
         )
     }
 
+    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     pub(crate) fn query<DB, O>(
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
     where
@@ -73,6 +73,7 @@ impl<'q> Account {
         )
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_by_guid_question_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -102,6 +103,7 @@ impl<'q> Account {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_by_guid_money_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -131,6 +133,7 @@ impl<'q> Account {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_by_commodity_guid_question_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -160,6 +163,7 @@ impl<'q> Account {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_by_commodity_guid_money_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -189,6 +193,7 @@ impl<'q> Account {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_by_parent_guid_question_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -218,6 +223,7 @@ impl<'q> Account {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_by_parent_guid_money_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -247,6 +253,7 @@ impl<'q> Account {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_by_name_question_mark<DB, O, T>(
         name: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -276,6 +283,7 @@ impl<'q> Account {
         .bind(name)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_by_name_money_mark<DB, O, T>(
         name: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -305,6 +313,7 @@ impl<'q> Account {
         .bind(name)
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_like_name_question_mark<DB, O, T>(
         name: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -334,6 +343,7 @@ impl<'q> Account {
         .bind(name)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_like_name_money_mark<DB, O, T>(
         name: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -365,6 +375,7 @@ impl<'q> Account {
 }
 
 #[cfg(test)]
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 mod tests {
     use super::*;
     use futures::executor::block_on;

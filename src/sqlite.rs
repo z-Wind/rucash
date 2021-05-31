@@ -19,9 +19,7 @@ pub type SqliteBook = Book<DB>;
 impl BookT for SqliteBook {
     type DB = DB;
     /// Options and flags which can be used to configure a SQLite connection.
-    ///
-    /// A value of `SqliteConnectOptions` can be parsed from a connection URI,
-    /// as described by [SQLite](https://www.sqlite.org/uri.html).
+    /// Described by [SQLite](https://www.sqlite.org/uri.html).
     ///
     /// | URI | Description |
     /// | -- | -- |

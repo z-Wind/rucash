@@ -12,7 +12,6 @@ pub struct Transaction {
     pub description: Option<String>,
 }
 
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 impl<'q> Transaction {
     // test schemas on compile time
     #[allow(dead_code)]
@@ -38,6 +37,7 @@ impl<'q> Transaction {
         )
     }
 
+    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     pub(crate) fn query<DB, O>(
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
     where
@@ -58,6 +58,7 @@ impl<'q> Transaction {
         )
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_by_guid_question_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -82,6 +83,7 @@ impl<'q> Transaction {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_by_guid_money_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -106,6 +108,7 @@ impl<'q> Transaction {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_by_currency_guid_question_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -130,6 +133,7 @@ impl<'q> Transaction {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_by_currency_guid_money_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -156,6 +160,7 @@ impl<'q> Transaction {
 }
 
 #[cfg(test)]
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 mod tests {
     use super::*;
     use futures::executor::block_on;

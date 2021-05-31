@@ -1,3 +1,4 @@
+use flate2::read::GzDecoder;
 use itertools::Itertools;
 use std::fs::File;
 use std::io::Read;
@@ -139,11 +140,12 @@ impl XMLBook {
 impl BookT for XMLBook {
     type DB = DB;
 
-    /// gnucash file should be decompressed to xml
+    /// read gnucash xml file in gzip
     fn new(uri: &str) -> Result<Self, Error> {
-        let mut file = File::open(uri).unwrap();
+        let f = File::open(uri)?;
+        let mut d = GzDecoder::new(f);
         let mut data = String::new();
-        file.read_to_string(&mut data).unwrap();
+        d.read_to_string(&mut data).unwrap();
 
         let mut root: Element = Element::parse(data.as_bytes()).unwrap();
         root = root.take_child("book").unwrap();
@@ -238,14 +240,13 @@ impl _Account {
         };
         let placeholder = slots
             .iter()
-            .filter(|e| {
+            .find(|e| {
                 e.get_child("key")
                     .and_then(|x| x.get_text())
                     .map(|x| x.into_owned())
-                    .unwrap_or(String::from(""))
+                    .unwrap_or_else(|| String::from(""))
                     == "placeholder"
             })
-            .next()
             .and_then(|x| x.get_child("value"))
             .and_then(|x| x.get_text())
             .map(|x| x.into_owned())
@@ -280,11 +281,9 @@ impl AccountT for Account {
     fn parent(&self) -> Option<Account> {
         Book::_accounts(&self.db)
             .map(|x| {
-                x.into_iter()
-                    .filter(|x| {
-                        x.guid.as_str() == self.parent_guid.as_ref().map_or("", |x| x.as_str())
-                    })
-                    .next()
+                x.into_iter().find(|x| {
+                    x.guid.as_str() == self.parent_guid.as_ref().map_or("", |x| x.as_str())
+                })
             })
             .unwrap_or(None)
     }
@@ -298,11 +297,9 @@ impl AccountT for Account {
     fn commodity(&self) -> Option<Commodity> {
         Book::_commodities(&self.db)
             .map(|x| {
-                x.into_iter()
-                    .filter(|x| {
-                        x.guid.as_str() == self.commodity_guid.as_ref().map_or("", |x| x.as_str())
-                    })
-                    .next()
+                x.into_iter().find(|x| {
+                    x.guid.as_str() == self.commodity_guid.as_ref().map_or("", |x| x.as_str())
+                })
             })
             .unwrap_or(None)
     }
@@ -353,17 +350,17 @@ impl _Split {
             .get_child("memo")
             .and_then(|x| x.get_text())
             .map(|x| x.into_owned())
-            .unwrap_or(String::from(""));
+            .unwrap_or_else(|| String::from(""));
         let action = e
             .get_child("action")
             .and_then(|x| x.get_text())
             .map(|x| x.into_owned())
-            .unwrap_or(String::from(""));
+            .unwrap_or_else(|| String::from(""));
         let reconcile_state = e
             .get_child("reconciled-state")
             .and_then(|x| x.get_text())
             .map(|x| x.into_owned())
-            .unwrap_or(String::from(""));
+            .unwrap_or_else(|| String::from(""));
         let reconcile_date = e
             .get_child("reconciled-date")
             .and_then(|x| x.get_text())
@@ -378,7 +375,7 @@ impl _Split {
             .expect("value must exist")
             .get_text()
             .unwrap();
-        let mut splits = splits.split("/");
+        let mut splits = splits.split('/');
         let value_num = splits.next().unwrap().parse().unwrap();
         let value_denom = splits.next().unwrap().parse().unwrap();
         let value = value_num as f64 / value_denom as f64;
@@ -388,7 +385,7 @@ impl _Split {
             .expect("quantity must exist")
             .get_text()
             .unwrap();
-        let mut splits = splits.split("/");
+        let mut splits = splits.split('/');
         let quantity_num = splits.next().unwrap().parse().unwrap();
         let quantity_denom = splits.next().unwrap().parse().unwrap();
         let quantity = quantity_num as f64 / quantity_denom as f64;
@@ -419,8 +416,7 @@ impl SplitT for Split {
     fn transaction(&self) -> Result<Transaction, Error> {
         Book::_transactions(&self.db).map(|x| {
             x.into_iter()
-                .filter(|x| x.guid == self.tx_guid)
-                .next()
+                .find(|x| x.guid == self.tx_guid)
                 .expect("tx_guid must match one")
         })
     }
@@ -428,8 +424,7 @@ impl SplitT for Split {
     fn account(&self) -> Result<Account, Error> {
         Book::_accounts(&self.db).map(|x| {
             x.into_iter()
-                .filter(|x| x.guid == self.account_guid)
-                .next()
+                .find(|x| x.guid == self.account_guid)
                 .expect("tx_guid must match one")
         })
     }
@@ -452,7 +447,7 @@ impl _Transaction {
             .get_child("num")
             .and_then(|x| x.get_text())
             .map(|x| x.into_owned())
-            .unwrap_or(String::from(""));
+            .unwrap_or_else(|| String::from(""));
         let post_date = e
             .get_child("date-posted")
             .and_then(|x| x.get_child("date"))
@@ -493,8 +488,7 @@ impl TransactionT for Transaction {
     fn currency(&self) -> Result<Commodity, Error> {
         Book::_commodities(&self.db).map(|x| {
             x.into_iter()
-                .filter(|x| x.guid == self.currency_guid)
-                .next()
+                .find(|x| x.guid == self.currency_guid)
                 .expect("tx_guid must match one")
         })
     }
@@ -548,7 +542,7 @@ impl _Price {
             .expect("value must exist")
             .get_text()
             .unwrap();
-        let mut splits = splits.split("/");
+        let mut splits = splits.split('/');
         let value_num = splits.next().unwrap().parse().unwrap();
         let value_denom = splits.next().unwrap().parse().unwrap();
         let value = value_num as f64 / value_denom as f64;
@@ -573,8 +567,7 @@ impl PriceT for Price {
     fn commodity(&self) -> Result<Commodity, Error> {
         Book::_commodities(&self.db).map(|x| {
             x.into_iter()
-                .filter(|x| x.guid == self.commodity_guid)
-                .next()
+                .find(|x| x.guid == self.commodity_guid)
                 .expect("tx_guid must match one")
         })
     }
@@ -582,8 +575,7 @@ impl PriceT for Price {
     fn currency(&self) -> Result<Commodity, Error> {
         Book::_commodities(&self.db).map(|x| {
             x.into_iter()
-                .filter(|x| x.guid == self.currency_guid)
-                .next()
+                .find(|x| x.guid == self.currency_guid)
                 .expect("tx_guid must match one")
         })
     }

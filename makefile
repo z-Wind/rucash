@@ -11,3 +11,6 @@ clean:
 	cargo clean
 bench:
 	cargo bench --features sqlite
+check:
+	cargo check --features sqlite
+	cargo clippy --features sqlite

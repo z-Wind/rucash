@@ -15,7 +15,6 @@ pub struct Commodity {
     pub quote_tz: Option<String>,
 }
 
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 impl<'q> Commodity {
     // test schemas on compile time
     #[allow(dead_code)]
@@ -44,6 +43,7 @@ impl<'q> Commodity {
         )
     }
 
+    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     pub(crate) fn query<DB, O>(
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
     where
@@ -67,6 +67,7 @@ impl<'q> Commodity {
         )
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_by_guid_question_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -94,6 +95,7 @@ impl<'q> Commodity {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_by_guid_money_mark<DB, O, T>(
         guid: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -121,6 +123,7 @@ impl<'q> Commodity {
         .bind(guid)
     }
 
+    #[cfg(any(feature = "sqlite", feature = "mysql",))]
     pub(crate) fn query_by_namespace_question_mark<DB, O, T>(
         namespace: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -148,6 +151,7 @@ impl<'q> Commodity {
         .bind(namespace)
     }
 
+    #[cfg(any(feature = "postgres"))]
     pub(crate) fn query_by_namespace_money_mark<DB, O, T>(
         namespace: T,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
@@ -177,6 +181,7 @@ impl<'q> Commodity {
 }
 
 #[cfg(test)]
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 mod tests {
     use super::*;
     use futures::executor::block_on;

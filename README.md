@@ -28,8 +28,6 @@
 <br/>
 
 rucash provides a simple interface to GnuCash files stored in xml and SQL (sqlite3, PostgreSQL and MySQL).
-
-xml file should be decompressed to real xml file.
 ## Example
 ```rust
 use rucash::prelude::*;

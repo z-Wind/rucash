@@ -20,9 +20,7 @@ impl BookT for MySQLBook {
     type DB = DB;
 
     /// Options and flags which can be used to configure a MySQL connection.
-    ///
-    /// A value of `MySqlConnectOptions` can be parsed from a connection URI,
-    /// as described by [MySQL](https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html).
+    /// Described by [MySQL](https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html).
     ///
     /// The generic format of the connection URL:
     ///
@@ -34,7 +32,7 @@ impl BookT for MySQLBook {
     ///
     /// |Parameter|Default|Description|
     /// |---------|-------|-----------|
-    /// | `ssl-mode` | `PREFERRED` | Determines whether or with what priority a secure SSL TCP/IP connection will be negotiated. See [`MySqlSslMode`]. |
+    /// | `ssl-mode` | `PREFERRED` | Determines whether or with what priority a secure SSL TCP/IP connection will be negotiated. |
     /// | `ssl-ca` | `None` | Sets the name of a file containing a list of trusted SSL Certificate Authorities. |
     /// | `statement-cache-capacity` | `100` | The maximum number of prepared statements stored in the cache. Set to `0` to disable. |
     /// | `socket` | `None` | Path to the unix domain socket, which will be used instead of TCP if set. |

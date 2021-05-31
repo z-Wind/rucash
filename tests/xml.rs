@@ -2,7 +2,7 @@ use rucash::prelude::*;
 use rucash::xml::Account;
 use rucash::XMLBook;
 
-const URI: &str = "tests/db/xml/complex_sample";
+const URI: &str = "tests/db/xml/complex_sample.gnucash";
 
 mod book {
     use super::*;
