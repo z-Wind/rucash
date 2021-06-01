@@ -1,4 +1,4 @@
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 #[cfg_attr(
     any(feature = "sqlite", feature = "postgres", feature = "mysql",),
     derive(sqlx::FromRow)
@@ -10,6 +10,20 @@ pub struct Transaction {
     pub post_date: Option<chrono::NaiveDateTime>,
     pub enter_date: Option<chrono::NaiveDateTime>,
     pub description: Option<String>,
+}
+
+impl crate::template::Consistency for Transaction {
+    fn consistency(self) -> Self {
+        let description = self.description.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+
+        Self {
+            description,
+            ..self
+        }
+    }
 }
 
 impl<'q> Transaction {

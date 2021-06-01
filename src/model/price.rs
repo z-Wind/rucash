@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 #[cfg_attr(
     any(feature = "sqlite", feature = "postgres", feature = "mysql",),
     derive(sqlx::FromRow)
@@ -16,6 +16,25 @@ pub struct Price {
     pub value_num: i64,
     pub value_denom: i64,
     pub value: f64,
+}
+
+impl crate::template::Consistency for Price {
+    fn consistency(self) -> Self {
+        let source = self.source.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+        let r#type = self.r#type.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+
+        Self {
+            source,
+            r#type,
+            ..self
+        }
+    }
 }
 
 impl<'q> Price {

@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 #[cfg_attr(
     any(feature = "sqlite", feature = "postgres", feature = "mysql",),
     derive(sqlx::FromRow)
@@ -21,6 +21,28 @@ pub struct Split {
     pub quantity_denom: i64,
     pub quantity: f64,
     pub lot_guid: Option<String>,
+}
+
+impl crate::template::Consistency for Split {
+    fn consistency(self) -> Self {
+        let lot_guid = self.lot_guid.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+
+        let reconcile_date = self.reconcile_date.and_then(|x| {
+            match x.format("%Y-%m-%d %H:%M:%S").to_string().as_str() {
+                "1970-01-01 00:00:00" => None,
+                _ => self.reconcile_date,
+            }
+        });
+
+        Self {
+            lot_guid,
+            reconcile_date,
+            ..self
+        }
+    }
 }
 
 impl<'q> Split {

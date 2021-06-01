@@ -2,7 +2,7 @@ use rucash::prelude::*;
 use rucash::xml::Account;
 use rucash::XMLBook;
 
-const URI: &str = "tests/db/xml/complex_sample.gnucash";
+pub const URI: &str = "tests/db/xml/complex_sample.gnucash";
 
 mod book {
     use super::*;
@@ -16,6 +16,14 @@ mod book {
     #[should_panic]
     fn new_fail() {
         XMLBook::new("./tests/db/xml/aa").unwrap();
+    }
+
+    #[test]
+    fn accounts() {
+        let book = XMLBook::new(URI).unwrap();
+        let accounts = book.accounts().unwrap();
+        // 21 - 1 template
+        assert_eq!(accounts.len(), 20);
     }
 
     #[test]
@@ -105,7 +113,7 @@ mod account {
         );
         assert_eq!(account.code, None);
         assert_eq!(account.description, None);
-        assert_eq!(account.hidden, None);
+        assert_eq!(account.hidden, Some(0));
         assert_eq!(account.placeholder.unwrap(), 1);
     }
 

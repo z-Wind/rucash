@@ -2,7 +2,7 @@ use rucash::prelude::*;
 use rucash::sqlite::Account;
 use rucash::SqliteBook;
 
-const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro";
+pub const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro";
 
 mod book {
     use super::*;
@@ -16,6 +16,13 @@ mod book {
     #[should_panic]
     fn new_fail() {
         SqliteBook::new("sqlite://tests/sample/no.gnucash").unwrap();
+    }
+
+    #[test]
+    fn accounts() {
+        let book = SqliteBook::new(URI).unwrap();
+        let accounts = book.accounts().unwrap();
+        assert_eq!(accounts.len(), 21);
     }
 
     #[test]
@@ -105,8 +112,8 @@ mod account {
             account.parent_guid.as_ref().unwrap(),
             "00622dda21937b29e494179de5013f82"
         );
-        assert_eq!(account.code.as_ref().unwrap(), "");
-        assert_eq!(account.description.as_ref().unwrap(), "");
+        assert_eq!(account.code, None);
+        assert_eq!(account.description, None);
         assert_eq!(account.hidden.unwrap(), 0);
         assert_eq!(account.placeholder.unwrap(), 1);
     }
@@ -197,15 +204,7 @@ mod split {
         assert_eq!(split.memo, "");
         assert_eq!(split.action, "");
         assert_eq!(split.reconcile_state, "n");
-        assert_eq!(
-            split
-                .reconcile_date
-                .as_ref()
-                .unwrap()
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string(),
-            "1970-01-01 00:00:00"
-        );
+        assert_eq!(split.reconcile_date, None);
         assert_eq!(split.value_num, 15000);
         assert_eq!(split.value_denom, 100);
         assert_eq!(split.value, 150.0);
@@ -389,7 +388,7 @@ mod commodity {
         assert_eq!(commodity.fraction, 100);
         assert_eq!(commodity.quote_flag, 1);
         assert_eq!(commodity.quote_source.as_ref().unwrap(), "currency");
-        assert_eq!(commodity.quote_tz.as_ref().unwrap(), "");
+        assert_eq!(commodity.quote_tz, None);
     }
 
     #[test]

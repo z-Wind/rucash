@@ -1,4 +1,4 @@
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 #[cfg_attr(
     any(feature = "sqlite", feature = "postgres", feature = "mysql",),
     derive(sqlx::FromRow)
@@ -13,6 +13,35 @@ pub struct Commodity {
     pub quote_flag: i32,
     pub quote_source: Option<String>,
     pub quote_tz: Option<String>,
+}
+
+impl crate::template::Consistency for Commodity {
+    fn consistency(self) -> Self {
+        let fullname = self.fullname.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+        let cusip = self.cusip.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+        let quote_source = self.quote_source.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+        let quote_tz = self.quote_tz.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+
+        Self {
+            fullname,
+            cusip,
+            quote_source,
+            quote_tz,
+            ..self
+        }
+    }
 }
 
 impl<'q> Commodity {

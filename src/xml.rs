@@ -608,12 +608,10 @@ impl _Commodity {
             .map(|x| x.into_owned())
             .map(|x| x.parse().expect("must be i32"))
             .unwrap_or(100);
-        let quote_flag = e
-            .get_child("quote_flag")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
-            .map(|x| x.parse().expect("must be i32"))
-            .unwrap_or(1);
+        let quote_flag = match e.get_child("get_quotes") {
+            Some(_) => 1,
+            None => 0,
+        };
         let quote_source = e
             .get_child("quote_source")
             .and_then(|x| x.get_text())

@@ -1,6 +1,6 @@
 [package]
 name = "rucash"
-version = "0.1.6"
+version = "0.1.7"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/z-Wind/rucash"
@@ -61,3 +61,8 @@ required-features = ["mysql"]
 name = "xml"
 path = "tests/xml.rs"
 required-features = ["xml"]
+
+[[test]]
+name = "all"
+path = "tests/all.rs"
+required-features = ["sqlite", "postgres", "mysql", "xml"]

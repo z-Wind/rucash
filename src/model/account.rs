@@ -1,4 +1,4 @@
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 #[cfg_attr(
     any(feature = "sqlite", feature = "postgres", feature = "mysql",),
     derive(sqlx::FromRow)
@@ -15,6 +15,46 @@ pub struct Account {
     pub description: Option<String>,
     pub hidden: Option<i32>,
     pub placeholder: Option<i32>,
+}
+
+impl crate::template::Consistency for Account {
+    fn consistency(self) -> Self {
+        let commodity_guid = self.commodity_guid.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+        let parent_guid = self.parent_guid.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+        let code = self.code.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+        let description = self.description.as_ref().and_then(|x| match x.as_str() {
+            "" => None,
+            x => Some(x.to_string()),
+        });
+
+        let hidden = match self.hidden {
+            Some(x) => Some(x),
+            None => Some(0),
+        };
+        let placeholder = match self.placeholder {
+            Some(x) => Some(x),
+            None => Some(0),
+        };
+
+        Self {
+            commodity_guid,
+            parent_guid,
+            code,
+            description,
+            hidden,
+            placeholder,
+            ..self
+        }
+    }
 }
 
 impl<'q> Account {

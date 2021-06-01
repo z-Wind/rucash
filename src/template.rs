@@ -7,6 +7,10 @@ pub use super::model::Price as _Price;
 pub use super::model::Split as _Split;
 pub use super::model::Transaction as _Transaction;
 
+pub trait Consistency {
+    fn consistency(self) -> Self;
+}
+
 #[derive(Debug)]
 pub struct Book<DB> {
     pub db: Rc<DB>,
@@ -19,11 +23,18 @@ pub struct Item<T, DB> {
 }
 
 impl<T, DB> Item<T, DB> {
-    pub fn new(content: T, db: &Rc<DB>) -> Self {
+    pub fn new(content: T, db: &Rc<DB>) -> Self
+    where
+        T: Consistency,
+    {
         Self {
-            content,
+            content: content.consistency(),
             db: Rc::clone(&db),
         }
+    }
+
+    pub fn content(&self) -> &T {
+        &self.content
     }
 }
 
@@ -32,6 +43,24 @@ impl<T, DB> Deref for Item<T, DB> {
 
     fn deref(&self) -> &T {
         &self.content
+    }
+}
+
+impl<T, DB> PartialEq for Item<T, DB>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.content == other.content
+    }
+}
+
+impl<T, DB> PartialOrd for Item<T, DB>
+where
+    T: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.content.partial_cmp(&other.content)
     }
 }
 
