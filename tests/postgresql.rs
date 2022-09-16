@@ -1,5 +1,3 @@
-use rucash::postgresql::Account;
-use rucash::prelude::*;
 use rucash::PostgreSQLBook;
 
 pub const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
@@ -28,7 +26,7 @@ mod book {
     #[test]
     fn accounts_filter() {
         let book = PostgreSQLBook::new(URI).unwrap();
-        let accounts: Vec<Account> = book
+        let accounts: Vec<_> = book
             .accounts()
             .unwrap()
             .into_iter()

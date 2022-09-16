@@ -1,45 +1,47 @@
 //! ```rust
 //! #[cfg(feature = "sqlite")]
 //! {
-//!     use rucash::prelude::*;
 //!     use rucash::SqliteBook;
 //!     let book = SqliteBook::new("sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro").unwrap();
 //!     let accounts = book.accounts();
 //! }
 //! ```
 pub mod model;
-pub mod template;
 
-#[cfg(feature = "mysql")]
-pub mod mysql;
-#[cfg(feature = "postgres")]
-pub mod postgresql;
-#[cfg(feature = "sqlite")]
-pub mod sqlite;
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+mod kind;
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+pub mod sql;
 #[cfg(feature = "xml")]
 pub mod xml;
 
 #[cfg(feature = "mysql")]
-pub use mysql::MySQLBook;
+pub use sql::mysql::MySQLBook;
 #[cfg(feature = "postgres")]
-pub use postgresql::PostgreSQLBook;
+pub use sql::postgresql::PostgreSQLBook;
 #[cfg(feature = "sqlite")]
-pub use sqlite::SqliteBook;
+pub use sql::sqlite::SqliteBook;
 #[cfg(feature = "xml")]
 pub use xml::XMLBook;
 
-/// A convenience module appropriate for glob imports (`use rust::prelude::*;`).
-pub mod prelude {
-    #[doc(no_inline)]
-    pub use crate::template::AccountT;
-    #[doc(no_inline)]
-    pub use crate::template::BookT;
-    #[doc(no_inline)]
-    pub use crate::template::CommodityT;
-    #[doc(no_inline)]
-    pub use crate::template::PriceT;
-    #[doc(no_inline)]
-    pub use crate::template::SplitT;
-    #[doc(no_inline)]
-    pub use crate::template::TransactionT;
-}
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+pub type SQLAccount = sql::DataWithPool<model::Account>;
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+pub type SQLSplit = sql::DataWithPool<model::Split>;
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+pub type SQLTransaction = sql::DataWithPool<model::Transaction>;
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+pub type SQLPrice = sql::DataWithPool<model::Price>;
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+pub type SQLCommodity = sql::DataWithPool<model::Commodity>;
+
+#[cfg(feature = "xml")]
+pub type XMLAccount = xml::DataWithPool<model::Account>;
+#[cfg(feature = "xml")]
+pub type XMLSplit = xml::DataWithPool<model::Split>;
+#[cfg(feature = "xml")]
+pub type XMLTransaction = xml::DataWithPool<model::Transaction>;
+#[cfg(feature = "xml")]
+pub type XMLPrice = xml::DataWithPool<model::Price>;
+#[cfg(feature = "xml")]
+pub type XMLCommodity = xml::DataWithPool<model::Commodity>;

@@ -1,5 +1,3 @@
-use rucash::prelude::*;
-use rucash::sqlite::Account;
 use rucash::SqliteBook;
 
 pub const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro";
@@ -28,7 +26,7 @@ mod book {
     #[test]
     fn accounts_filter() {
         let book = SqliteBook::new(URI).unwrap();
-        let accounts: Vec<Account> = book
+        let accounts: Vec<_> = book
             .accounts()
             .unwrap()
             .into_iter()

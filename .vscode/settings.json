@@ -1,5 +1,4 @@
 {
-    "editor.formatOnSave": true,
     "cSpell.words": [
         "Postgres",
         "Sqlite",
@@ -20,5 +19,11 @@
         "sqlx",
         "taxtable",
         "xmltree"
-    ]
+    ],
+    "rust-analyzer.cargo.features": [
+        // "sqlite",
+        // "postgres",
+        // "mysql",
+        // "xml",
+    ],
 }

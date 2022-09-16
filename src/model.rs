@@ -9,3 +9,7 @@ pub use commodity::Commodity;
 pub use price::Price;
 pub use split::Split;
 pub use transaction::Transaction;
+
+pub trait NullNone {
+    fn null_none(self) -> Self;
+}

@@ -1,5 +1,3 @@
-use rucash::mysql::Account;
-use rucash::prelude::*;
 use rucash::MySQLBook;
 
 pub const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
@@ -28,7 +26,7 @@ mod book {
     #[test]
     fn accounts_filter() {
         let book = MySQLBook::new(URI).unwrap();
-        let accounts: Vec<Account> = book
+        let accounts: Vec<_> = book
             .accounts()
             .unwrap()
             .into_iter()

@@ -1,4 +1,3 @@
-use rucash::prelude::*;
 use rucash::MySQLBook;
 use rucash::PostgreSQLBook;
 use rucash::SqliteBook;
@@ -75,7 +74,7 @@ mod consistency {
             v_mysql.iter().map(|v| v.content()).collect();
         v_mysql.sort_by_key(|x| &x.guid);
 
-        let v_xml = setup_xml().accounts().unwrap();
+        let v_xml = setup_xml().accounts();
         let mut v_xml: Vec<&rucash::model::Account> = v_xml.iter().map(|v| v.content()).collect();
         v_xml.sort_by_key(|x| &x.guid);
 
@@ -118,7 +117,7 @@ mod consistency {
         let mut v_mysql: Vec<&rucash::model::Split> = v_mysql.iter().map(|v| v.content()).collect();
         v_mysql.sort_by_key(|x| &x.guid);
 
-        let v_xml = setup_xml().splits().unwrap();
+        let v_xml = setup_xml().splits();
         let mut v_xml: Vec<&rucash::model::Split> = v_xml.iter().map(|v| v.content()).collect();
         v_xml.sort_by_key(|x| &x.guid);
 
@@ -158,7 +157,7 @@ mod consistency {
             v_mysql.iter().map(|v| v.content()).collect();
         v_mysql.sort_by_key(|x| &x.guid);
 
-        let v_xml = setup_xml().transactions().unwrap();
+        let v_xml = setup_xml().transactions();
         let mut v_xml: Vec<&rucash::model::Transaction> =
             v_xml.iter().map(|v| v.content()).collect();
         v_xml.sort_by_key(|x| &x.guid);
@@ -201,7 +200,7 @@ mod consistency {
         let mut v_mysql: Vec<&rucash::model::Price> = v_mysql.iter().map(|v| v.content()).collect();
         v_mysql.sort_by_key(|x| &x.guid);
 
-        let v_xml = setup_xml().prices().unwrap();
+        let v_xml = setup_xml().prices();
         let mut v_xml: Vec<&rucash::model::Price> = v_xml.iter().map(|v| v.content()).collect();
         v_xml.sort_by_key(|x| &x.guid);
 
@@ -245,7 +244,7 @@ mod consistency {
             v_mysql.iter().map(|v| v.content()).collect();
         v_mysql.sort_by_key(|x| &x.mnemonic);
 
-        let v_xml = setup_xml().commodities().unwrap();
+        let v_xml = setup_xml().commodities();
         let mut v_xml: Vec<&rucash::model::Commodity> = v_xml.iter().map(|v| v.content()).collect();
         v_xml.sort_by_key(|x| &x.mnemonic);
 

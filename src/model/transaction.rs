@@ -1,3 +1,6 @@
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+use crate::kind::SQLKind;
+
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 #[cfg_attr(
     any(feature = "sqlite", feature = "postgres", feature = "mysql",),
@@ -12,8 +15,8 @@ pub struct Transaction {
     pub description: Option<String>,
 }
 
-impl crate::template::Consistency for Transaction {
-    fn consistency(self) -> Self {
+impl super::NullNone for Transaction {
+    fn null_none(self) -> Self {
         let description = self.description.as_ref().and_then(|x| match x.as_str() {
             "" => None,
             x => Some(x.to_string()),
@@ -72,17 +75,33 @@ impl<'q> Transaction {
         )
     }
 
-    #[cfg(any(feature = "sqlite", feature = "mysql",))]
-    pub(crate) fn query_by_guid_question_mark<DB, O, T>(
+    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
+    pub(crate) fn query_by_guid<DB, O, T>(
         guid: T,
+        kind: SQLKind,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
     where
         DB: sqlx::Database,
         O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
         T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
     {
-        sqlx::query_as(
-            r#"
+        match kind {
+            SQLKind::Postgres => sqlx::query_as(
+                r#"
+                SELECT
+                guid,
+                currency_guid,
+                num,
+                post_date,
+                enter_date,
+                description
+                FROM transactions
+                WHERE guid = $1
+                "#,
+            )
+            .bind(guid),
+            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
+                r#"
             SELECT
             guid,
             currency_guid,
@@ -93,46 +112,39 @@ impl<'q> Transaction {
             FROM transactions
             WHERE guid = ?
             "#,
-        )
-        .bind(guid)
+            )
+            .bind(guid),
+            _ => panic!("{:?} not support", kind),
+        }
     }
 
-    #[cfg(any(feature = "postgres"))]
-    pub(crate) fn query_by_guid_money_mark<DB, O, T>(
+    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
+    pub(crate) fn query_by_currency_guid<DB, O, T>(
         guid: T,
+        kind: SQLKind,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
     where
         DB: sqlx::Database,
         O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
         T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
     {
-        sqlx::query_as(
-            r#"
-            SELECT
-            guid,
-            currency_guid,
-            num,
-            post_date,
-            enter_date,
-            description
-            FROM transactions
-            WHERE guid = $1
-            "#,
-        )
-        .bind(guid)
-    }
-
-    #[cfg(any(feature = "sqlite", feature = "mysql",))]
-    pub(crate) fn query_by_currency_guid_question_mark<DB, O, T>(
-        guid: T,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        sqlx::query_as(
-            r#"
+        match kind {
+            SQLKind::Postgres => sqlx::query_as(
+                r#"
+                SELECT
+                guid,
+                currency_guid,
+                num,
+                post_date,
+                enter_date,
+                description
+                FROM transactions
+                WHERE currency_guid = $1
+                "#,
+            )
+            .bind(guid),
+            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
+                r#"
             SELECT
             guid,
             currency_guid,
@@ -143,33 +155,10 @@ impl<'q> Transaction {
             FROM transactions
             WHERE currency_guid = ?
             "#,
-        )
-        .bind(guid)
-    }
-
-    #[cfg(any(feature = "postgres"))]
-    pub(crate) fn query_by_currency_guid_money_mark<DB, O, T>(
-        guid: T,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        sqlx::query_as(
-            r#"
-            SELECT
-            guid,
-            currency_guid,
-            num,
-            post_date,
-            enter_date,
-            description
-            FROM transactions
-            WHERE currency_guid = $1
-            "#,
-        )
-        .bind(guid)
+            )
+            .bind(guid),
+            _ => panic!("{:?} not support", kind),
+        }
     }
 }
 
@@ -186,19 +175,22 @@ mod tests {
         const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
-        fn setup(uri: &str) -> sqlx::Pool<DB> {
-            block_on(async {
-                sqlx::sqlite::SqlitePoolOptions::new()
-                    .max_connections(5)
-                    .connect(&format!("{}?mode=ro", uri)) // read only
-                    .await
-                    .unwrap()
-            })
+        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+            (
+                block_on(async {
+                    sqlx::sqlite::SqlitePoolOptions::new()
+                        .max_connections(5)
+                        .connect(&format!("{}?mode=ro", uri)) // read only
+                        .await
+                        .unwrap()
+                }),
+                uri.parse().expect("sqlite"),
+            )
         }
 
         #[test]
         fn query() {
-            let pool = setup(URI);
+            let (pool, _kind) = setup(URI);
             let result: Vec<Transaction> =
                 block_on(async { Transaction::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(11, result.len());
@@ -206,9 +198,9 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Transaction = block_on(async {
-                Transaction::query_by_guid_question_mark("6c8876003c4a6026e38e3afb67d6f2b1")
+                Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -226,13 +218,11 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Vec<Transaction> = block_on(async {
-                Transaction::query_by_currency_guid_question_mark(
-                    "346629655191dcf59a7e2c2a85b70f69",
-                )
-                .fetch_all(&pool)
-                .await
+                Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
+                    .fetch_all(&pool)
+                    .await
             })
             .unwrap();
             assert_eq!(11, result.len());
@@ -247,19 +237,22 @@ mod tests {
         const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
         type DB = sqlx::Postgres;
 
-        fn setup(uri: &str) -> sqlx::Pool<DB> {
-            block_on(async {
-                sqlx::postgres::PgPoolOptions::new()
-                    .max_connections(5)
-                    .connect(uri)
-                    .await
-                    .unwrap()
-            })
+        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+            (
+                block_on(async {
+                    sqlx::postgres::PgPoolOptions::new()
+                        .max_connections(5)
+                        .connect(uri)
+                        .await
+                        .unwrap()
+                }),
+                uri.parse().expect("postgres"),
+            )
         }
 
         #[test]
         fn query() {
-            let pool = setup(URI);
+            let (pool, _kind) = setup(URI);
             let result: Vec<Transaction> =
                 block_on(async { Transaction::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(11, result.len());
@@ -267,9 +260,9 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Transaction = block_on(async {
-                Transaction::query_by_guid_money_mark("6c8876003c4a6026e38e3afb67d6f2b1")
+                Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -287,9 +280,9 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Vec<Transaction> = block_on(async {
-                Transaction::query_by_currency_guid_money_mark("346629655191dcf59a7e2c2a85b70f69")
+                Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
                     .fetch_all(&pool)
                     .await
             })
@@ -306,19 +299,22 @@ mod tests {
         const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
         type DB = sqlx::MySql;
 
-        fn setup(uri: &str) -> sqlx::Pool<DB> {
-            block_on(async {
-                sqlx::mysql::MySqlPoolOptions::new()
-                    .max_connections(5)
-                    .connect(uri)
-                    .await
-                    .unwrap()
-            })
+        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+            (
+                block_on(async {
+                    sqlx::mysql::MySqlPoolOptions::new()
+                        .max_connections(5)
+                        .connect(uri)
+                        .await
+                        .unwrap()
+                }),
+                uri.parse().expect("mysql"),
+            )
         }
 
         #[test]
         fn query() {
-            let pool = setup(URI);
+            let (pool, _kind) = setup(URI);
             let result: Vec<Transaction> =
                 block_on(async { Transaction::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(11, result.len());
@@ -326,9 +322,9 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Transaction = block_on(async {
-                Transaction::query_by_guid_question_mark("6c8876003c4a6026e38e3afb67d6f2b1")
+                Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -346,13 +342,11 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Vec<Transaction> = block_on(async {
-                Transaction::query_by_currency_guid_question_mark(
-                    "346629655191dcf59a7e2c2a85b70f69",
-                )
-                .fetch_all(&pool)
-                .await
+                Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
+                    .fetch_all(&pool)
+                    .await
             })
             .unwrap();
             assert_eq!(11, result.len());

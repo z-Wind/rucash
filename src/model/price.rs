@@ -1,6 +1,8 @@
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+use crate::kind::SQLKind;
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 #[cfg_attr(
     any(feature = "sqlite", feature = "postgres", feature = "mysql",),
@@ -18,8 +20,8 @@ pub struct Price {
     pub value: f64,
 }
 
-impl crate::template::Consistency for Price {
-    fn consistency(self) -> Self {
+impl super::NullNone for Price {
+    fn null_none(self) -> Self {
         let source = self.source.as_ref().and_then(|x| match x.as_str() {
             "" => None,
             x => Some(x.to_string()),
@@ -89,17 +91,37 @@ impl<'q> Price {
         )
     }
 
-    #[cfg(any(feature = "sqlite", feature = "mysql",))]
-    pub(crate) fn query_by_guid_question_mark<DB, O, T>(
+    #[allow(dead_code)]
+    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
+    pub(crate) fn query_by_guid<DB, O, T>(
         guid: T,
+        kind: SQLKind,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
     where
         DB: sqlx::Database,
         O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
         T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
     {
-        sqlx::query_as(
-            r#"
+        match kind {
+            SQLKind::Postgres => sqlx::query_as(
+                r#"
+                SELECT
+                guid,
+                commodity_guid,
+                currency_guid,
+                date,
+                source,
+                type,
+                value_num,
+                value_denom,
+                CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+                FROM prices
+                WHERE guid = $1
+                "#,
+            )
+            .bind(guid),
+            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
+                r#"
             SELECT
             guid,
             commodity_guid,
@@ -113,49 +135,42 @@ impl<'q> Price {
             FROM prices
             WHERE guid = ?
             "#,
-        )
-        .bind(guid)
+            )
+            .bind(guid),
+            _ => panic!("{:?} not support", kind),
+        }
     }
 
-    #[cfg(any(feature = "postgres"))]
-    pub(crate) fn query_by_guid_money_mark<DB, O, T>(
+    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
+    pub(crate) fn query_by_commodity_guid<DB, O, T>(
         guid: T,
+        kind: SQLKind,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
     where
         DB: sqlx::Database,
         O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
         T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
     {
-        sqlx::query_as(
-            r#"
-            SELECT
-            guid,
-            commodity_guid,
-            currency_guid,
-            date,
-            source,
-            type,
-            value_num,
-            value_denom,
-            CAST(value_num AS float) / CAST(value_denom AS float) as "value"
-            FROM prices
-            WHERE guid = $1
-            "#,
-        )
-        .bind(guid)
-    }
-
-    #[cfg(any(feature = "sqlite", feature = "mysql",))]
-    pub(crate) fn query_by_commodity_guid_question_mark<DB, O, T>(
-        guid: T,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        sqlx::query_as(
-            r#"
+        match kind {
+            SQLKind::Postgres => sqlx::query_as(
+                r#"
+                SELECT
+                guid,
+                commodity_guid,
+                currency_guid,
+                date,
+                source,
+                type,
+                value_num,
+                value_denom,
+                CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+                FROM prices
+                WHERE commodity_guid = $1
+                "#,
+            )
+            .bind(guid),
+            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
+                r#"
             SELECT
             guid,
             commodity_guid,
@@ -169,49 +184,42 @@ impl<'q> Price {
             FROM prices
             WHERE commodity_guid = ?
             "#,
-        )
-        .bind(guid)
+            )
+            .bind(guid),
+            _ => panic!("{:?} not support", kind),
+        }
     }
 
-    #[cfg(any(feature = "postgres"))]
-    pub(crate) fn query_by_commodity_guid_money_mark<DB, O, T>(
+    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
+    pub(crate) fn query_by_currency_guid<DB, O, T>(
         guid: T,
+        kind: SQLKind,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
     where
         DB: sqlx::Database,
         O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
         T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
     {
-        sqlx::query_as(
-            r#"
-            SELECT
-            guid,
-            commodity_guid,
-            currency_guid,
-            date,
-            source,
-            type,
-            value_num,
-            value_denom,
-            CAST(value_num AS float) / CAST(value_denom AS float) as "value"
-            FROM prices
-            WHERE commodity_guid = $1
-            "#,
-        )
-        .bind(guid)
-    }
-
-    #[cfg(any(feature = "sqlite", feature = "mysql",))]
-    pub(crate) fn query_by_currency_guid_question_mark<DB, O, T>(
-        guid: T,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        sqlx::query_as(
-            r#"
+        match kind {
+            SQLKind::Postgres => sqlx::query_as(
+                r#"
+                SELECT
+                guid,
+                commodity_guid,
+                currency_guid,
+                date,
+                source,
+                type,
+                value_num,
+                value_denom,
+                CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+                FROM prices
+                WHERE currency_guid = $1
+                "#,
+            )
+            .bind(guid),
+            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
+                r#"
             SELECT
             guid,
             commodity_guid,
@@ -225,49 +233,43 @@ impl<'q> Price {
             FROM prices
             WHERE currency_guid = ?
             "#,
-        )
-        .bind(guid)
+            )
+            .bind(guid),
+            _ => panic!("{:?} not support", kind),
+        }
     }
 
-    #[cfg(any(feature = "postgres"))]
-    pub(crate) fn query_by_currency_guid_money_mark<DB, O, T>(
+    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
+    pub(crate) fn query_by_commodity_or_currency_guid<DB, O, T>(
         guid: T,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        sqlx::query_as(
-            r#"
-            SELECT
-            guid,
-            commodity_guid,
-            currency_guid,
-            date,
-            source,
-            type,
-            value_num,
-            value_denom,
-            CAST(value_num AS float) / CAST(value_denom AS float) as "value"
-            FROM prices
-            WHERE currency_guid = $1
-            "#,
-        )
-        .bind(guid)
-    }
-
-    #[cfg(any(feature = "sqlite", feature = "mysql",))]
-    pub(crate) fn query_by_commodity_or_currency_guid_question_mark<DB, O, T>(
-        guid: T,
+        kind: SQLKind,
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
     where
         DB: sqlx::Database,
         O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
         T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB> + Clone,
     {
-        sqlx::query_as(
-            r#"
+        match kind {
+            SQLKind::Postgres => sqlx::query_as(
+                r#"
+                SELECT
+                guid,
+                commodity_guid,
+                currency_guid,
+                date,
+                source,
+                type,
+                value_num,
+                value_denom,
+                CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+                FROM prices
+                WHERE commodity_guid = $1
+                OR currency_guid = $1
+                "#,
+            )
+            .bind(guid),
+            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
+                r#"
             SELECT
             guid,
             commodity_guid,
@@ -282,38 +284,11 @@ impl<'q> Price {
             WHERE commodity_guid = ?
             OR currency_guid = ?
             "#,
-        )
-        .bind(guid.clone())
-        .bind(guid)
-    }
-
-    #[cfg(any(feature = "postgres"))]
-    pub(crate) fn query_by_commodity_or_currency_guid_money_mark<DB, O, T>(
-        guid: T,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        sqlx::query_as(
-            r#"
-            SELECT
-            guid,
-            commodity_guid,
-            currency_guid,
-            date,
-            source,
-            type,
-            value_num,
-            value_denom,
-            CAST(value_num AS float) / CAST(value_denom AS float) as "value"
-            FROM prices
-            WHERE commodity_guid = $1
-            OR currency_guid = $1
-            "#,
-        )
-        .bind(guid)
+            )
+            .bind(guid.clone())
+            .bind(guid),
+            _ => panic!("{:?} not support", kind),
+        }
     }
 
     pub fn value(&self) -> Decimal {
@@ -335,19 +310,22 @@ mod tests {
         const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
-        fn setup(uri: &str) -> sqlx::Pool<DB> {
-            block_on(async {
-                sqlx::sqlite::SqlitePoolOptions::new()
-                    .max_connections(5)
-                    .connect(&format!("{}?mode=ro", uri)) // read only
-                    .await
-                    .unwrap()
-            })
+        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+            (
+                block_on(async {
+                    sqlx::sqlite::SqlitePoolOptions::new()
+                        .max_connections(5)
+                        .connect(&format!("{}?mode=ro", uri)) // read only
+                        .await
+                        .unwrap()
+                }),
+                uri.parse().expect("sqlite"),
+            )
         }
 
         #[test]
         fn query() {
-            let pool = setup(URI);
+            let (pool, _kind) = setup(URI);
             let result: Vec<Price> =
                 block_on(async { Price::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(5, result.len());
@@ -355,9 +333,9 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Price = block_on(async {
-                Price::query_by_guid_question_mark("0d6684f44fb018e882de76094ed9c433")
+                Price::query_by_guid("0d6684f44fb018e882de76094ed9c433", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -368,9 +346,9 @@ mod tests {
 
         #[test]
         fn query_by_commodity_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Price = block_on(async {
-                Price::query_by_commodity_guid_question_mark("d821d6776fde9f7c2d01b67876406fd3")
+                Price::query_by_commodity_guid("d821d6776fde9f7c2d01b67876406fd3", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -381,9 +359,9 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Price = block_on(async {
-                Price::query_by_currency_guid_question_mark("5f586908098232e67edb1371408bfaa8")
+                Price::query_by_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -394,13 +372,11 @@ mod tests {
 
         #[test]
         fn query_by_commodity_or_currency_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Vec<Price> = block_on(async {
-                Price::query_by_commodity_or_currency_guid_question_mark(
-                    "5f586908098232e67edb1371408bfaa8",
-                )
-                .fetch_all(&pool)
-                .await
+                Price::query_by_commodity_or_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
+                    .fetch_all(&pool)
+                    .await
             })
             .unwrap();
             assert_eq!(4, result.len());
@@ -414,19 +390,22 @@ mod tests {
         const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
         type DB = sqlx::Postgres;
 
-        fn setup(uri: &str) -> sqlx::Pool<DB> {
-            block_on(async {
-                sqlx::postgres::PgPoolOptions::new()
-                    .max_connections(5)
-                    .connect(uri)
-                    .await
-                    .unwrap()
-            })
+        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+            (
+                block_on(async {
+                    sqlx::postgres::PgPoolOptions::new()
+                        .max_connections(5)
+                        .connect(uri)
+                        .await
+                        .unwrap()
+                }),
+                uri.parse().expect("postgres"),
+            )
         }
 
         #[test]
         fn query() {
-            let pool = setup(URI);
+            let (pool, _kind) = setup(URI);
             let result: Vec<Price> =
                 block_on(async { Price::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(5, result.len());
@@ -434,9 +413,9 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Price = block_on(async {
-                Price::query_by_guid_money_mark("0d6684f44fb018e882de76094ed9c433")
+                Price::query_by_guid("0d6684f44fb018e882de76094ed9c433", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -447,9 +426,9 @@ mod tests {
 
         #[test]
         fn query_by_commodity_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Price = block_on(async {
-                Price::query_by_commodity_guid_money_mark("d821d6776fde9f7c2d01b67876406fd3")
+                Price::query_by_commodity_guid("d821d6776fde9f7c2d01b67876406fd3", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -460,9 +439,9 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Price = block_on(async {
-                Price::query_by_currency_guid_money_mark("5f586908098232e67edb1371408bfaa8")
+                Price::query_by_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -473,13 +452,11 @@ mod tests {
 
         #[test]
         fn query_by_commodity_or_currency_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Vec<Price> = block_on(async {
-                Price::query_by_commodity_or_currency_guid_money_mark(
-                    "5f586908098232e67edb1371408bfaa8",
-                )
-                .fetch_all(&pool)
-                .await
+                Price::query_by_commodity_or_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
+                    .fetch_all(&pool)
+                    .await
             })
             .unwrap();
             assert_eq!(4, result.len());
@@ -493,19 +470,22 @@ mod tests {
         const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
         type DB = sqlx::MySql;
 
-        fn setup(uri: &str) -> sqlx::Pool<DB> {
-            block_on(async {
-                sqlx::mysql::MySqlPoolOptions::new()
-                    .max_connections(5)
-                    .connect(uri)
-                    .await
-                    .unwrap()
-            })
+        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+            (
+                block_on(async {
+                    sqlx::mysql::MySqlPoolOptions::new()
+                        .max_connections(5)
+                        .connect(uri)
+                        .await
+                        .unwrap()
+                }),
+                uri.parse().expect("mysql"),
+            )
         }
 
         #[test]
         fn query() {
-            let pool = setup(URI);
+            let (pool, _kind) = setup(URI);
             let result: Vec<Price> =
                 block_on(async { Price::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(5, result.len());
@@ -513,9 +493,9 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Price = block_on(async {
-                Price::query_by_guid_question_mark("0d6684f44fb018e882de76094ed9c433")
+                Price::query_by_guid("0d6684f44fb018e882de76094ed9c433", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -526,9 +506,9 @@ mod tests {
 
         #[test]
         fn query_by_commodity_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Price = block_on(async {
-                Price::query_by_commodity_guid_question_mark("d821d6776fde9f7c2d01b67876406fd3")
+                Price::query_by_commodity_guid("d821d6776fde9f7c2d01b67876406fd3", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -539,9 +519,9 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Price = block_on(async {
-                Price::query_by_currency_guid_question_mark("5f586908098232e67edb1371408bfaa8")
+                Price::query_by_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
                     .fetch_one(&pool)
                     .await
             })
@@ -552,13 +532,11 @@ mod tests {
 
         #[test]
         fn query_by_commodity_or_currency_guid() {
-            let pool = setup(URI);
+            let (pool, kind) = setup(URI);
             let result: Vec<Price> = block_on(async {
-                Price::query_by_commodity_or_currency_guid_question_mark(
-                    "5f586908098232e67edb1371408bfaa8",
-                )
-                .fetch_all(&pool)
-                .await
+                Price::query_by_commodity_or_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
+                    .fetch_all(&pool)
+                    .await
             })
             .unwrap();
             assert_eq!(4, result.len());

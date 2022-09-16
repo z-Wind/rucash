@@ -1,5 +1,3 @@
-use rucash::prelude::*;
-use rucash::xml::Account;
 use rucash::XMLBook;
 
 pub const URI: &str = "tests/db/xml/complex_sample.gnucash";
@@ -21,7 +19,7 @@ mod book {
     #[test]
     fn accounts() {
         let book = XMLBook::new(URI).unwrap();
-        let accounts = book.accounts().unwrap();
+        let accounts = book.accounts();
         // 21 - 1 template
         assert_eq!(accounts.len(), 20);
     }
@@ -29,9 +27,8 @@ mod book {
     #[test]
     fn accounts_filter() {
         let book = XMLBook::new(URI).unwrap();
-        let accounts: Vec<Account> = book
+        let accounts: Vec<_> = book
             .accounts()
-            .unwrap()
             .into_iter()
             .filter(|x| x.name.to_lowercase().contains(&"aS".to_lowercase()))
             .collect();
@@ -41,42 +38,42 @@ mod book {
     #[test]
     fn accounts_by_name() {
         let book = XMLBook::new(URI).unwrap();
-        let accounts = book.accounts_contains_name("aS").unwrap();
+        let accounts = book.accounts_contains_name("aS");
         assert_eq!(accounts.len(), 3);
     }
 
     #[test]
     fn account_by_name() {
         let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("aS").unwrap().unwrap();
+        let account = book.account_by_name("aS").expect("must have one");
         assert_eq!(account.name, "NASDAQ");
     }
 
     #[test]
     fn splits() {
         let book = XMLBook::new(URI).unwrap();
-        let splits = book.splits().unwrap();
+        let splits = book.splits();
         assert_eq!(splits.len(), 25);
     }
 
     #[test]
     fn transactions() {
         let book = XMLBook::new(URI).unwrap();
-        let transactions = book.transactions().unwrap();
+        let transactions = book.transactions();
         assert_eq!(transactions.len(), 11);
     }
 
     #[test]
     fn prices() {
         let book = XMLBook::new(URI).unwrap();
-        let prices = book.prices().unwrap();
+        let prices = book.prices();
         assert_eq!(prices.len(), 5);
     }
 
     #[test]
     fn commodities() {
         let book = XMLBook::new(URI).unwrap();
-        let commodities = book.commodities().unwrap();
+        let commodities = book.commodities();
         //  6 = 5 + 1 template
         assert_eq!(commodities.len(), 6);
     }
@@ -84,7 +81,7 @@ mod book {
     #[test]
     fn currencies() {
         let book = XMLBook::new(URI).unwrap();
-        let currencies = book.currencies().unwrap();
+        let currencies = book.currencies();
         assert_eq!(currencies.len(), 4);
     }
 }
@@ -95,7 +92,6 @@ mod account {
         let book = XMLBook::new(URI).unwrap();
         let account = book
             .accounts()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "fcd795021c976ba75621ec39e75f6214")
             .next()
@@ -122,39 +118,37 @@ mod account {
         let book = XMLBook::new(URI).unwrap();
         let account = book
             .accounts()
-            .unwrap()
             .into_iter()
             .filter(|x| x.name == "Current")
             .next()
             .unwrap();
 
-        assert_eq!(account.balance().unwrap(), 4590.0);
+        assert_eq!(account.balance(), 4590.0);
     }
     #[test]
     fn balance_diff_currency() {
         let book = XMLBook::new(URI).unwrap();
         let account = book
             .accounts()
-            .unwrap()
             .into_iter()
             .filter(|x| x.name == "Asset")
             .next()
             .unwrap();
 
-        assert_eq!(account.balance().unwrap(), 24695.3);
+        assert_eq!(account.balance(), 24695.3);
     }
     #[test]
     fn splits() {
         let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("Cash").unwrap().unwrap();
-        let splits = account.splits().unwrap();
+        let account = book.account_by_name("Cash").expect("must have one");
+        let splits = account.splits();
         assert_eq!(splits.len(), 3);
     }
 
     #[test]
     fn parent() {
         let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("Cash").unwrap().unwrap();
+        let account = book.account_by_name("Cash").expect("must have one");
         let parent = account.parent().unwrap();
         assert_eq!(parent.name, "Current");
     }
@@ -162,7 +156,7 @@ mod account {
     #[test]
     fn no_parent() {
         let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("Root Account").unwrap().unwrap();
+        let account = book.account_by_name("Root Account").expect("must have one");
         let parent = account.parent();
         assert!(parent.is_none());
     }
@@ -170,15 +164,15 @@ mod account {
     #[test]
     fn children() {
         let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("Current").unwrap().unwrap();
-        let children = account.children().unwrap();
+        let account = book.account_by_name("Current").expect("must have one");
+        let children = account.children();
         assert_eq!(children.len(), 3);
     }
 
     #[test]
     fn commodity() {
         let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("Cash").unwrap().unwrap();
+        let account = book.account_by_name("Cash").expect("must have one");
         let commodity = account.commodity().unwrap();
         assert_eq!(commodity.mnemonic, "EUR");
     }
@@ -191,7 +185,6 @@ mod split {
         let book = XMLBook::new(URI).unwrap();
         let split = book
             .splits()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .next()
@@ -217,12 +210,11 @@ mod split {
         let book = XMLBook::new(URI).unwrap();
         let split = book
             .splits()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .next()
             .unwrap();
-        let transaction = split.transaction().unwrap();
+        let transaction = split.transaction();
         assert_eq!(transaction.description.as_ref().unwrap(), "income 1");
     }
 
@@ -231,12 +223,11 @@ mod split {
         let book = XMLBook::new(URI).unwrap();
         let split = book
             .splits()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .next()
             .unwrap();
-        let account = split.account().unwrap();
+        let account = split.account();
         assert_eq!(account.name, "Cash");
     }
 }
@@ -248,7 +239,6 @@ mod transaction {
         let book = XMLBook::new(URI).unwrap();
         let transaction = book
             .transactions()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .next()
@@ -283,12 +273,11 @@ mod transaction {
         let book = XMLBook::new(URI).unwrap();
         let transaction = book
             .transactions()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .next()
             .unwrap();
-        let currency = transaction.currency().unwrap();
+        let currency = transaction.currency();
         assert_eq!(currency.mnemonic, "EUR");
     }
 
@@ -297,12 +286,11 @@ mod transaction {
         let book = XMLBook::new(URI).unwrap();
         let transaction = book
             .transactions()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .next()
             .unwrap();
-        let splits = transaction.splits().unwrap();
+        let splits = transaction.splits();
         assert_eq!(splits.len(), 2);
     }
 }
@@ -314,7 +302,6 @@ mod price {
         let book = XMLBook::new(URI).unwrap();
         let price = book
             .prices()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .next()
@@ -339,12 +326,11 @@ mod price {
         let book = XMLBook::new(URI).unwrap();
         let price = book
             .prices()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .next()
             .unwrap();
-        let commodity = price.commodity().unwrap();
+        let commodity = price.commodity();
         assert_eq!(commodity.mnemonic, "ADF");
     }
 
@@ -353,12 +339,11 @@ mod price {
         let book = XMLBook::new(URI).unwrap();
         let price = book
             .prices()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .next()
             .unwrap();
-        let currency = price.currency().unwrap();
+        let currency = price.currency();
         assert_eq!(currency.mnemonic, "AED");
     }
 }
@@ -370,7 +355,6 @@ mod commodity {
         let book = XMLBook::new(URI).unwrap();
         let commodity = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "EUR")
             .next()
@@ -392,12 +376,11 @@ mod commodity {
         let book = XMLBook::new(URI).unwrap();
         let commodity = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "EUR")
             .next()
             .unwrap();
-        let accounts = commodity.accounts().unwrap();
+        let accounts = commodity.accounts();
         assert_eq!(accounts.len(), 14);
     }
 
@@ -406,12 +389,11 @@ mod commodity {
         let book = XMLBook::new(URI).unwrap();
         let commodity = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "EUR")
             .next()
             .unwrap();
-        let transactions = commodity.transactions().unwrap();
+        let transactions = commodity.transactions();
         assert_eq!(transactions.len(), 11);
     }
 
@@ -420,12 +402,11 @@ mod commodity {
         let book = XMLBook::new(URI).unwrap();
         let commodity = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "EUR")
             .next()
             .unwrap();
-        let prices = commodity.as_commodity_prices().unwrap();
+        let prices = commodity.as_commodity_prices();
         assert_eq!(prices.len(), 1);
     }
 
@@ -434,12 +415,11 @@ mod commodity {
         let book = XMLBook::new(URI).unwrap();
         let commodity = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "EUR")
             .next()
             .unwrap();
-        let prices = commodity.as_currency_prices().unwrap();
+        let prices = commodity.as_currency_prices();
         assert_eq!(prices.len(), 2);
     }
 
@@ -448,12 +428,11 @@ mod commodity {
         let book = XMLBook::new(URI).unwrap();
         let commodity = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "EUR")
             .next()
             .unwrap();
-        let prices = commodity.as_commodity_or_currency_prices().unwrap();
+        let prices = commodity.as_commodity_or_currency_prices();
         assert_eq!(prices.len(), 3);
     }
 
@@ -463,44 +442,40 @@ mod commodity {
         let book = XMLBook::new(URI).unwrap();
         let commodity = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "ADF")
             .next()
             .unwrap();
         let currency = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "AED")
             .next()
             .unwrap();
 
-        let rate = commodity.sell(&currency).unwrap().unwrap();
+        let rate = commodity.sell(&currency).unwrap();
         assert_eq!(rate, 1.5);
-        let rate = currency.buy(&commodity).unwrap().unwrap();
+        let rate = currency.buy(&commodity).unwrap();
         assert_eq!(rate, 1.0 / 1.5);
 
         // AED => EUR
         let book = XMLBook::new(URI).unwrap();
         let commodity = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "AED")
             .next()
             .unwrap();
         let currency = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "EUR")
             .next()
             .unwrap();
 
-        let rate = commodity.sell(&currency).unwrap().unwrap();
+        let rate = commodity.sell(&currency).unwrap();
         assert_eq!(rate, 9.0 / 10.0);
-        let rate = currency.buy(&commodity).unwrap().unwrap();
+        let rate = currency.buy(&commodity).unwrap();
         assert_eq!(rate, 10.0 / 9.0);
     }
 
@@ -509,20 +484,18 @@ mod commodity {
         let book = XMLBook::new(URI).unwrap();
         let commodity = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "USD")
             .next()
             .unwrap();
         let currency = book
             .commodities()
-            .unwrap()
             .into_iter()
             .filter(|x| x.guid == "AED")
             .next()
             .unwrap();
 
-        let rate = commodity.sell(&currency).unwrap();
+        let rate = commodity.sell(&currency);
         assert_eq!(rate, None);
         // assert_eq!(rate, 7.0 / 5.0 * 10.0 / 9.0);
     }
