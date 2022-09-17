@@ -6,6 +6,7 @@ pub(crate) enum SQLKind {
     Postgres,
     MySql,
     Sqlite,
+    #[allow(dead_code)]
     Mssql,
 }
 

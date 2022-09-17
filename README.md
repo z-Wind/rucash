@@ -30,7 +30,6 @@
 rucash provides a simple interface to GnuCash files stored in xml and SQL (sqlite3, PostgreSQL and MySQL).
 ## Example
 ```rust
-use rucash::prelude::*;
 use rucash::SqliteBook;
 
 let book = SqliteBook::new("sqlite://money.gnucash").unwrap();

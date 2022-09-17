@@ -1,7 +1,7 @@
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 use crate::kind::SQLKind;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 #[cfg_attr(
     any(feature = "sqlite", feature = "postgres", feature = "mysql",),
     derive(sqlx::FromRow)
@@ -60,6 +60,7 @@ impl super::NullNone for Account {
     }
 }
 
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 impl<'q> Account {
     // test schemas on compile time
     #[allow(dead_code)]
@@ -90,7 +91,6 @@ impl<'q> Account {
         )
     }
 
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     pub(crate) fn query<DB, O>(
     ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
     where
@@ -116,7 +116,6 @@ impl<'q> Account {
         )
     }
 
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     pub(crate) fn query_by_guid<DB, O, T>(
         guid: T,
         kind: SQLKind,
@@ -169,7 +168,6 @@ impl<'q> Account {
         }
     }
 
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     pub(crate) fn query_by_commodity_guid<DB, O, T>(
         guid: T,
         kind: SQLKind,
@@ -222,7 +220,6 @@ impl<'q> Account {
         }
     }
 
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     pub(crate) fn query_by_parent_guid<DB, O, T>(
         guid: T,
         kind: SQLKind,
@@ -276,7 +273,6 @@ impl<'q> Account {
     }
 
     #[allow(dead_code)]
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     pub(crate) fn query_by_name<DB, O, T>(
         name: T,
         kind: SQLKind,
@@ -329,7 +325,6 @@ impl<'q> Account {
         }
     }
 
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     pub(crate) fn query_like_name<DB, O, T>(
         name: T,
         kind: SQLKind,
@@ -383,8 +378,99 @@ impl<'q> Account {
     }
 }
 
+#[cfg(feature = "xml")]
+use xmltree::Element;
+#[cfg(feature = "xml")]
+impl Account {
+    pub(crate) fn new_by_element(e: &Element) -> Self {
+        let guid = e
+            .get_child("id")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned())
+            .expect("id must exist");
+        let name = e
+            .get_child("name")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned())
+            .expect("name must exist");
+        let account_type = e
+            .get_child("type")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned())
+            .expect("type must exist");
+        let commodity_guid = e
+            .get_child("commodity")
+            .and_then(|x| x.get_child("id"))
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned());
+        let commodity_scu = e
+            .get_child("commodity-scu")
+            .and_then(|x| x.get_text())
+            .map(|x| x.parse().expect("must be i32"))
+            .unwrap_or(0);
+        let non_std_scu = e
+            .get_child("non-std-scu")
+            .and_then(|x| x.get_text())
+            .map(|x| x.parse().expect("must be i32"))
+            .unwrap_or(0);
+        let parent_guid = e
+            .get_child("parent")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned());
+        let code = e
+            .get_child("code")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned());
+        let description = e
+            .get_child("description")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned());
+        let hidden = e
+            .get_child("hidden")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned())
+            .map(|x| x.parse().unwrap_or(0));
+
+        let slots: Vec<&Element> = match e.get_child("slots") {
+            None => Vec::new(),
+            Some(x) => x.children.iter().filter_map(|x| x.as_element()).collect(),
+        };
+        let placeholder = slots
+            .iter()
+            .find(|e| {
+                e.get_child("key")
+                    .and_then(|e| e.get_text())
+                    .map(|s| s.into_owned())
+                    == Some("placeholder".to_string())
+            })
+            .and_then(|e| e.get_child("value"))
+            .and_then(|s| s.get_text())
+            .map(|x| x.into_owned())
+            .map(|x| if x == "true" { 1 } else { 0 });
+
+        Self {
+            guid,
+            name,
+            account_type,
+            commodity_guid,
+            commodity_scu,
+            non_std_scu,
+            parent_guid,
+            code,
+            description,
+            hidden,
+            placeholder,
+        }
+    }
+}
+
 #[cfg(test)]
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+#[cfg(any(
+    feature = "sqlite",
+    feature = "postgres",
+    feature = "mysql",
+    feature = "xml"
+))]
 mod tests {
     use super::*;
     use futures::executor::block_on;
@@ -644,6 +730,97 @@ mod tests {
             })
             .unwrap();
             assert_eq!(3, result.len());
+        }
+    }
+
+    #[cfg(feature = "xml")]
+    mod xml {
+        use super::*;
+        use std::sync::Arc;
+
+        #[allow(dead_code)]
+        const URI: &str = r"tests\db\xml\complex_sample.gnucash";
+
+        #[allow(dead_code)]
+        fn setup() -> Arc<Element> {
+            crate::XMLBook::new(URI).unwrap().pool.0.clone()
+        }
+
+        #[test]
+        fn new_by_element() {
+            let data = r##"
+            <?xml version="1.0" encoding="utf-8" ?>
+            <gnc-v2
+                xmlns:gnc="http://www.gnucash.org/XML/gnc"
+                xmlns:act="http://www.gnucash.org/XML/act"
+                xmlns:book="http://www.gnucash.org/XML/book"
+                xmlns:cd="http://www.gnucash.org/XML/cd"
+                xmlns:cmdty="http://www.gnucash.org/XML/cmdty"
+                xmlns:price="http://www.gnucash.org/XML/price"
+                xmlns:slot="http://www.gnucash.org/XML/slot"
+                xmlns:split="http://www.gnucash.org/XML/split"
+                xmlns:sx="http://www.gnucash.org/XML/sx"
+                xmlns:trn="http://www.gnucash.org/XML/trn"
+                xmlns:ts="http://www.gnucash.org/XML/ts"
+                xmlns:fs="http://www.gnucash.org/XML/fs"
+                xmlns:bgt="http://www.gnucash.org/XML/bgt"
+                xmlns:recurrence="http://www.gnucash.org/XML/recurrence"
+                xmlns:lot="http://www.gnucash.org/XML/lot"
+                xmlns:addr="http://www.gnucash.org/XML/addr"
+                xmlns:billterm="http://www.gnucash.org/XML/billterm"
+                xmlns:bt-days="http://www.gnucash.org/XML/bt-days"
+                xmlns:bt-prox="http://www.gnucash.org/XML/bt-prox"
+                xmlns:cust="http://www.gnucash.org/XML/cust"
+                xmlns:employee="http://www.gnucash.org/XML/employee"
+                xmlns:entry="http://www.gnucash.org/XML/entry"
+                xmlns:invoice="http://www.gnucash.org/XML/invoice"
+                xmlns:job="http://www.gnucash.org/XML/job"
+                xmlns:order="http://www.gnucash.org/XML/order"
+                xmlns:owner="http://www.gnucash.org/XML/owner"
+                xmlns:taxtable="http://www.gnucash.org/XML/taxtable"
+                xmlns:tte="http://www.gnucash.org/XML/tte"
+                xmlns:vendor="http://www.gnucash.org/XML/vendor">
+            <gnc:account version="2.0.0">
+                <act:name>Asset</act:name>
+                <act:id type="guid">fcd795021c976ba75621ec39e75f6214</act:id>
+                <act:type>ASSET</act:type>
+                <act:commodity>
+                    <cmdty:space>CURRENCY</cmdty:space>
+                    <cmdty:id>EUR</cmdty:id>
+                </act:commodity>
+                <act:commodity-scu>100</act:commodity-scu>
+                <act:slots>
+                    <slot>
+                    <slot:key>placeholder</slot:key>
+                    <slot:value type="string">true</slot:value>
+                    </slot>
+                </act:slots>
+                <act:parent type="guid">00622dda21937b29e494179de5013f82</act:parent>
+            </gnc:account>
+            </gnc-v2>
+            "##;
+
+            let e = Element::parse(data.as_bytes())
+                .unwrap()
+                .take_child("account")
+                .unwrap();
+
+            let account = Account::new_by_element(&e);
+
+            assert_eq!(account.guid, "fcd795021c976ba75621ec39e75f6214");
+            assert_eq!(account.name, "Asset");
+            assert_eq!(account.account_type, "ASSET");
+            assert_eq!(account.commodity_guid.as_ref().unwrap(), "EUR");
+            assert_eq!(account.commodity_scu, 100);
+            assert_eq!(account.non_std_scu, 0);
+            assert_eq!(
+                account.parent_guid.as_ref().unwrap(),
+                "00622dda21937b29e494179de5013f82"
+            );
+            assert_eq!(account.code, None);
+            assert_eq!(account.description, None);
+            assert_eq!(account.hidden, None);
+            assert_eq!(account.placeholder.unwrap(), 1);
         }
     }
 }

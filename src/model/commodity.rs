@@ -1,7 +1,7 @@
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 use crate::kind::SQLKind;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 #[cfg_attr(
     any(feature = "sqlite", feature = "postgres", feature = "mysql",),
     derive(sqlx::FromRow)
@@ -198,8 +198,71 @@ impl<'q> Commodity {
     }
 }
 
+#[cfg(feature = "xml")]
+use xmltree::Element;
+#[cfg(feature = "xml")]
+
+impl Commodity {
+    pub(crate) fn new_by_element(e: &Element) -> Self {
+        let guid = e
+            .get_child("id")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned())
+            .expect("id must exist");
+        let namespace = e
+            .get_child("space")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned())
+            .expect("space must exist");
+        let mnemonic = guid.clone();
+        let fullname = e
+            .get_child("fullname")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned());
+        let cusip = e
+            .get_child("cusip")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned());
+        let fraction = e
+            .get_child("fraction")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned())
+            .map(|x| x.parse().expect("must be i32"))
+            .unwrap_or(100);
+        let quote_flag = match e.get_child("get_quotes") {
+            Some(_) => 1,
+            None => 0,
+        };
+        let quote_source = e
+            .get_child("quote_source")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned());
+        let quote_tz = e
+            .get_child("quote_tz")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned());
+
+        Self {
+            guid,
+            namespace,
+            mnemonic,
+            fullname,
+            cusip,
+            fraction,
+            quote_flag,
+            quote_source,
+            quote_tz,
+        }
+    }
+}
+
 #[cfg(test)]
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+#[cfg(any(
+    feature = "sqlite",
+    feature = "postgres",
+    feature = "mysql",
+    feature = "xml"
+))]
 mod tests {
     use super::*;
     use futures::executor::block_on;
@@ -360,6 +423,82 @@ mod tests {
             })
             .unwrap();
             assert_eq!(4, result.len());
+        }
+    }
+
+    #[cfg(feature = "xml")]
+    mod xml {
+        use super::*;
+        use std::sync::Arc;
+
+        #[allow(dead_code)]
+        const URI: &str = r"tests\db\xml\complex_sample.gnucash";
+
+        #[allow(dead_code)]
+        fn setup() -> Arc<Element> {
+            crate::XMLBook::new(URI).unwrap().pool.0.clone()
+        }
+
+        #[test]
+        fn new_by_element() {
+            let data = r##"
+            <?xml version="1.0" encoding="utf-8" ?>
+            <gnc-v2
+                xmlns:gnc="http://www.gnucash.org/XML/gnc"
+                xmlns:act="http://www.gnucash.org/XML/act"
+                xmlns:book="http://www.gnucash.org/XML/book"
+                xmlns:cd="http://www.gnucash.org/XML/cd"
+                xmlns:cmdty="http://www.gnucash.org/XML/cmdty"
+                xmlns:price="http://www.gnucash.org/XML/price"
+                xmlns:slot="http://www.gnucash.org/XML/slot"
+                xmlns:split="http://www.gnucash.org/XML/split"
+                xmlns:sx="http://www.gnucash.org/XML/sx"
+                xmlns:trn="http://www.gnucash.org/XML/trn"
+                xmlns:ts="http://www.gnucash.org/XML/ts"
+                xmlns:fs="http://www.gnucash.org/XML/fs"
+                xmlns:bgt="http://www.gnucash.org/XML/bgt"
+                xmlns:recurrence="http://www.gnucash.org/XML/recurrence"
+                xmlns:lot="http://www.gnucash.org/XML/lot"
+                xmlns:addr="http://www.gnucash.org/XML/addr"
+                xmlns:billterm="http://www.gnucash.org/XML/billterm"
+                xmlns:bt-days="http://www.gnucash.org/XML/bt-days"
+                xmlns:bt-prox="http://www.gnucash.org/XML/bt-prox"
+                xmlns:cust="http://www.gnucash.org/XML/cust"
+                xmlns:employee="http://www.gnucash.org/XML/employee"
+                xmlns:entry="http://www.gnucash.org/XML/entry"
+                xmlns:invoice="http://www.gnucash.org/XML/invoice"
+                xmlns:job="http://www.gnucash.org/XML/job"
+                xmlns:order="http://www.gnucash.org/XML/order"
+                xmlns:owner="http://www.gnucash.org/XML/owner"
+                xmlns:taxtable="http://www.gnucash.org/XML/taxtable"
+                xmlns:tte="http://www.gnucash.org/XML/tte"
+                xmlns:vendor="http://www.gnucash.org/XML/vendor">
+            <gnc:commodity version="2.0.0">
+                <cmdty:space>CURRENCY</cmdty:space>
+                <cmdty:id>EUR</cmdty:id>
+                <cmdty:get_quotes/>
+                <cmdty:quote_source>currency</cmdty:quote_source>
+                <cmdty:quote_tz/>
+            </gnc:commodity>
+            </gnc-v2>
+            "##;
+
+            let e = Element::parse(data.as_bytes())
+                .unwrap()
+                .take_child("commodity")
+                .unwrap();
+
+            let commodity = Commodity::new_by_element(&e);
+
+            assert_eq!(commodity.guid, "EUR");
+            assert_eq!(commodity.namespace, "CURRENCY");
+            assert_eq!(commodity.mnemonic, "EUR");
+            assert_eq!(commodity.fullname, None);
+            assert_eq!(commodity.cusip, None);
+            assert_eq!(commodity.fraction, 100);
+            assert_eq!(commodity.quote_flag, 1);
+            assert_eq!(commodity.quote_source.as_ref().unwrap(), "currency");
+            assert_eq!(commodity.quote_tz, None);
         }
     }
 }

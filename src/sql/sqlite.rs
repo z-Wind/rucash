@@ -30,7 +30,6 @@ impl SqliteBook {
                 .connect(uri)
                 .await
         });
-        let pool = pool?.clone();
-        Ok(Self(SQLBook::new(uri.parse()?, pool)))
+        Ok(Self(SQLBook::new(uri.parse()?, pool?)))
     }
 }

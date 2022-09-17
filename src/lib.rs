@@ -25,23 +25,23 @@ pub use sql::sqlite::SqliteBook;
 pub use xml::XMLBook;
 
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
-pub type SQLAccount = sql::DataWithPool<model::Account>;
+pub type SQLAccount = sql::wrap::DataWithPool<model::Account>;
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
-pub type SQLSplit = sql::DataWithPool<model::Split>;
+pub type SQLSplit = sql::wrap::DataWithPool<model::Split>;
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
-pub type SQLTransaction = sql::DataWithPool<model::Transaction>;
+pub type SQLTransaction = sql::wrap::DataWithPool<model::Transaction>;
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
-pub type SQLPrice = sql::DataWithPool<model::Price>;
+pub type SQLPrice = sql::wrap::DataWithPool<model::Price>;
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
-pub type SQLCommodity = sql::DataWithPool<model::Commodity>;
+pub type SQLCommodity = sql::wrap::DataWithPool<model::Commodity>;
 
 #[cfg(feature = "xml")]
-pub type XMLAccount = xml::DataWithPool<model::Account>;
+pub type XMLAccount = xml::wrap::DataWithPool<model::Account>;
 #[cfg(feature = "xml")]
-pub type XMLSplit = xml::DataWithPool<model::Split>;
+pub type XMLSplit = xml::wrap::DataWithPool<model::Split>;
 #[cfg(feature = "xml")]
-pub type XMLTransaction = xml::DataWithPool<model::Transaction>;
+pub type XMLTransaction = xml::wrap::DataWithPool<model::Transaction>;
 #[cfg(feature = "xml")]
-pub type XMLPrice = xml::DataWithPool<model::Price>;
+pub type XMLPrice = xml::wrap::DataWithPool<model::Price>;
 #[cfg(feature = "xml")]
-pub type XMLCommodity = xml::DataWithPool<model::Commodity>;
+pub type XMLCommodity = xml::wrap::DataWithPool<model::Commodity>;

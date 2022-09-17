@@ -22,12 +22,12 @@ fn benchmark_vec_filter(c: &mut Criterion) {
     });
 }
 
-fn benchmark_XMLBook(c: &mut Criterion) {
+fn benchmark_xml_book(c: &mut Criterion) {
     let book = rucash::XMLBook::new("tests/db/xml/complex_sample.gnucash").unwrap();
     c.bench_function("XMLBook", |b| b.iter(|| book.accounts()));
 }
 
-fn benchmark_SqliteBook(c: &mut Criterion) {
+fn benchmark_sqlite_book(c: &mut Criterion) {
     let book = rucash::SqliteBook::new(URI).unwrap();
     c.bench_function("SqliteBook", |b| b.iter(|| book.accounts()));
 }
@@ -36,7 +36,7 @@ criterion_group!(
     benches,
     benchmark_sql_query,
     benchmark_vec_filter,
-    benchmark_XMLBook,
-    benchmark_SqliteBook,
+    benchmark_xml_book,
+    benchmark_sqlite_book,
 );
 criterion_main!(benches);

@@ -297,8 +297,80 @@ impl<'q> Price {
     }
 }
 
+#[cfg(feature = "xml")]
+use xmltree::Element;
+#[cfg(feature = "xml")]
+
+impl Price {
+    pub(crate) fn new_by_element(e: &Element) -> Self {
+        let guid = e
+            .get_child("id")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned())
+            .expect("id must exist");
+        let commodity_guid = e
+            .get_child("commodity")
+            .and_then(|x| x.get_child("id"))
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned())
+            .expect("commodity must exist");
+        let currency_guid = e
+            .get_child("currency")
+            .and_then(|x| x.get_child("id"))
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned())
+            .expect("currency must exist");
+        let date = e
+            .get_child("time")
+            .and_then(|x| x.get_child("date"))
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned())
+            .map(|x| {
+                chrono::NaiveDateTime::parse_from_str(&x, "%Y-%m-%d %H:%M:%S%z")
+                    .expect("%Y-%m-%d %H:%M:%S%z")
+            })
+            .expect("time must exist");
+        let source = e
+            .get_child("source")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned());
+
+        let r#type = e
+            .get_child("type")
+            .and_then(|x| x.get_text())
+            .map(|x| x.into_owned());
+
+        let splits = e
+            .get_child("value")
+            .expect("value must exist")
+            .get_text()
+            .unwrap();
+        let mut splits = splits.split('/');
+        let value_num = splits.next().unwrap().parse().unwrap();
+        let value_denom = splits.next().unwrap().parse().unwrap();
+        let value = value_num as f64 / value_denom as f64;
+
+        Self {
+            guid,
+            commodity_guid,
+            currency_guid,
+            date,
+            source,
+            r#type,
+            value_num,
+            value_denom,
+            value,
+        }
+    }
+}
+
 #[cfg(test)]
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+#[cfg(any(
+    feature = "sqlite",
+    feature = "postgres",
+    feature = "mysql",
+    feature = "xml"
+))]
 mod tests {
     use super::*;
     use futures::executor::block_on;
@@ -540,6 +612,95 @@ mod tests {
             })
             .unwrap();
             assert_eq!(4, result.len());
+        }
+    }
+
+    #[cfg(feature = "xml")]
+    mod xml {
+        use super::*;
+        use std::sync::Arc;
+
+        #[allow(dead_code)]
+        const URI: &str = r"tests\db\xml\complex_sample.gnucash";
+
+        #[allow(dead_code)]
+        fn setup() -> Arc<Element> {
+            crate::XMLBook::new(URI).unwrap().pool.0.clone()
+        }
+
+        #[test]
+        fn new_by_element() {
+            let data = r##"
+                <?xml version="1.0" encoding="utf-8" ?>
+                <gnc-v2
+                    xmlns:gnc="http://www.gnucash.org/XML/gnc"
+                    xmlns:act="http://www.gnucash.org/XML/act"
+                    xmlns:book="http://www.gnucash.org/XML/book"
+                    xmlns:cd="http://www.gnucash.org/XML/cd"
+                    xmlns:cmdty="http://www.gnucash.org/XML/cmdty"
+                    xmlns:price="http://www.gnucash.org/XML/price"
+                    xmlns:slot="http://www.gnucash.org/XML/slot"
+                    xmlns:split="http://www.gnucash.org/XML/split"
+                    xmlns:sx="http://www.gnucash.org/XML/sx"
+                    xmlns:trn="http://www.gnucash.org/XML/trn"
+                    xmlns:ts="http://www.gnucash.org/XML/ts"
+                    xmlns:fs="http://www.gnucash.org/XML/fs"
+                    xmlns:bgt="http://www.gnucash.org/XML/bgt"
+                    xmlns:recurrence="http://www.gnucash.org/XML/recurrence"
+                    xmlns:lot="http://www.gnucash.org/XML/lot"
+                    xmlns:addr="http://www.gnucash.org/XML/addr"
+                    xmlns:billterm="http://www.gnucash.org/XML/billterm"
+                    xmlns:bt-days="http://www.gnucash.org/XML/bt-days"
+                    xmlns:bt-prox="http://www.gnucash.org/XML/bt-prox"
+                    xmlns:cust="http://www.gnucash.org/XML/cust"
+                    xmlns:employee="http://www.gnucash.org/XML/employee"
+                    xmlns:entry="http://www.gnucash.org/XML/entry"
+                    xmlns:invoice="http://www.gnucash.org/XML/invoice"
+                    xmlns:job="http://www.gnucash.org/XML/job"
+                    xmlns:order="http://www.gnucash.org/XML/order"
+                    xmlns:owner="http://www.gnucash.org/XML/owner"
+                    xmlns:taxtable="http://www.gnucash.org/XML/taxtable"
+                    xmlns:tte="http://www.gnucash.org/XML/tte"
+                    xmlns:vendor="http://www.gnucash.org/XML/vendor">
+                <price>
+                    <price:id type="guid">0d6684f44fb018e882de76094ed9c433</price:id>
+                    <price:commodity>
+                        <cmdty:space>CURRENCY</cmdty:space>
+                        <cmdty:id>ADF</cmdty:id>
+                    </price:commodity>
+                    <price:currency>
+                        <cmdty:space>CURRENCY</cmdty:space>
+                        <cmdty:id>AED</cmdty:id>
+                    </price:currency>
+                    <price:time>
+                        <ts:date>2018-02-20 23:00:00 +0000</ts:date>
+                    </price:time>
+                    <price:source>user:price-editor</price:source>
+                    <price:type>unknown</price:type>
+                    <price:value>3/2</price:value>
+                </price>
+                </gnc-v2>
+                "##;
+
+            let e = Element::parse(data.as_bytes())
+                .unwrap()
+                .take_child("price")
+                .unwrap();
+
+            let price = Price::new_by_element(&e);
+
+            assert_eq!(price.guid, "0d6684f44fb018e882de76094ed9c433");
+            assert_eq!(price.commodity_guid, "ADF");
+            assert_eq!(price.currency_guid, "AED");
+            assert_eq!(
+                price.date.format("%Y-%m-%d %H:%M:%S").to_string(),
+                "2018-02-20 23:00:00"
+            );
+            assert_eq!(price.source.as_ref().unwrap(), "user:price-editor");
+            assert_eq!(price.r#type.as_ref().unwrap(), "unknown");
+            assert_eq!(price.value_num, 3);
+            assert_eq!(price.value_denom, 2);
+            assert_eq!(price.value, 1.5);
         }
     }
 }
