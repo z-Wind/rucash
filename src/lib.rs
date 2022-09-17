@@ -34,6 +34,8 @@ pub type SQLTransaction = sql::wrap::DataWithPool<model::Transaction>;
 pub type SQLPrice = sql::wrap::DataWithPool<model::Price>;
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 pub type SQLCommodity = sql::wrap::DataWithPool<model::Commodity>;
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
+pub type SQLError = sqlx::Error;
 
 #[cfg(feature = "xml")]
 pub type XMLAccount = xml::wrap::DataWithPool<model::Account>;
@@ -45,3 +47,5 @@ pub type XMLTransaction = xml::wrap::DataWithPool<model::Transaction>;
 pub type XMLPrice = xml::wrap::DataWithPool<model::Price>;
 #[cfg(feature = "xml")]
 pub type XMLCommodity = xml::wrap::DataWithPool<model::Commodity>;
+#[cfg(feature = "xml")]
+pub type XMLError = Box<dyn std::error::Error>;

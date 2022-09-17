@@ -350,6 +350,8 @@ mod price {
 
 mod commodity {
     use super::*;
+    use float_cmp::assert_approx_eq;
+
     #[test]
     fn property() {
         let book = XMLBook::new(URI).unwrap();
@@ -456,7 +458,7 @@ mod commodity {
         let rate = commodity.sell(&currency).unwrap();
         assert_eq!(rate, 1.5);
         let rate = currency.buy(&commodity).unwrap();
-        assert_eq!(rate, 1.0 / 1.5);
+        assert_eq!(rate, 1.5);
 
         // AED => EUR
         let book = XMLBook::new(URI).unwrap();
@@ -474,9 +476,9 @@ mod commodity {
             .unwrap();
 
         let rate = commodity.sell(&currency).unwrap();
-        assert_eq!(rate, 9.0 / 10.0);
+        assert_approx_eq!(f64, rate, 9.0 / 10.0);
         let rate = currency.buy(&commodity).unwrap();
-        assert_eq!(rate, 10.0 / 9.0);
+        assert_approx_eq!(f64, rate, 9.0 / 10.0);
     }
 
     #[test]
@@ -495,8 +497,7 @@ mod commodity {
             .next()
             .unwrap();
 
-        let rate = commodity.sell(&currency);
-        assert_eq!(rate, None);
-        // assert_eq!(rate, 7.0 / 5.0 * 10.0 / 9.0);
+        let rate = commodity.sell(&currency).unwrap();
+        assert_approx_eq!(f64, rate, 7.0 / 5.0 * 10.0 / 9.0);
     }
 }
