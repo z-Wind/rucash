@@ -137,7 +137,7 @@ impl DataWithPool<model::Split> {
             .accounts()
             .into_iter()
             .find(|x| x.guid == self.account_guid)
-            .expect("tx_guid must match one")
+            .expect("account_guid must match one")
     }
 }
 
@@ -147,7 +147,7 @@ impl DataWithPool<model::Transaction> {
             .commodities()
             .into_iter()
             .find(|x| x.guid == self.currency_guid)
-            .expect("tx_guid must match one")
+            .expect("currency_guid must match one")
     }
 
     pub fn splits(&self) -> Vec<DataWithPool<model::Split>> {
@@ -165,7 +165,7 @@ impl DataWithPool<model::Price> {
             .commodities()
             .into_iter()
             .find(|x| x.guid == self.commodity_guid)
-            .expect("tx_guid must match one")
+            .expect("commodity_guid must match one")
     }
 
     pub fn currency(&self) -> DataWithPool<model::Commodity> {
@@ -173,7 +173,7 @@ impl DataWithPool<model::Price> {
             .commodities()
             .into_iter()
             .find(|x| x.guid == self.currency_guid)
-            .expect("tx_guid must match one")
+            .expect("currency_guid must match one")
     }
 }
 
@@ -316,6 +316,7 @@ fn exchange(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::NaiveDateTime;
     use float_cmp::assert_approx_eq;
     #[cfg(feature = "xml")]
     mod xml {
@@ -465,6 +466,86 @@ mod tests {
             assert_eq!(3, account.children().len());
             assert_eq!("EUR", account.commodity().unwrap().mnemonic);
             assert_approx_eq!(f64, 24695.30, account.balance());
+        }
+
+        #[test]
+        fn split() {
+            let book = setup(URI);
+            let split = book
+                .splits()
+                .into_iter()
+                .find(|s| s.guid == "de832fe97e37811a7fff7e28b3a43425")
+                .unwrap();
+
+            assert_eq!(split.transaction().guid, "6c8876003c4a6026e38e3afb67d6f2b1");
+            assert_eq!(split.transaction().description, Some("income 1".into()));
+            assert_eq!(
+                split.transaction().post_date,
+                Some(
+                    NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
+                        .unwrap()
+                )
+            );
+            assert_eq!(
+                split.transaction().enter_date,
+                Some(
+                    NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
+                        .unwrap()
+                )
+            );
+
+            assert_eq!(split.account().guid, "93fc043c3062aaa1297b30e543d2cd0d",);
+            assert_eq!(split.account().name, "Cash",);
+        }
+
+        #[test]
+        fn transaction() {
+            let book = setup(URI);
+            let transaction = book
+                .transactions()
+                .into_iter()
+                .find(|t| t.description == Some("buy foo".into()))
+                .unwrap();
+
+            assert_eq!(transaction.currency().mnemonic, "EUR");
+            assert_eq!(transaction.splits().len(), 4);
+        }
+
+        #[test]
+        fn price() {
+            let book = setup(URI);
+            let price = book
+                .prices()
+                .into_iter()
+                .find(|p| p.guid == "0d6684f44fb018e882de76094ed9c433")
+                .unwrap();
+
+            assert_eq!(price.commodity().mnemonic, "ADF");
+            assert_eq!(price.currency().mnemonic, "AED");
+        }
+
+        #[test]
+        fn commodity() {
+            let book = setup(URI);
+            let commodity = book
+                .commodities()
+                .into_iter()
+                .find(|p| p.mnemonic == "EUR")
+                .unwrap();
+
+            assert_eq!(commodity.accounts().len(), 14);
+            assert_eq!(commodity.transactions().len(), 11);
+            assert_eq!(commodity.as_commodity_prices().len(), 1);
+            assert_eq!(commodity.as_currency_prices().len(), 2);
+            assert_eq!(commodity.as_commodity_or_currency_prices().len(), 3);
+
+            let currency = book
+                .commodities()
+                .into_iter()
+                .find(|p| p.mnemonic == "FOO")
+                .unwrap();
+            assert_approx_eq!(f64, 1.2345679012345678, currency.buy(&commodity).unwrap());
+            assert_approx_eq!(f64, 1.2345679012345678, commodity.sell(&currency).unwrap());
         }
     }
 }
