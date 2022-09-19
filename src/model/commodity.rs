@@ -1,3 +1,4 @@
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 use super::TestSchemas;
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 use crate::kind::SQLKind;
@@ -267,6 +268,7 @@ impl Commodity {
 ))]
 mod tests {
     use super::*;
+    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     use futures::executor::block_on;
 
     #[cfg(feature = "sqlite")]
@@ -277,6 +279,7 @@ mod tests {
         type DB = sqlx::Sqlite;
 
         fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+            println!("work_dir: {:?}", std::env::current_dir());
             (
                 block_on(async {
                     sqlx::sqlite::SqlitePoolOptions::new()

@@ -118,6 +118,7 @@ mod tests {
         type DB = sqlx::Sqlite;
 
         fn setup(uri: &str) -> crate::SqliteBook {
+            println!("work_dir: {:?}", std::env::current_dir());
             crate::SqliteBook::new(uri).expect("right path")
         }
 

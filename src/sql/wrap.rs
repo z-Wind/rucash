@@ -311,6 +311,7 @@ mod tests {
     use super::*;
     use chrono::NaiveDateTime;
     use float_cmp::assert_approx_eq;
+
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
@@ -319,6 +320,7 @@ mod tests {
         type DB = sqlx::Sqlite;
 
         fn setup(uri: &str) -> crate::SqliteBook {
+            println!("work_dir: {:?}", std::env::current_dir());
             crate::SqliteBook::new(uri).expect("right path")
         }
 
@@ -456,6 +458,7 @@ mod tests {
             assert_approx_eq!(f64, 1.2345679012345678, commodity.sell(&currency).unwrap());
         }
     }
+
     #[cfg(feature = "postgresql")]
     mod postgresql {
         use super::*;
@@ -465,123 +468,6 @@ mod tests {
 
         fn setup(uri: &str) -> crate::PostgreSQLBook {
             crate::PostgreSQLBook::new(&uri).expect("right path")
-        }
-
-        #[test]
-        fn test_exchange() {
-            let book = setup(URI);
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "ADF")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 1.5, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 1.0, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 0.9, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "USD")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 1.0 / 1.4, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 0.9, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 0.81, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 1.0 / 0.81, exchange(&from, &to).unwrap());
         }
 
         #[test]
@@ -718,6 +604,7 @@ mod tests {
             assert_approx_eq!(f64, 1.2345679012345678, commodity.sell(&currency).unwrap());
         }
     }
+
     #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
@@ -727,123 +614,6 @@ mod tests {
 
         fn setup(uri: &str) -> crate::MySQLBook {
             crate::MySQLBook::new(uri).expect("right path")
-        }
-
-        #[test]
-        fn test_exchange() {
-            let book = setup(URI);
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "ADF")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 1.5, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 1.0, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 0.9, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "USD")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 1.0 / 1.4, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 0.9, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 0.81, exchange(&from, &to).unwrap());
-
-            let from = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
-                .unwrap();
-            let to = book
-                .commodities()
-                .unwrap()
-                .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
-                .unwrap();
-            assert_approx_eq!(f64, 1.0 / 0.81, exchange(&from, &to).unwrap());
         }
 
         #[test]

@@ -236,13 +236,15 @@ mod tests {
     use super::*;
     use chrono::NaiveDateTime;
     use float_cmp::assert_approx_eq;
+
     #[cfg(feature = "xml")]
     mod xml {
         use super::*;
 
-        const URI: &str = r"tests\db\xml\complex_sample.gnucash";
+        const URI: &str = r"tests/db/xml/complex_sample.gnucash";
 
         fn setup(uri: &str) -> crate::XMLBook {
+            println!("work_dir: {:?}", std::env::current_dir());
             crate::XMLBook::new(uri).expect("right path")
         }
 
