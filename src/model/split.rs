@@ -1,3 +1,4 @@
+use super::TestSchemas;
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
@@ -52,10 +53,11 @@ impl<'q> Split {
     // test schemas on compile time
     #[allow(dead_code)]
     #[cfg(feature = "sqlite")]
-    fn test_schemas() -> sqlx::query::Map<
+    fn test_schemas() -> TestSchemas<
         'q,
         sqlx::Sqlite,
-        fn(sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error>,
+        sqlx::sqlite::SqliteRow,
+        Self,
         sqlx::sqlite::SqliteArguments<'q>,
     > {
         sqlx::query_as!(

@@ -5,6 +5,7 @@ pub(crate) mod postgresql;
 #[cfg(feature = "sqlite")]
 pub(crate) mod sqlite;
 
+mod exchange;
 pub mod wrap;
 
 use super::kind::SQLKind;

@@ -1,8 +1,10 @@
+mod exchange;
 pub mod wrap;
 
 use super::model;
 use flate2::read::GzDecoder;
 
+use exchange::Exchange;
 use itertools::Itertools;
 use std::fs::File;
 use std::io::Read;
@@ -147,13 +149,13 @@ impl XMLPool {
 
 #[derive(Debug)]
 pub struct XMLBook {
-    pub(crate) pool: Arc<XMLPool>,
+    pub(crate) pool: XMLPool,
 }
 
 impl XMLBook {
     /// read gnucash xml file in gzip
     pub fn new(uri: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let pool = Arc::new(XMLPool::new(uri)?);
+        let pool = XMLPool::new(uri)?;
         Ok(Self { pool })
     }
 
