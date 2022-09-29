@@ -2,6 +2,7 @@ use super::exchange::Exchange;
 use crate::kind::SQLKind;
 use crate::model::{self, Commodity};
 use futures::executor::block_on;
+use std::hash::Hash;
 use std::ops::Deref;
 
 #[derive(Debug, Clone)]
@@ -42,6 +43,17 @@ where
 {
     fn eq(&self, other: &Self) -> bool {
         self.content == other.content
+    }
+}
+
+impl<T> Eq for DataWithPool<T> where T: Eq {}
+
+impl<T> Hash for DataWithPool<T>
+where
+    T: Hash,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.content.hash(state);
     }
 }
 
@@ -107,7 +119,7 @@ impl DataWithPool<model::Account> {
         &self,
         currency: &DataWithPool<Commodity>,
     ) -> Result<f64, sqlx::Error> {
-        let mut net: f64 = self.splits()?.iter().map(|s| s.quantity).sum();
+        let mut net: f64 = self.splits()?.iter().map(|s| s.quantity()).sum();
         let commodity = self.commodity().expect("must have commodity");
 
         for child in self.children()? {
@@ -133,7 +145,7 @@ impl DataWithPool<model::Account> {
     }
 
     pub fn balance(&self) -> Result<f64, sqlx::Error> {
-        let mut net: f64 = self.splits()?.iter().map(|s| s.quantity).sum();
+        let mut net: f64 = self.splits()?.iter().map(|s| s.quantity()).sum();
 
         let commodity = match self.commodity() {
             Some(commodity) => commodity,

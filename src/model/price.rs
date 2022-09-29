@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 use crate::kind::SQLKind;
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(
     any(feature = "sqlite", feature = "postgres", feature = "mysql",),
     derive(sqlx::FromRow)
@@ -19,7 +19,6 @@ pub struct Price {
     pub r#type: Option<String>,
     pub value_num: i64,
     pub value_denom: i64,
-    pub value: f64,
 }
 
 impl super::NullNone for Price {
@@ -63,8 +62,7 @@ impl<'q> Price {
             source,
             type,
             value_num,
-            value_denom,
-            CAST(value_num AS float) / CAST(value_denom AS float) as "value!: f64"
+            value_denom
             FROM prices
             "#,
         )
@@ -87,8 +85,7 @@ impl<'q> Price {
             source,
             type,
             value_num,
-            value_denom,
-            CAST(value_num AS float) / CAST(value_denom AS float) as value
+            value_denom
             FROM prices
             "#,
         )
@@ -116,8 +113,7 @@ impl<'q> Price {
                 source,
                 type,
                 value_num,
-                value_denom,
-                CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+                value_denom
                 FROM prices
                 WHERE guid = $1
                 "#,
@@ -133,8 +129,7 @@ impl<'q> Price {
             source,
             type,
             value_num,
-            value_denom,
-            CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+            value_denom
             FROM prices
             WHERE guid = ?
             "#,
@@ -165,8 +160,7 @@ impl<'q> Price {
                 source,
                 type,
                 value_num,
-                value_denom,
-                CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+                value_denom
                 FROM prices
                 WHERE commodity_guid = $1
                 "#,
@@ -182,8 +176,7 @@ impl<'q> Price {
             source,
             type,
             value_num,
-            value_denom,
-            CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+            value_denom
             FROM prices
             WHERE commodity_guid = ?
             "#,
@@ -214,8 +207,7 @@ impl<'q> Price {
                 source,
                 type,
                 value_num,
-                value_denom,
-                CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+                value_denom
                 FROM prices
                 WHERE currency_guid = $1
                 "#,
@@ -231,8 +223,7 @@ impl<'q> Price {
             source,
             type,
             value_num,
-            value_denom,
-            CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+            value_denom
             FROM prices
             WHERE currency_guid = ?
             "#,
@@ -263,8 +254,7 @@ impl<'q> Price {
                 source,
                 type,
                 value_num,
-                value_denom,
-                CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+                value_denom
                 FROM prices
                 WHERE commodity_guid = $1
                 OR currency_guid = $1
@@ -281,8 +271,7 @@ impl<'q> Price {
             source,
             type,
             value_num,
-            value_denom,
-            CAST(value_num AS float) / CAST(value_denom AS float) as "value"
+            value_denom
             FROM prices
             WHERE commodity_guid = ?
             OR currency_guid = ?
@@ -294,9 +283,12 @@ impl<'q> Price {
         }
     }
 
-    pub fn value(&self) -> Decimal {
-        Decimal::from_str(&self.value_num.to_string()).unwrap()
-            / Decimal::from_str(&self.value_denom.to_string()).unwrap()
+    pub fn value(&self) -> f64 {
+        self.value_num as f64 / self.value_denom as f64
+    }
+
+    pub fn value_into_decimal(&self) -> Decimal {
+        Decimal::new(self.value_num, 0) / Decimal::new(self.value_denom, 0)
     }
 }
 
@@ -351,7 +343,6 @@ impl Price {
         let mut splits = splits.split('/');
         let value_num = splits.next().unwrap().parse().unwrap();
         let value_denom = splits.next().unwrap().parse().unwrap();
-        let value = value_num as f64 / value_denom as f64;
 
         Self {
             guid,
@@ -362,7 +353,6 @@ impl Price {
             r#type,
             value_num,
             value_denom,
-            value,
         }
     }
 }
@@ -417,8 +407,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(1.5, result.value);
-            assert_eq!(Decimal::new(15, 1), result.value());
+            assert_eq!(1.5, result.value());
+            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
@@ -430,8 +420,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(1.5, result.value);
-            assert_eq!(Decimal::new(15, 1), result.value());
+            assert_eq!(1.5, result.value());
+            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
@@ -443,8 +433,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(1.5, result.value);
-            assert_eq!(Decimal::new(15, 1), result.value());
+            assert_eq!(1.5, result.value());
+            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
@@ -497,8 +487,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(1.5, result.value);
-            assert_eq!(Decimal::new(15, 1), result.value());
+            assert_eq!(1.5, result.value());
+            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
@@ -510,8 +500,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(1.5, result.value);
-            assert_eq!(Decimal::new(15, 1), result.value());
+            assert_eq!(1.5, result.value());
+            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
@@ -523,8 +513,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(1.5, result.value);
-            assert_eq!(Decimal::new(15, 1), result.value());
+            assert_eq!(1.5, result.value());
+            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
@@ -577,8 +567,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(1.5, result.value);
-            assert_eq!(Decimal::new(15, 1), result.value());
+            assert_eq!(1.5, result.value());
+            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
@@ -590,8 +580,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(1.5, result.value);
-            assert_eq!(Decimal::new(15, 1), result.value());
+            assert_eq!(1.5, result.value());
+            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
@@ -603,8 +593,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(1.5, result.value);
-            assert_eq!(Decimal::new(15, 1), result.value());
+            assert_eq!(1.5, result.value());
+            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
@@ -705,7 +695,7 @@ mod tests {
             assert_eq!(price.r#type.as_ref().unwrap(), "unknown");
             assert_eq!(price.value_num, 3);
             assert_eq!(price.value_denom, 2);
-            assert_eq!(price.value, 1.5);
+            assert_eq!(price.value(), 1.5);
         }
     }
 }

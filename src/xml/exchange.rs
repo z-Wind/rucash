@@ -25,10 +25,10 @@ impl Exchange {
                 .entry(currency.clone())
                 .and_modify(|e| {
                     if e.1 < p.date {
-                        *e = (p.value, p.date);
+                        *e = (p.value(), p.date);
                     }
                 })
-                .or_insert((p.value, p.date));
+                .or_insert((p.value(), p.date));
 
             graph
                 .entry(currency.clone())
@@ -36,10 +36,10 @@ impl Exchange {
                 .entry(commodity.clone())
                 .and_modify(|e| {
                     if e.1 < p.date {
-                        *e = (1.0 / p.value, p.date);
+                        *e = (1.0 / p.value(), p.date);
                     }
                 })
-                .or_insert((1.0 / p.value, p.date));
+                .or_insert((1.0 / p.value(), p.date));
         }
 
         Self { graph }

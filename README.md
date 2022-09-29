@@ -40,7 +40,7 @@ let accounts = book.accounts();
 ```toml
 # Cargo.toml
 [dependencies]
-rucash = { version = "0.1", features = [ "sqlite" ] }
+rucash = { version = "0.2", features = [ "sqlite" ] }
 ```
 
 #### Cargo Feature Flags

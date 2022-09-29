@@ -80,7 +80,7 @@ impl DataWithPool<model::Account> {
     }
 
     fn balance_into_currency(&self, currency: &DataWithPool<Commodity>) -> f64 {
-        let mut net: f64 = self.splits().iter().map(|s| s.quantity).sum();
+        let mut net: f64 = self.splits().iter().map(|s| s.quantity()).sum();
         let commodity = self.commodity().expect("must have commodity");
 
         for child in self.children() {
@@ -106,7 +106,7 @@ impl DataWithPool<model::Account> {
     }
 
     pub fn balance(&self) -> f64 {
-        let mut net: f64 = self.splits().iter().map(|s| s.quantity).sum();
+        let mut net: f64 = self.splits().iter().map(|s| s.quantity()).sum();
 
         let commodity = match self.commodity() {
             Some(commodity) => commodity,

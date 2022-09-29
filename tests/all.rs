@@ -181,7 +181,7 @@ mod consistency {
             assert_eq!(a.r#type, b.r#type);
             assert_eq!(a.value_num, b.value_num);
             assert_eq!(a.value_denom, b.value_denom);
-            assert_eq!(a.value, b.value);
+            assert_eq!(a.value(), b.value());
 
             true
         }

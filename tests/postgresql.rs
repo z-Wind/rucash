@@ -205,10 +205,10 @@ mod split {
         assert_eq!(split.reconcile_date, None);
         assert_eq!(split.value_num, 15000);
         assert_eq!(split.value_denom, 100);
-        assert_eq!(split.value, 150.0);
+        assert_eq!(split.value(), 150.0);
         assert_eq!(split.quantity_num, 15000);
         assert_eq!(split.quantity_denom, 100);
-        assert_eq!(split.quantity, 150.0);
+        assert_eq!(split.quantity(), 150.0);
         assert_eq!(split.lot_guid, None);
     }
     #[test]
@@ -333,7 +333,7 @@ mod price {
         assert_eq!(price.r#type.as_ref().unwrap(), "unknown");
         assert_eq!(price.value_num, 3);
         assert_eq!(price.value_denom, 2);
-        assert_eq!(price.value, 1.5);
+        assert_eq!(price.value(), 1.5);
     }
 
     #[test]

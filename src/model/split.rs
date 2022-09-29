@@ -6,7 +6,7 @@ use std::str::FromStr;
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 use crate::kind::SQLKind;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(
     any(feature = "sqlite", feature = "postgres", feature = "mysql",),
     derive(sqlx::FromRow)
@@ -21,10 +21,8 @@ pub struct Split {
     pub reconcile_date: Option<chrono::NaiveDateTime>,
     pub value_num: i64,
     pub value_denom: i64,
-    pub value: f64,
     pub quantity_num: i64,
     pub quantity_denom: i64,
-    pub quantity: f64,
     pub lot_guid: Option<String>,
 }
 
@@ -74,10 +72,8 @@ impl<'q> Split {
             reconcile_date as "reconcile_date: chrono::NaiveDateTime",
             value_num,
             value_denom,
-            CAST(value_num AS float)/ CAST(value_denom AS float) as "value!: f64",
             quantity_num,
             quantity_denom,
-            CAST(quantity_num AS float) / CAST(quantity_denom AS float) as "quantity!: f64",
             lot_guid
             FROM splits
             "#,
@@ -103,10 +99,8 @@ impl<'q> Split {
             reconcile_date,
             value_num,
             value_denom,
-            CAST(value_num AS float)/ CAST(value_denom AS float) as value,
             quantity_num,
             quantity_denom,
-            CAST(quantity_num AS float) / CAST(quantity_denom AS float) as quantity,
             lot_guid
             FROM splits
             "#,
@@ -137,10 +131,8 @@ impl<'q> Split {
                 reconcile_date,
                 value_num,
                 value_denom,
-                CAST(value_num AS float)/ CAST(value_denom AS float) as "value",
                 quantity_num,
                 quantity_denom,
-                CAST(quantity_num AS float) / CAST(quantity_denom AS float) as "quantity",
                 lot_guid
                 FROM splits
                 WHERE guid = $1
@@ -159,10 +151,8 @@ impl<'q> Split {
             reconcile_date,
             value_num,
             value_denom,
-            CAST(value_num AS float)/ CAST(value_denom AS float) as "value",
             quantity_num,
             quantity_denom,
-            CAST(quantity_num AS float) / CAST(quantity_denom AS float) as "quantity",
             lot_guid
             FROM splits
             WHERE guid = ?
@@ -196,10 +186,8 @@ impl<'q> Split {
                 reconcile_date,
                 value_num,
                 value_denom,
-                CAST(value_num AS float)/ CAST(value_denom AS float) as "value" ,
                 quantity_num,
                 quantity_denom,
-                CAST(quantity_num AS float) / CAST(quantity_denom AS float) as "quantity",
                 lot_guid
                 FROM splits
                 WHERE account_guid = $1
@@ -218,10 +206,8 @@ impl<'q> Split {
             reconcile_date,
             value_num,
             value_denom,
-            CAST(value_num AS float)/ CAST(value_denom AS float) as "value" ,
             quantity_num,
             quantity_denom,
-            CAST(quantity_num AS float) / CAST(quantity_denom AS float) as "quantity",
             lot_guid
             FROM splits
             WHERE account_guid = ?
@@ -255,10 +241,8 @@ impl<'q> Split {
                 reconcile_date,
                 value_num,
                 value_denom,
-                CAST(value_num AS float)/ CAST(value_denom AS float) as "value" ,
                 quantity_num,
                 quantity_denom,
-                CAST(quantity_num AS float) / CAST(quantity_denom AS float) as "quantity",
                 lot_guid
                 FROM splits
                 WHERE tx_guid = $1
@@ -277,10 +261,8 @@ impl<'q> Split {
             reconcile_date,
             value_num,
             value_denom,
-            CAST(value_num AS float)/ CAST(value_denom AS float) as "value" ,
             quantity_num,
             quantity_denom,
-            CAST(quantity_num AS float) / CAST(quantity_denom AS float) as "quantity",
             lot_guid
             FROM splits
             WHERE tx_guid = ?
@@ -291,14 +273,20 @@ impl<'q> Split {
         }
     }
 
-    pub fn value(&self) -> Decimal {
-        Decimal::from_str(&self.value_num.to_string()).unwrap()
-            / Decimal::from_str(&self.value_denom.to_string()).unwrap()
+    pub fn value(&self) -> f64 {
+        self.value_num as f64 / self.value_denom as f64
     }
 
-    pub fn quantity(&self) -> Decimal {
-        Decimal::from_str(&self.quantity_num.to_string()).unwrap()
-            / Decimal::from_str(&self.quantity_denom.to_string()).unwrap()
+    pub fn value_into_decimal(&self) -> Decimal {
+        Decimal::new(self.value_num, 0) / Decimal::new(self.value_denom, 0)
+    }
+
+    pub fn quantity(&self) -> f64 {
+        self.quantity_num as f64 / self.quantity_denom as f64
+    }
+
+    pub fn quantity_into_decimal(&self) -> Decimal {
+        Decimal::new(self.quantity_num, 0) / Decimal::new(self.quantity_denom, 0)
     }
 }
 
@@ -350,7 +338,6 @@ impl Split {
         let mut splits = splits.split('/');
         let value_num = splits.next().unwrap().parse().unwrap();
         let value_denom = splits.next().unwrap().parse().unwrap();
-        let value = value_num as f64 / value_denom as f64;
 
         let splits = e
             .get_child("quantity")
@@ -360,7 +347,6 @@ impl Split {
         let mut splits = splits.split('/');
         let quantity_num = splits.next().unwrap().parse().unwrap();
         let quantity_denom = splits.next().unwrap().parse().unwrap();
-        let quantity = quantity_num as f64 / quantity_denom as f64;
         let lot_guid = None;
 
         Self {
@@ -373,10 +359,8 @@ impl Split {
             reconcile_date,
             value_num,
             value_denom,
-            value,
             quantity_num,
             quantity_denom,
-            quantity,
             lot_guid,
         }
     }
@@ -432,8 +416,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(150.0, result.value);
-            assert_eq!(Decimal::new(150, 0), result.value());
+            assert_eq!(150.0, result.value());
+            assert_eq!(Decimal::new(150, 0), result.value_into_decimal());
         }
 
         #[test]
@@ -498,8 +482,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(150.0, result.value);
-            assert_eq!(Decimal::new(150, 0), result.value());
+            assert_eq!(150.0, result.value());
+            assert_eq!(Decimal::new(150, 0), result.value_into_decimal());
         }
 
         #[test]
@@ -564,8 +548,8 @@ mod tests {
                     .await
             })
             .unwrap();
-            assert_eq!(150.0, result.value);
-            assert_eq!(Decimal::new(150, 0), result.value());
+            assert_eq!(150.0, result.value());
+            assert_eq!(Decimal::new(150, 0), result.value_into_decimal());
         }
 
         #[test]
@@ -664,10 +648,10 @@ mod tests {
             assert_eq!(split.reconcile_date, None);
             assert_eq!(split.value_num, 15000);
             assert_eq!(split.value_denom, 100);
-            assert_eq!(split.value, 150.0);
+            assert_eq!(split.value(), 150.0);
             assert_eq!(split.quantity_num, 15000);
             assert_eq!(split.quantity_denom, 100);
-            assert_eq!(split.quantity, 150.0);
+            assert_eq!(split.quantity(), 150.0);
             assert_eq!(split.lot_guid, None);
         }
     }
