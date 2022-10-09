@@ -7,16 +7,22 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
 
+#[derive(Debug, Clone)]
 pub(crate) struct Exchange {
+    kind: SQLKind,
+    pool: sqlx::AnyPool,
     graph: HashMap<String, HashMap<String, (f64, NaiveDateTime)>>,
 }
 
 impl Exchange {
-    pub(crate) fn new(kind: SQLKind, pool: sqlx::AnyPool) -> Result<Self, sqlx::Error> {
+    fn new_graph(
+        kind: SQLKind,
+        pool: sqlx::AnyPool,
+    ) -> Result<HashMap<String, HashMap<String, (f64, NaiveDateTime)>>, sqlx::Error> {
         let prices: Vec<DataWithPool<model::Price>> =
             block_on(async { model::Price::query().fetch_all(&pool).await }).map(|v| {
                 v.into_iter()
-                    .map(|x| DataWithPool::new(x, kind, pool.clone()))
+                    .map(|x| DataWithPool::new(x, kind, pool.clone(), None))
                     .collect()
             })?;
 
@@ -48,7 +54,14 @@ impl Exchange {
                 .or_insert((1.0 / p.value(), p.date));
         }
 
-        Ok(Self { graph })
+        Ok(graph)
+    }
+    pub(crate) fn new(kind: SQLKind, pool: sqlx::AnyPool) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            graph: Self::new_graph(kind, pool.clone())?,
+            kind,
+            pool,
+        })
     }
 
     pub(crate) fn cal(
@@ -104,6 +117,11 @@ impl Exchange {
 
         None
     }
+
+    pub(crate) fn update(&mut self) -> Result<(), sqlx::Error> {
+        self.graph = Self::new_graph(self.kind, self.pool.clone())?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -125,7 +143,8 @@ mod tests {
         #[test]
         fn test_exchange() {
             let book = setup(URI);
-            let exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
+            let mut exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
+            exchange.update().expect("ok");
 
             let from = book
                 .commodities()
@@ -254,7 +273,8 @@ mod tests {
         #[test]
         fn test_exchange() {
             let book = setup(URI);
-            let exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
+            let mut exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
+            exchange.update().expect("ok");
 
             let from = book
                 .commodities()
@@ -383,7 +403,8 @@ mod tests {
         #[test]
         fn test_exchange() {
             let book = setup(URI);
-            let exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
+            let mut exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
+            exchange.update().expect("ok");
 
             let from = book
                 .commodities()

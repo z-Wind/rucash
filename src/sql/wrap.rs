@@ -4,16 +4,23 @@ use crate::model::{self, Commodity};
 use futures::executor::block_on;
 use std::hash::Hash;
 use std::ops::Deref;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct DataWithPool<T> {
     content: T,
     kind: SQLKind,
     pub pool: sqlx::AnyPool,
+    exchange_graph: Option<Arc<RwLock<Exchange>>>,
 }
 
 impl<T> DataWithPool<T> {
-    pub(crate) fn new(content: T, kind: SQLKind, pool: sqlx::AnyPool) -> Self
+    pub(crate) fn new(
+        content: T,
+        kind: SQLKind,
+        pool: sqlx::AnyPool,
+        exchange_graph: Option<Arc<RwLock<Exchange>>>,
+    ) -> Self
     where
         T: model::NullNone,
     {
@@ -21,6 +28,7 @@ impl<T> DataWithPool<T> {
             content: content.null_none(),
             kind,
             pool,
+            exchange_graph,
         }
     }
 
@@ -75,7 +83,9 @@ impl DataWithPool<model::Account> {
         })
         .map(|v| {
             v.into_iter()
-                .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+                .map(|x| {
+                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+                })
                 .collect()
         })
     }
@@ -88,7 +98,7 @@ impl DataWithPool<model::Account> {
                 .await
                 .unwrap()
         })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
     }
 
     pub fn children(&self) -> Result<Vec<DataWithPool<model::Account>>, sqlx::Error> {
@@ -99,7 +109,9 @@ impl DataWithPool<model::Account> {
         })
         .map(|v| {
             v.into_iter()
-                .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+                .map(|x| {
+                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+                })
                 .collect()
         })
     }
@@ -112,7 +124,7 @@ impl DataWithPool<model::Account> {
                 .await
                 .unwrap()
         })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
     }
 
     fn balance_into_currency(
@@ -170,7 +182,7 @@ impl DataWithPool<model::Split> {
                 .fetch_one(&self.pool)
                 .await
         })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
     }
 
     pub fn account(&self) -> Result<DataWithPool<model::Account>, sqlx::Error> {
@@ -180,7 +192,7 @@ impl DataWithPool<model::Split> {
                 .fetch_one(&self.pool)
                 .await
         })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
     }
 }
 
@@ -192,7 +204,7 @@ impl DataWithPool<model::Transaction> {
                 .fetch_one(&self.pool)
                 .await
         })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
     }
 
     pub fn splits(&self) -> Result<Vec<DataWithPool<model::Split>>, sqlx::Error> {
@@ -204,7 +216,9 @@ impl DataWithPool<model::Transaction> {
         })
         .map(|v| {
             v.into_iter()
-                .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+                .map(|x| {
+                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+                })
                 .collect()
         })
     }
@@ -218,7 +232,7 @@ impl DataWithPool<model::Price> {
                 .fetch_one(&self.pool)
                 .await
         })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
     }
 
     pub fn currency(&self) -> Result<DataWithPool<model::Commodity>, sqlx::Error> {
@@ -228,7 +242,7 @@ impl DataWithPool<model::Price> {
                 .fetch_one(&self.pool)
                 .await
         })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
     }
 }
 
@@ -242,7 +256,9 @@ impl DataWithPool<model::Commodity> {
         })
         .map(|v| {
             v.into_iter()
-                .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+                .map(|x| {
+                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+                })
                 .collect()
         })
     }
@@ -256,7 +272,9 @@ impl DataWithPool<model::Commodity> {
         })
         .map(|v| {
             v.into_iter()
-                .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+                .map(|x| {
+                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+                })
                 .collect()
         })
     }
@@ -270,7 +288,9 @@ impl DataWithPool<model::Commodity> {
         })
         .map(|v| {
             v.into_iter()
-                .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+                .map(|x| {
+                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+                })
                 .collect()
         })
     }
@@ -284,7 +304,9 @@ impl DataWithPool<model::Commodity> {
         })
         .map(|v| {
             v.into_iter()
-                .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+                .map(|x| {
+                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+                })
                 .collect()
         })
     }
@@ -300,21 +322,38 @@ impl DataWithPool<model::Commodity> {
         })
         .map(|v| {
             v.into_iter()
-                .map(|x| DataWithPool::new(x, self.kind, self.pool.clone()))
+                .map(|x| {
+                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+                })
                 .collect()
         })
     }
 
     pub fn sell(&self, currency: &DataWithPool<model::Commodity>) -> Option<f64> {
         // println!("{} to {}", self.mnemonic, currency.mnemonic);
-        let exchange = Exchange::new(self.kind, self.pool.clone()).ok()?;
-        exchange.cal(self, currency)
+        self.exchange_graph
+            .as_ref()?
+            .read()
+            .ok()?
+            .cal(self, currency)
     }
 
     pub fn buy(&self, commodity: &DataWithPool<model::Commodity>) -> Option<f64> {
         // println!("{} to {}", commodity.mnemonic, self.mnemonic);
-        let exchange = Exchange::new(self.kind, self.pool.clone()).ok()?;
-        exchange.cal(commodity, self)
+        self.exchange_graph
+            .as_ref()?
+            .read()
+            .ok()?
+            .cal(commodity, self)
+    }
+
+    pub fn update_exchange_graph(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let graph = self.exchange_graph.as_ref().ok_or("No exchange graph")?;
+        graph
+            .write()
+            .expect("graph must could be written")
+            .update()?;
+        Ok(())
     }
 }
 

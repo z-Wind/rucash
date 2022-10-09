@@ -1,7 +1,6 @@
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 use super::TestSchemas;
 use rust_decimal::Decimal;
-use std::str::FromStr;
 
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 use crate::kind::SQLKind;

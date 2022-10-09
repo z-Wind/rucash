@@ -2,21 +2,28 @@ use super::Exchange;
 use super::XMLPool;
 use crate::model::{self, Commodity};
 use std::ops::Deref;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct DataWithPool<T> {
     content: T,
     pub(crate) pool: XMLPool,
+    exchange_graph: Option<Arc<RwLock<Exchange>>>,
 }
 
 impl<T> DataWithPool<T> {
-    pub(crate) fn new(content: T, pool: XMLPool) -> Self
+    pub(crate) fn new(
+        content: T,
+        pool: XMLPool,
+        exchange_graph: Option<Arc<RwLock<Exchange>>>,
+    ) -> Self
     where
         T: model::NullNone,
     {
         Self {
             content: content.null_none(),
             pool,
+            exchange_graph,
         }
     }
 
@@ -54,27 +61,27 @@ where
 impl DataWithPool<model::Account> {
     pub fn splits(&self) -> Vec<DataWithPool<model::Split>> {
         self.pool
-            .splits()
+            .splits(self.exchange_graph.clone())
             .into_iter()
             .filter(|x| x.account_guid == self.guid)
             .collect()
     }
     pub fn parent(&self) -> Option<DataWithPool<model::Account>> {
         self.pool
-            .accounts()
+            .accounts(self.exchange_graph.clone())
             .into_iter()
             .find(|x| Some(x.guid.clone()) == self.parent_guid)
     }
     pub fn children(&self) -> Vec<DataWithPool<model::Account>> {
         self.pool
-            .accounts()
+            .accounts(self.exchange_graph.clone())
             .into_iter()
             .filter(|x| x.parent_guid == Some(self.guid.clone()))
             .collect()
     }
     pub fn commodity(&self) -> Option<DataWithPool<model::Commodity>> {
         self.pool
-            .commodities()
+            .commodities(self.exchange_graph.clone())
             .into_iter()
             .find(|x| Some(x.guid.clone()) == self.commodity_guid)
     }
@@ -126,7 +133,7 @@ impl DataWithPool<model::Account> {
 impl DataWithPool<model::Split> {
     pub fn transaction(&self) -> DataWithPool<model::Transaction> {
         self.pool
-            .transactions()
+            .transactions(self.exchange_graph.clone())
             .into_iter()
             .find(|x| x.guid == self.tx_guid)
             .expect("tx_guid must match one")
@@ -134,7 +141,7 @@ impl DataWithPool<model::Split> {
 
     pub fn account(&self) -> DataWithPool<model::Account> {
         self.pool
-            .accounts()
+            .accounts(self.exchange_graph.clone())
             .into_iter()
             .find(|x| x.guid == self.account_guid)
             .expect("account_guid must match one")
@@ -144,7 +151,7 @@ impl DataWithPool<model::Split> {
 impl DataWithPool<model::Transaction> {
     pub fn currency(&self) -> DataWithPool<model::Commodity> {
         self.pool
-            .commodities()
+            .commodities(self.exchange_graph.clone())
             .into_iter()
             .find(|x| x.guid == self.currency_guid)
             .expect("currency_guid must match one")
@@ -152,7 +159,7 @@ impl DataWithPool<model::Transaction> {
 
     pub fn splits(&self) -> Vec<DataWithPool<model::Split>> {
         self.pool
-            .splits()
+            .splits(self.exchange_graph.clone())
             .into_iter()
             .filter(|x| x.tx_guid == self.guid)
             .collect()
@@ -162,7 +169,7 @@ impl DataWithPool<model::Transaction> {
 impl DataWithPool<model::Price> {
     pub fn commodity(&self) -> DataWithPool<model::Commodity> {
         self.pool
-            .commodities()
+            .commodities(self.exchange_graph.clone())
             .into_iter()
             .find(|x| x.guid == self.commodity_guid)
             .expect("commodity_guid must match one")
@@ -170,7 +177,7 @@ impl DataWithPool<model::Price> {
 
     pub fn currency(&self) -> DataWithPool<model::Commodity> {
         self.pool
-            .commodities()
+            .commodities(self.exchange_graph.clone())
             .into_iter()
             .find(|x| x.guid == self.currency_guid)
             .expect("currency_guid must match one")
@@ -180,7 +187,7 @@ impl DataWithPool<model::Price> {
 impl DataWithPool<model::Commodity> {
     pub fn accounts(&self) -> Vec<DataWithPool<model::Account>> {
         self.pool
-            .accounts()
+            .accounts(self.exchange_graph.clone())
             .into_iter()
             .filter(|x| x.commodity_guid == Some(self.guid.clone()))
             .collect()
@@ -188,7 +195,7 @@ impl DataWithPool<model::Commodity> {
 
     pub fn transactions(&self) -> Vec<DataWithPool<model::Transaction>> {
         self.pool
-            .transactions()
+            .transactions(self.exchange_graph.clone())
             .into_iter()
             .filter(|x| x.currency_guid == self.guid)
             .collect()
@@ -196,7 +203,7 @@ impl DataWithPool<model::Commodity> {
 
     pub fn as_commodity_prices(&self) -> Vec<DataWithPool<model::Price>> {
         self.pool
-            .prices()
+            .prices(self.exchange_graph.clone())
             .into_iter()
             .filter(|x| x.commodity_guid == self.guid)
             .collect()
@@ -204,7 +211,7 @@ impl DataWithPool<model::Commodity> {
 
     pub fn as_currency_prices(&self) -> Vec<DataWithPool<model::Price>> {
         self.pool
-            .prices()
+            .prices(self.exchange_graph.clone())
             .into_iter()
             .filter(|x| x.currency_guid == self.guid)
             .collect()
@@ -212,7 +219,7 @@ impl DataWithPool<model::Commodity> {
 
     pub fn as_commodity_or_currency_prices(&self) -> Vec<DataWithPool<model::Price>> {
         self.pool
-            .prices()
+            .prices(self.exchange_graph.clone())
             .into_iter()
             .filter(|x| x.commodity_guid == self.guid || x.currency_guid == self.guid)
             .collect()
@@ -228,6 +235,12 @@ impl DataWithPool<model::Commodity> {
         // println!("{} to {}", commodity.mnemonic, self.mnemonic);
         let exchange = Exchange::new(self.pool.clone());
         exchange.cal(commodity, self)
+    }
+
+    pub fn update_exchange_graph(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let graph = self.exchange_graph.as_ref().ok_or("No exchange graph")?;
+        graph.write().expect("graph must could be written").update();
+        Ok(())
     }
 }
 

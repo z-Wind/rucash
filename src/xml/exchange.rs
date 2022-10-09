@@ -6,13 +6,15 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
 
+#[derive(Debug, Clone)]
 pub(crate) struct Exchange {
     graph: HashMap<String, HashMap<String, (f64, NaiveDateTime)>>,
+    pool: XMLPool,
 }
 
 impl Exchange {
-    pub(crate) fn new(pool: XMLPool) -> Self {
-        let prices: Vec<DataWithPool<model::Price>> = pool.prices();
+    fn new_graph(pool: XMLPool) -> HashMap<String, HashMap<String, (f64, NaiveDateTime)>> {
+        let prices: Vec<DataWithPool<model::Price>> = pool.prices(None);
 
         let mut graph: HashMap<String, HashMap<String, (f64, NaiveDateTime)>> = HashMap::new();
         for p in prices {
@@ -42,7 +44,14 @@ impl Exchange {
                 .or_insert((1.0 / p.value(), p.date));
         }
 
-        Self { graph }
+        graph
+    }
+
+    pub(crate) fn new(pool: XMLPool) -> Self {
+        Self {
+            graph: Self::new_graph(pool.clone()),
+            pool,
+        }
     }
 
     pub(crate) fn cal(
@@ -98,6 +107,10 @@ impl Exchange {
 
         None
     }
+
+    pub(crate) fn update(&mut self) {
+        self.graph = Self::new_graph(self.pool.clone());
+    }
 }
 
 #[cfg(test)]
@@ -119,7 +132,8 @@ mod tests {
         #[test]
         fn test_exchange() {
             let book = setup(URI);
-            let exchange = Exchange::new(book.pool.clone());
+            let mut exchange = Exchange::new(book.pool.clone());
+            exchange.update();
 
             let from = book
                 .commodities()
