@@ -367,17 +367,19 @@ mod tests {
     mod sqlite {
         use super::*;
 
-        const URI: &str = r"sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
-        fn setup(uri: &str) -> crate::SqliteBook {
-            println!("work_dir: {:?}", std::env::current_dir());
+        fn setup() -> crate::SqliteBook {
+            let uri: &str = &format!(
+                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
             crate::SqliteBook::new(uri).expect("right path")
         }
 
         #[test]
         fn account() {
-            let book = setup(URI);
+            let book = setup();
 
             let account = book.account_by_name("Foo stock").unwrap().unwrap();
             assert_eq!("Foo stock", account.name);
@@ -414,7 +416,7 @@ mod tests {
 
         #[test]
         fn split() {
-            let book = setup(URI);
+            let book = setup();
             let split = book
                 .splits()
                 .unwrap()
@@ -454,7 +456,7 @@ mod tests {
 
         #[test]
         fn transaction() {
-            let book = setup(URI);
+            let book = setup();
             let transaction = book
                 .transactions()
                 .unwrap()
@@ -468,7 +470,7 @@ mod tests {
 
         #[test]
         fn price() {
-            let book = setup(URI);
+            let book = setup();
             let price = book
                 .prices()
                 .unwrap()
@@ -482,7 +484,7 @@ mod tests {
 
         #[test]
         fn commodity() {
-            let book = setup(URI);
+            let book = setup();
             let commodity = book
                 .commodities()
                 .unwrap()
@@ -514,16 +516,16 @@ mod tests {
     mod postgresql {
         use super::*;
 
-        const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
         type DB = sqlx::Postgres;
 
-        fn setup(uri: &str) -> crate::PostgreSQLBook {
+        fn setup() -> crate::PostgreSQLBook {
+            let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
             crate::PostgreSQLBook::new(&uri).expect("right path")
         }
 
         #[test]
         fn account() {
-            let book = setup(URI);
+            let book = setup();
 
             let account = book.account_by_name("Foo stock").unwrap().unwrap();
             assert_eq!("Foo stock", account.name);
@@ -560,7 +562,7 @@ mod tests {
 
         #[test]
         fn split() {
-            let book = setup(URI);
+            let book = setup();
             let split = book
                 .splits()
                 .unwrap()
@@ -600,7 +602,7 @@ mod tests {
 
         #[test]
         fn transaction() {
-            let book = setup(URI);
+            let book = setup();
             let transaction = book
                 .transactions()
                 .unwrap()
@@ -614,7 +616,7 @@ mod tests {
 
         #[test]
         fn price() {
-            let book = setup(URI);
+            let book = setup();
             let price = book
                 .prices()
                 .unwrap()
@@ -628,7 +630,7 @@ mod tests {
 
         #[test]
         fn commodity() {
-            let book = setup(URI);
+            let book = setup();
             let commodity = book
                 .commodities()
                 .unwrap()
@@ -660,16 +662,16 @@ mod tests {
     mod mysql {
         use super::*;
 
-        const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
         type DB = sqlx::MySql;
 
-        fn setup(uri: &str) -> crate::MySQLBook {
+        fn setup() -> crate::MySQLBook {
+            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
             crate::MySQLBook::new(uri).expect("right path")
         }
 
         #[test]
         fn account() {
-            let book = setup(URI);
+            let book = setup();
 
             let account = book.account_by_name("Foo stock").unwrap().unwrap();
             assert_eq!("Foo stock", account.name);
@@ -706,7 +708,7 @@ mod tests {
 
         #[test]
         fn split() {
-            let book = setup(URI);
+            let book = setup();
             let split = book
                 .splits()
                 .unwrap()
@@ -746,7 +748,7 @@ mod tests {
 
         #[test]
         fn transaction() {
-            let book = setup(URI);
+            let book = setup();
             let transaction = book
                 .transactions()
                 .unwrap()
@@ -760,7 +762,7 @@ mod tests {
 
         #[test]
         fn price() {
-            let book = setup(URI);
+            let book = setup();
             let price = book
                 .prices()
                 .unwrap()
@@ -774,7 +776,7 @@ mod tests {
 
         #[test]
         fn commodity() {
-            let book = setup(URI);
+            let book = setup();
             let commodity = book
                 .commodities()
                 .unwrap()

@@ -132,17 +132,19 @@ mod tests {
     mod sqlite {
         use super::*;
 
-        const URI: &str = r"sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
-        fn setup(uri: &str) -> crate::SqliteBook {
-            println!("work_dir: {:?}", std::env::current_dir());
+        fn setup() -> crate::SqliteBook {
+            let uri: &str = &format!(
+                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
             crate::SqliteBook::new(uri).expect("right path")
         }
 
         #[test]
         fn test_exchange() {
-            let book = setup(URI);
+            let book = setup();
             let mut exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
             exchange.update().expect("ok");
 
@@ -272,7 +274,7 @@ mod tests {
 
         #[test]
         fn test_exchange() {
-            let book = setup(URI);
+            let book = setup();
             let mut exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
             exchange.update().expect("ok");
 
@@ -393,16 +395,16 @@ mod tests {
     mod mysql {
         use super::*;
 
-        const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
         type DB = sqlx::MySql;
 
-        fn setup(uri: &str) -> crate::MySQLBook {
+        fn setup() -> crate::MySQLBook {
+            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
             crate::MySQLBook::new(uri).expect("right path")
         }
 
         #[test]
         fn test_exchange() {
-            let book = setup(URI);
+            let book = setup();
             let mut exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
             exchange.update().expect("ok");
 

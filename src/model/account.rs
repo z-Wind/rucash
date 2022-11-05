@@ -483,10 +483,14 @@ mod tests {
     mod sqlite {
         use super::*;
 
-        const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
-        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+            let uri: &str = &format!(
+                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+
             println!("work_dir: {:?}", std::env::current_dir());
             (
                 block_on(async {
@@ -502,7 +506,7 @@ mod tests {
 
         #[test]
         fn query() {
-            let (pool, _) = setup(URI);
+            let (pool, _) = setup();
             let result: Vec<Account> =
                 block_on(async { Account::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(21, result.len());
@@ -510,7 +514,7 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Account = block_on(async {
                 Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
                     .fetch_one(&pool)
@@ -522,7 +526,7 @@ mod tests {
 
         #[test]
         fn query_by_commodity_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Account> = block_on(async {
                 Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
                     .fetch_all(&pool)
@@ -534,7 +538,7 @@ mod tests {
 
         #[test]
         fn query_by_parent_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Account> = block_on(async {
                 Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
                     .fetch_all(&pool)
@@ -546,7 +550,7 @@ mod tests {
 
         #[test]
         fn query_by_name() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Account =
                 block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
                     .unwrap();
@@ -555,7 +559,7 @@ mod tests {
 
         #[test]
         fn query_like_name() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Account> = block_on(async {
                 Account::query_like_name("%AS%", kind)
                     .fetch_all(&pool)
@@ -570,10 +574,11 @@ mod tests {
     mod postgresql {
         use super::*;
 
-        const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
         type DB = sqlx::Postgres;
 
-        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+            let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+
             (
                 block_on(async {
                     sqlx::postgres::PgPoolOptions::new()
@@ -588,7 +593,7 @@ mod tests {
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup(URI);
+            let (pool, _kind) = setup();
             let result: Vec<Account> =
                 block_on(async { Account::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(21, result.len());
@@ -596,7 +601,7 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Account = block_on(async {
                 Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
                     .fetch_one(&pool)
@@ -608,7 +613,7 @@ mod tests {
 
         #[test]
         fn query_by_commodity_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Account> = block_on(async {
                 Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
                     .fetch_all(&pool)
@@ -620,7 +625,7 @@ mod tests {
 
         #[test]
         fn query_by_parent_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Account> = block_on(async {
                 Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
                     .fetch_all(&pool)
@@ -632,7 +637,7 @@ mod tests {
 
         #[test]
         fn query_by_name() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Account =
                 block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
                     .unwrap();
@@ -641,7 +646,7 @@ mod tests {
 
         #[test]
         fn query_like_name() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Account> = block_on(async {
                 Account::query_like_name("%AS%", kind)
                     .fetch_all(&pool)
@@ -656,10 +661,11 @@ mod tests {
     mod mysql {
         use super::*;
 
-        const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
         type DB = sqlx::MySql;
 
-        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+
             (
                 block_on(async {
                     sqlx::mysql::MySqlPoolOptions::new()
@@ -674,7 +680,7 @@ mod tests {
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup(URI);
+            let (pool, _kind) = setup();
             let result: Vec<Account> =
                 block_on(async { Account::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(21, result.len());
@@ -682,7 +688,7 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Account = block_on(async {
                 Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
                     .fetch_one(&pool)
@@ -694,7 +700,7 @@ mod tests {
 
         #[test]
         fn query_by_commodity_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Account> = block_on(async {
                 Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
                     .fetch_all(&pool)
@@ -706,7 +712,7 @@ mod tests {
 
         #[test]
         fn query_by_parent_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Account> = block_on(async {
                 Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
                     .fetch_all(&pool)
@@ -718,7 +724,7 @@ mod tests {
 
         #[test]
         fn query_by_name() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Account =
                 block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
                     .unwrap();
@@ -727,7 +733,7 @@ mod tests {
 
         #[test]
         fn query_like_name() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Account> = block_on(async {
                 Account::query_like_name("%AS%", kind)
                     .fetch_all(&pool)
@@ -744,11 +750,12 @@ mod tests {
         use std::sync::Arc;
 
         #[allow(dead_code)]
-        const URI: &str = r"tests\db\xml\complex_sample.gnucash";
-
-        #[allow(dead_code)]
         fn setup() -> Arc<Element> {
-            crate::XMLBook::new(URI).unwrap().pool.0.clone()
+            let uri: &str = &format!(
+                "{}/tests/db/xml/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+            crate::XMLBook::new(uri).unwrap().pool.0.clone()
         }
 
         #[test]

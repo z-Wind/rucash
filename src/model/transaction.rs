@@ -236,11 +236,13 @@ mod tests {
         use super::*;
         use chrono::NaiveDateTime;
 
-        const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
-        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
-            println!("work_dir: {:?}", std::env::current_dir());
+        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+            let uri: &str = &format!(
+                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
             (
                 block_on(async {
                     sqlx::sqlite::SqlitePoolOptions::new()
@@ -255,7 +257,7 @@ mod tests {
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup(URI);
+            let (pool, _kind) = setup();
             let result: Vec<Transaction> =
                 block_on(async { Transaction::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(11, result.len());
@@ -263,7 +265,7 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Transaction = block_on(async {
                 Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
                     .fetch_one(&pool)
@@ -283,7 +285,7 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Transaction> = block_on(async {
                 Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
                     .fetch_all(&pool)
@@ -299,10 +301,10 @@ mod tests {
         use super::*;
         use chrono::NaiveDateTime;
 
-        const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
         type DB = sqlx::Postgres;
 
-        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+            let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
             (
                 block_on(async {
                     sqlx::postgres::PgPoolOptions::new()
@@ -317,7 +319,7 @@ mod tests {
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup(URI);
+            let (pool, _kind) = setup();
             let result: Vec<Transaction> =
                 block_on(async { Transaction::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(11, result.len());
@@ -325,7 +327,7 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Transaction = block_on(async {
                 Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
                     .fetch_one(&pool)
@@ -345,7 +347,7 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Transaction> = block_on(async {
                 Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
                     .fetch_all(&pool)
@@ -361,10 +363,10 @@ mod tests {
         use super::*;
         use chrono::NaiveDateTime;
 
-        const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
         type DB = sqlx::MySql;
 
-        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
             (
                 block_on(async {
                     sqlx::mysql::MySqlPoolOptions::new()
@@ -379,7 +381,7 @@ mod tests {
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup(URI);
+            let (pool, _kind) = setup();
             let result: Vec<Transaction> =
                 block_on(async { Transaction::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(11, result.len());
@@ -387,7 +389,7 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Transaction = block_on(async {
                 Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
                     .fetch_one(&pool)
@@ -407,7 +409,7 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Transaction> = block_on(async {
                 Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
                     .fetch_all(&pool)
@@ -422,11 +424,14 @@ mod tests {
     mod xml {
         use super::*;
         use std::sync::Arc;
-        #[allow(dead_code)]
-        const URI: &str = r"tests\db\xml\complex_sample.gnucash";
+
         #[allow(dead_code)]
         fn setup() -> Arc<Element> {
-            crate::XMLBook::new(URI).unwrap().pool.0.clone()
+            let uri: &str = &format!(
+                "{}/tests/db/xml/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+            crate::XMLBook::new(uri).unwrap().pool.0.clone()
         }
 
         #[test]

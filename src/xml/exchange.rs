@@ -122,16 +122,17 @@ mod tests {
     mod xml {
         use super::*;
 
-        const URI: &str = r"tests/db/xml/complex_sample.gnucash";
-
-        fn setup(uri: &str) -> crate::XMLBook {
-            println!("work_dir: {:?}", std::env::current_dir());
+        fn setup() -> crate::XMLBook {
+            let uri: &str = &format!(
+                "{}/tests/db/xml/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
             crate::XMLBook::new(uri).expect("right path")
         }
 
         #[test]
         fn test_exchange() {
-            let book = setup(URI);
+            let book = setup();
             let mut exchange = Exchange::new(book.pool.clone());
             exchange.update();
 

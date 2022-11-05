@@ -381,11 +381,13 @@ mod tests {
     mod sqlite {
         use super::*;
 
-        const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash";
         type DB = sqlx::Sqlite;
 
-        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
-            println!("work_dir: {:?}", std::env::current_dir());
+        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+            let uri: &str = &format!(
+                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
             (
                 block_on(async {
                     sqlx::sqlite::SqlitePoolOptions::new()
@@ -400,7 +402,7 @@ mod tests {
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup(URI);
+            let (pool, _kind) = setup();
             let result: Vec<Split> =
                 block_on(async { Split::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(25, result.len());
@@ -408,7 +410,7 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Split = block_on(async {
                 Split::query_by_guid("de832fe97e37811a7fff7e28b3a43425", kind)
                     .fetch_one(&pool)
@@ -421,7 +423,7 @@ mod tests {
 
         #[test]
         fn query_by_account_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Split> = block_on(async {
                 Split::query_by_account_guid("93fc043c3062aaa1297b30e543d2cd0d", kind)
                     .fetch_all(&pool)
@@ -433,7 +435,7 @@ mod tests {
 
         #[test]
         fn query_by_tx_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Split> = block_on(async {
                 Split::query_by_tx_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
                     .fetch_all(&pool)
@@ -448,10 +450,10 @@ mod tests {
     mod postgresql {
         use super::*;
 
-        const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
         type DB = sqlx::Postgres;
 
-        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+            let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
             (
                 block_on(async {
                     sqlx::postgres::PgPoolOptions::new()
@@ -466,7 +468,7 @@ mod tests {
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup(URI);
+            let (pool, _kind) = setup();
             let result: Vec<Split> =
                 block_on(async { Split::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(25, result.len());
@@ -474,7 +476,7 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Split = block_on(async {
                 Split::query_by_guid("de832fe97e37811a7fff7e28b3a43425", kind)
                     .fetch_one(&pool)
@@ -487,7 +489,7 @@ mod tests {
 
         #[test]
         fn query_by_account_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Split> = block_on(async {
                 Split::query_by_account_guid("93fc043c3062aaa1297b30e543d2cd0d", kind)
                     .fetch_all(&pool)
@@ -499,7 +501,7 @@ mod tests {
 
         #[test]
         fn query_by_tx_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Split> = block_on(async {
                 Split::query_by_tx_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
                     .fetch_all(&pool)
@@ -514,10 +516,10 @@ mod tests {
     mod mysql {
         use super::*;
 
-        const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
         type DB = sqlx::MySql;
 
-        fn setup(uri: &str) -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
             (
                 block_on(async {
                     sqlx::mysql::MySqlPoolOptions::new()
@@ -532,7 +534,7 @@ mod tests {
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup(URI);
+            let (pool, _kind) = setup();
             let result: Vec<Split> =
                 block_on(async { Split::query().fetch_all(&pool).await }).unwrap();
             assert_eq!(25, result.len());
@@ -540,7 +542,7 @@ mod tests {
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Split = block_on(async {
                 Split::query_by_guid("de832fe97e37811a7fff7e28b3a43425", kind)
                     .fetch_one(&pool)
@@ -553,7 +555,7 @@ mod tests {
 
         #[test]
         fn query_by_account_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Split> = block_on(async {
                 Split::query_by_account_guid("93fc043c3062aaa1297b30e543d2cd0d", kind)
                     .fetch_all(&pool)
@@ -565,7 +567,7 @@ mod tests {
 
         #[test]
         fn query_by_tx_guid() {
-            let (pool, kind) = setup(URI);
+            let (pool, kind) = setup();
             let result: Vec<Split> = block_on(async {
                 Split::query_by_tx_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
                     .fetch_all(&pool)
@@ -580,11 +582,14 @@ mod tests {
     mod xml {
         use super::*;
         use std::sync::Arc;
-        #[allow(dead_code)]
-        const URI: &str = r"tests\db\xml\complex_sample.gnucash";
+
         #[allow(dead_code)]
         fn setup() -> Arc<Element> {
-            crate::XMLBook::new(URI).unwrap().pool.0.clone()
+            let uri: &str = &format!(
+                "{}/tests/db/xml/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+            crate::XMLBook::new(uri).unwrap().pool.0.clone()
         }
 
         #[test]
