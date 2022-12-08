@@ -11,16 +11,16 @@ mod xml;
 mod consistency {
     use super::*;
 
-    fn setup_sqlite() -> SqliteBook {
-        SqliteBook::new(sqlite::URI).unwrap()
+    async fn setup_sqlite() -> SqliteBook {
+        SqliteBook::new(sqlite::URI).await.unwrap()
     }
 
-    fn setup_postgresql() -> PostgreSQLBook {
-        PostgreSQLBook::new(postgresql::URI).unwrap()
+    async fn setup_postgresql() -> PostgreSQLBook {
+        PostgreSQLBook::new(postgresql::URI).await.unwrap()
     }
 
-    fn setup_mysql() -> MySQLBook {
-        MySQLBook::new(mysql::URI).unwrap()
+    async fn setup_mysql() -> MySQLBook {
+        MySQLBook::new(mysql::URI).await.unwrap()
     }
 
     fn setup_xml() -> XMLBook {
@@ -38,8 +38,8 @@ mod consistency {
         matching == a.len() && matching == b.len()
     }
 
-    #[test]
-    fn accounts_consistency() {
+    #[tokio::test]
+    async fn accounts_consistency() {
         fn cmp(a: &rucash::model::Account, b: &rucash::model::Account) -> bool {
             // println!("a:{}\nb:{}\n\n", a.guid, b.guid);
             assert_eq!(a.guid, b.guid);
@@ -59,17 +59,17 @@ mod consistency {
             true
         }
 
-        let v_sqlite = setup_sqlite().accounts().unwrap();
+        let v_sqlite = setup_sqlite().await.accounts().await.unwrap();
         let mut v_sqlite: Vec<&rucash::model::Account> =
             v_sqlite.iter().map(|v| v.content()).collect();
         v_sqlite.sort_by_key(|x| &x.guid);
 
-        let v_postgresql = setup_postgresql().accounts().unwrap();
+        let v_postgresql = setup_postgresql().await.accounts().await.unwrap();
         let mut v_postgresql: Vec<&rucash::model::Account> =
             v_postgresql.iter().map(|v| v.content()).collect();
         v_postgresql.sort_by_key(|x| &x.guid);
 
-        let v_mysql = setup_mysql().accounts().unwrap();
+        let v_mysql = setup_mysql().await.accounts().await.unwrap();
         let mut v_mysql: Vec<&rucash::model::Account> =
             v_mysql.iter().map(|v| v.content()).collect();
         v_mysql.sort_by_key(|x| &x.guid);
@@ -96,24 +96,24 @@ mod consistency {
         );
     }
 
-    #[test]
-    fn splits_consistency() {
+    #[tokio::test]
+    async fn splits_consistency() {
         fn cmp(a: &rucash::model::Split, b: &rucash::model::Split) -> bool {
             assert_eq!(a, b);
             a == b
         }
 
-        let v_sqlite = setup_sqlite().splits().unwrap();
+        let v_sqlite = setup_sqlite().await.splits().await.unwrap();
         let mut v_sqlite: Vec<&rucash::model::Split> =
             v_sqlite.iter().map(|v| v.content()).collect();
         v_sqlite.sort_by_key(|x| &x.guid);
 
-        let v_postgresql = setup_postgresql().splits().unwrap();
+        let v_postgresql = setup_postgresql().await.splits().await.unwrap();
         let mut v_postgresql: Vec<&rucash::model::Split> =
             v_postgresql.iter().map(|v| v.content()).collect();
         v_postgresql.sort_by_key(|x| &x.guid);
 
-        let v_mysql = setup_mysql().splits().unwrap();
+        let v_mysql = setup_mysql().await.splits().await.unwrap();
         let mut v_mysql: Vec<&rucash::model::Split> = v_mysql.iter().map(|v| v.content()).collect();
         v_mysql.sort_by_key(|x| &x.guid);
 
@@ -129,8 +129,8 @@ mod consistency {
         assert_eq!(vec_match(&v_sqlite, &v_xml, cmp), true);
     }
 
-    #[test]
-    fn transactions_consistency() {
+    #[tokio::test]
+    async fn transactions_consistency() {
         fn cmp(a: &rucash::model::Transaction, b: &rucash::model::Transaction) -> bool {
             assert_eq!(a.guid, b.guid);
             // assert_eq!(a.currency_guid, b.currency_guid);
@@ -142,17 +142,17 @@ mod consistency {
             true
         }
 
-        let v_sqlite = setup_sqlite().transactions().unwrap();
+        let v_sqlite = setup_sqlite().await.transactions().await.unwrap();
         let mut v_sqlite: Vec<&rucash::model::Transaction> =
             v_sqlite.iter().map(|v| v.content()).collect();
         v_sqlite.sort_by_key(|x| &x.guid);
 
-        let v_postgresql = setup_postgresql().transactions().unwrap();
+        let v_postgresql = setup_postgresql().await.transactions().await.unwrap();
         let mut v_postgresql: Vec<&rucash::model::Transaction> =
             v_postgresql.iter().map(|v| v.content()).collect();
         v_postgresql.sort_by_key(|x| &x.guid);
 
-        let v_mysql = setup_mysql().transactions().unwrap();
+        let v_mysql = setup_mysql().await.transactions().await.unwrap();
         let mut v_mysql: Vec<&rucash::model::Transaction> =
             v_mysql.iter().map(|v| v.content()).collect();
         v_mysql.sort_by_key(|x| &x.guid);
@@ -170,8 +170,8 @@ mod consistency {
         assert_eq!(vec_match(&v_sqlite, &v_xml, cmp), true);
     }
 
-    #[test]
-    fn prices_consistency() {
+    #[tokio::test]
+    async fn prices_consistency() {
         fn cmp(a: &rucash::model::Price, b: &rucash::model::Price) -> bool {
             assert_eq!(a.guid, b.guid);
             // assert_eq!(a.commodity_guid, b.commodity_guid);
@@ -186,17 +186,17 @@ mod consistency {
             true
         }
 
-        let v_sqlite = setup_sqlite().prices().unwrap();
+        let v_sqlite = setup_sqlite().await.prices().await.unwrap();
         let mut v_sqlite: Vec<&rucash::model::Price> =
             v_sqlite.iter().map(|v| v.content()).collect();
         v_sqlite.sort_by_key(|x| &x.guid);
 
-        let v_postgresql = setup_postgresql().prices().unwrap();
+        let v_postgresql = setup_postgresql().await.prices().await.unwrap();
         let mut v_postgresql: Vec<&rucash::model::Price> =
             v_postgresql.iter().map(|v| v.content()).collect();
         v_postgresql.sort_by_key(|x| &x.guid);
 
-        let v_mysql = setup_mysql().prices().unwrap();
+        let v_mysql = setup_mysql().await.prices().await.unwrap();
         let mut v_mysql: Vec<&rucash::model::Price> = v_mysql.iter().map(|v| v.content()).collect();
         v_mysql.sort_by_key(|x| &x.guid);
 
@@ -212,8 +212,8 @@ mod consistency {
         assert_eq!(vec_match(&v_sqlite, &v_xml, cmp), true);
     }
 
-    #[test]
-    fn commodities_consistency() {
+    #[tokio::test]
+    async fn commodities_consistency() {
         fn cmp(a: &rucash::model::Commodity, b: &rucash::model::Commodity) -> bool {
             println!("a:{}\nb:{}\n\n", a.guid, b.guid);
             // assert_eq!(a.guid, b.guid);
@@ -229,17 +229,17 @@ mod consistency {
             true
         }
 
-        let v_sqlite = setup_sqlite().commodities().unwrap();
+        let v_sqlite = setup_sqlite().await.commodities().await.unwrap();
         let mut v_sqlite: Vec<&rucash::model::Commodity> =
             v_sqlite.iter().map(|v| v.content()).collect();
         v_sqlite.sort_by_key(|x| &x.mnemonic);
 
-        let v_postgresql = setup_postgresql().commodities().unwrap();
+        let v_postgresql = setup_postgresql().await.commodities().await.unwrap();
         let mut v_postgresql: Vec<&rucash::model::Commodity> =
             v_postgresql.iter().map(|v| v.content()).collect();
         v_postgresql.sort_by_key(|x| &x.mnemonic);
 
-        let v_mysql = setup_mysql().commodities().unwrap();
+        let v_mysql = setup_mysql().await.commodities().await.unwrap();
         let mut v_mysql: Vec<&rucash::model::Commodity> =
             v_mysql.iter().map(|v| v.content()).collect();
         v_mysql.sort_by_key(|x| &x.mnemonic);

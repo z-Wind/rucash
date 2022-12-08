@@ -478,6 +478,7 @@ mod tests {
     use super::*;
     #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     use futures::executor::block_on;
+    use tokio::runtime::Runtime;
 
     #[cfg(feature = "sqlite")]
     mod sqlite {
@@ -485,87 +486,97 @@ mod tests {
 
         type DB = sqlx::Sqlite;
 
-        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
             let uri: &str = &format!(
                 "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
 
             println!("work_dir: {:?}", std::env::current_dir());
             (
-                block_on(async {
+                rt.block_on(async {
                     sqlx::sqlite::SqlitePoolOptions::new()
                         .max_connections(5)
                         .connect(&format!("{}?mode=ro", uri)) // read only
                         .await
                         .unwrap()
                 }),
+                rt,
                 uri.parse().expect("sqlite"),
             )
         }
 
         #[test]
         fn query() {
-            let (pool, _) = setup();
-            let result: Vec<Account> =
-                block_on(async { Account::query().fetch_all(&pool).await }).unwrap();
+            let (pool, rt, _) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async { Account::query().fetch_all(&pool).await })
+                .unwrap();
             assert_eq!(21, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup();
-            let result: Account = block_on(async {
-                Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Account = rt
+                .block_on(async {
+                    Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!("Asset", result.name);
         }
 
         #[test]
         fn query_by_commodity_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Account> = block_on(async {
-                Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async {
+                    Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(14, result.len());
         }
 
         #[test]
         fn query_by_parent_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Account> = block_on(async {
-                Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async {
+                    Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(3, result.len());
         }
 
         #[test]
         fn query_by_name() {
-            let (pool, kind) = setup();
-            let result: Account =
-                block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
-                    .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Account = rt
+                .block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
+                .unwrap();
             assert_eq!("fcd795021c976ba75621ec39e75f6214", result.guid);
         }
 
         #[test]
         fn query_like_name() {
-            let (pool, kind) = setup();
-            let result: Vec<Account> = block_on(async {
-                Account::query_like_name("%AS%", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async {
+                    Account::query_like_name("%AS%", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(3, result.len());
         }
     }
@@ -576,83 +587,93 @@ mod tests {
 
         type DB = sqlx::Postgres;
 
-        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
             let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
 
             (
-                block_on(async {
+                rt.block_on(async {
                     sqlx::postgres::PgPoolOptions::new()
                         .max_connections(5)
                         .connect(uri)
                         .await
                         .unwrap()
                 }),
+                rt,
                 uri.parse().expect("postgres"),
             )
         }
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup();
-            let result: Vec<Account> =
-                block_on(async { Account::query().fetch_all(&pool).await }).unwrap();
+            let (pool, rt, _) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async { Account::query().fetch_all(&pool).await })
+                .unwrap();
             assert_eq!(21, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup();
-            let result: Account = block_on(async {
-                Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Account = rt
+                .block_on(async {
+                    Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!("Asset", result.name);
         }
 
         #[test]
         fn query_by_commodity_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Account> = block_on(async {
-                Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async {
+                    Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(14, result.len());
         }
 
         #[test]
         fn query_by_parent_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Account> = block_on(async {
-                Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async {
+                    Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(3, result.len());
         }
 
         #[test]
         fn query_by_name() {
-            let (pool, kind) = setup();
-            let result: Account =
-                block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
-                    .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Account = rt
+                .block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
+                .unwrap();
             assert_eq!("fcd795021c976ba75621ec39e75f6214", result.guid);
         }
 
         #[test]
         fn query_like_name() {
-            let (pool, kind) = setup();
-            let result: Vec<Account> = block_on(async {
-                Account::query_like_name("%AS%", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async {
+                    Account::query_like_name("%AS%", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(3, result.len());
         }
     }
@@ -663,83 +684,93 @@ mod tests {
 
         type DB = sqlx::MySql;
 
-        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
 
             (
-                block_on(async {
+                rt.block_on(async {
                     sqlx::mysql::MySqlPoolOptions::new()
                         .max_connections(5)
                         .connect(uri)
                         .await
                         .unwrap()
                 }),
+                rt,
                 uri.parse().expect("mysql"),
             )
         }
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup();
-            let result: Vec<Account> =
-                block_on(async { Account::query().fetch_all(&pool).await }).unwrap();
+            let (pool, rt, _) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async { Account::query().fetch_all(&pool).await })
+                .unwrap();
             assert_eq!(21, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup();
-            let result: Account = block_on(async {
-                Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Account = rt
+                .block_on(async {
+                    Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!("Asset", result.name);
         }
 
         #[test]
         fn query_by_commodity_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Account> = block_on(async {
-                Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async {
+                    Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(14, result.len());
         }
 
         #[test]
         fn query_by_parent_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Account> = block_on(async {
-                Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async {
+                    Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(3, result.len());
         }
 
         #[test]
         fn query_by_name() {
-            let (pool, kind) = setup();
-            let result: Account =
-                block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
-                    .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Account = rt
+                .block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
+                .unwrap();
             assert_eq!("fcd795021c976ba75621ec39e75f6214", result.guid);
         }
 
         #[test]
         fn query_like_name() {
-            let (pool, kind) = setup();
-            let result: Vec<Account> = block_on(async {
-                Account::query_like_name("%AS%", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Account> = rt
+                .block_on(async {
+                    Account::query_like_name("%AS%", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(3, result.len());
         }
     }

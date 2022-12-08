@@ -5,29 +5,30 @@ pub const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
 mod book {
     use super::*;
 
-    #[test]
-    fn new() {
-        MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn new() {
+        MySQLBook::new(URI).await.unwrap();
     }
 
-    #[test]
+    #[tokio::test]
     #[should_panic]
-    fn new_fail() {
-        MySQLBook::new("mysql://user@localhost").unwrap();
+    async fn new_fail() {
+        MySQLBook::new("mysql://user@localhost").await.unwrap();
     }
 
-    #[test]
-    fn accounts() {
-        let book = MySQLBook::new(URI).unwrap();
-        let accounts = book.accounts().unwrap();
+    #[tokio::test]
+    async fn accounts() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let accounts = book.accounts().await.unwrap();
         assert_eq!(accounts.len(), 21);
     }
 
-    #[test]
-    fn accounts_filter() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn accounts_filter() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let accounts: Vec<_> = book
             .accounts()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.name.to_lowercase().contains(&"aS".to_lowercase()))
@@ -35,62 +36,63 @@ mod book {
         assert_eq!(accounts.len(), 3);
     }
 
-    #[test]
-    fn accounts_by_name() {
-        let book = MySQLBook::new(URI).unwrap();
-        let accounts = book.accounts_contains_name("aS").unwrap();
+    #[tokio::test]
+    async fn accounts_by_name() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let accounts = book.accounts_contains_name("aS").await.unwrap();
         assert_eq!(accounts.len(), 3);
     }
 
-    #[test]
-    fn account_by_name() {
-        let book = MySQLBook::new(URI).unwrap();
-        let account = book.account_by_name("aS").unwrap().unwrap();
+    #[tokio::test]
+    async fn account_by_name() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let account = book.account_by_name("aS").await.unwrap().unwrap();
         assert_eq!(account.name, "Asset");
     }
 
-    #[test]
-    fn splits() {
-        let book = MySQLBook::new(URI).unwrap();
-        let splits = book.splits().unwrap();
+    #[tokio::test]
+    async fn splits() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let splits = book.splits().await.unwrap();
         assert_eq!(splits.len(), 25);
     }
 
-    #[test]
-    fn transactions() {
-        let book = MySQLBook::new(URI).unwrap();
-        let transactions = book.transactions().unwrap();
+    #[tokio::test]
+    async fn transactions() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let transactions = book.transactions().await.unwrap();
         assert_eq!(transactions.len(), 11);
     }
 
-    #[test]
-    fn prices() {
-        let book = MySQLBook::new(URI).unwrap();
-        let prices = book.prices().unwrap();
+    #[tokio::test]
+    async fn prices() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let prices = book.prices().await.unwrap();
         assert_eq!(prices.len(), 5);
     }
 
-    #[test]
-    fn commodities() {
-        let book = MySQLBook::new(URI).unwrap();
-        let commodities = book.commodities().unwrap();
+    #[tokio::test]
+    async fn commodities() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let commodities = book.commodities().await.unwrap();
         assert_eq!(commodities.len(), 5);
     }
 
-    #[test]
-    fn currencies() {
-        let book = MySQLBook::new(URI).unwrap();
-        let currencies = book.currencies().unwrap();
+    #[tokio::test]
+    async fn currencies() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let currencies = book.currencies().await.unwrap();
         assert_eq!(currencies.len(), 4);
     }
 }
 mod account {
     use super::*;
-    #[test]
-    fn property() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn property() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let account = book
             .accounts()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "fcd795021c976ba75621ec39e75f6214")
@@ -116,80 +118,83 @@ mod account {
         assert_eq!(account.placeholder.unwrap(), 1);
     }
 
-    #[test]
-    fn balance() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn balance() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let account = book
             .accounts()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.name == "Current")
             .next()
             .unwrap();
 
-        assert_eq!(account.balance().unwrap(), 4590.0);
+        assert_eq!(account.balance().await.unwrap(), 4590.0);
     }
-    #[test]
-    fn balance_diff_currency() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn balance_diff_currency() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let account = book
             .accounts()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.name == "Asset")
             .next()
             .unwrap();
 
-        assert_eq!(account.balance().unwrap(), 24695.3);
+        assert_eq!(account.balance().await.unwrap(), 24695.3);
     }
-    #[test]
-    fn splits() {
-        let book = MySQLBook::new(URI).unwrap();
-        let account = book.account_by_name("Cash").unwrap().unwrap();
-        let splits = account.splits().unwrap();
+    #[tokio::test]
+    async fn splits() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let account = book.account_by_name("Cash").await.unwrap().unwrap();
+        let splits = account.splits().await.unwrap();
         assert_eq!(splits.len(), 3);
     }
 
-    #[test]
-    fn parent() {
-        let book = MySQLBook::new(URI).unwrap();
-        let account = book.account_by_name("Cash").unwrap().unwrap();
-        let parent = account.parent().unwrap();
+    #[tokio::test]
+    async fn parent() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let account = book.account_by_name("Cash").await.unwrap().unwrap();
+        let parent = account.parent().await.unwrap();
         assert_eq!(parent.name, "Current");
     }
 
-    #[test]
-    fn no_parent() {
-        let book = MySQLBook::new(URI).unwrap();
-        let account = book.account_by_name("Root Account").unwrap().unwrap();
-        let parent = account.parent();
+    #[tokio::test]
+    async fn no_parent() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let account = book.account_by_name("Root Account").await.unwrap().unwrap();
+        let parent = account.parent().await;
         assert!(parent.is_none());
     }
 
-    #[test]
-    fn children() {
-        let book = MySQLBook::new(URI).unwrap();
-        let account = book.account_by_name("Current").unwrap().unwrap();
-        let children = account.children().unwrap();
+    #[tokio::test]
+    async fn children() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let account = book.account_by_name("Current").await.unwrap().unwrap();
+        let children = account.children().await.unwrap();
         assert_eq!(children.len(), 3);
     }
 
-    #[test]
-    fn commodity() {
-        let book = MySQLBook::new(URI).unwrap();
-        let account = book.account_by_name("Cash").unwrap().unwrap();
-        let commodity = account.commodity().unwrap();
+    #[tokio::test]
+    async fn commodity() {
+        let book = MySQLBook::new(URI).await.unwrap();
+        let account = book.account_by_name("Cash").await.unwrap().unwrap();
+        let commodity = account.commodity().await.unwrap();
         assert_eq!(commodity.mnemonic, "EUR");
     }
 }
 
 mod split {
     use super::*;
-    #[test]
-    fn property() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn property() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let split = book
             .splits()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
@@ -211,42 +216,45 @@ mod split {
         assert_eq!(split.quantity(), 150.0);
         assert_eq!(split.lot_guid, None);
     }
-    #[test]
-    fn transaction() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn transaction() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let split = book
             .splits()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .next()
             .unwrap();
-        let transaction = split.transaction().unwrap();
+        let transaction = split.transaction().await.unwrap();
         assert_eq!(transaction.description.as_ref().unwrap(), "income 1");
     }
 
-    #[test]
-    fn account() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn account() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let split = book
             .splits()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .next()
             .unwrap();
-        let account = split.account().unwrap();
+        let account = split.account().await.unwrap();
         assert_eq!(account.name, "Cash");
     }
 }
 
 mod transaction {
     use super::*;
-    #[test]
-    fn property() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn property() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let transaction = book
             .transactions()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -280,42 +288,45 @@ mod transaction {
         assert_eq!(transaction.description.as_ref().unwrap(), "income 1");
     }
 
-    #[test]
-    fn currency() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn currency() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let transaction = book
             .transactions()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .next()
             .unwrap();
-        let currency = transaction.currency().unwrap();
+        let currency = transaction.currency().await.unwrap();
         assert_eq!(currency.fullname.as_ref().unwrap(), "Euro");
     }
 
-    #[test]
-    fn splits() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn splits() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let transaction = book
             .transactions()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .next()
             .unwrap();
-        let splits = transaction.splits().unwrap();
+        let splits = transaction.splits().await.unwrap();
         assert_eq!(splits.len(), 2);
     }
 }
 
 mod price {
     use super::*;
-    #[test]
-    fn property() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn property() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let price = book
             .prices()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
@@ -336,31 +347,33 @@ mod price {
         assert_eq!(price.value(), 1.5);
     }
 
-    #[test]
-    fn commodity() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn commodity() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let price = book
             .prices()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .next()
             .unwrap();
-        let commodity = price.commodity().unwrap();
+        let commodity = price.commodity().await.unwrap();
         assert_eq!(commodity.fullname.as_ref().unwrap(), "Andorran Franc");
     }
 
-    #[test]
-    fn currency() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn currency() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let price = book
             .prices()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .next()
             .unwrap();
-        let currency = price.currency().unwrap();
+        let currency = price.currency().await.unwrap();
         assert_eq!(currency.fullname.as_ref().unwrap(), "UAE Dirham");
     }
 }
@@ -369,11 +382,12 @@ mod commodity {
     use super::*;
     use float_cmp::assert_approx_eq;
 
-    #[test]
-    fn property() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn property() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let commodity = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
@@ -391,82 +405,88 @@ mod commodity {
         assert_eq!(commodity.quote_tz, None);
     }
 
-    #[test]
-    fn accounts() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn accounts() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let commodity = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .next()
             .unwrap();
-        let accounts = commodity.accounts().unwrap();
+        let accounts = commodity.accounts().await.unwrap();
         assert_eq!(accounts.len(), 14);
     }
 
-    #[test]
-    fn transactions() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn transactions() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let commodity = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .next()
             .unwrap();
-        let transactions = commodity.transactions().unwrap();
+        let transactions = commodity.transactions().await.unwrap();
         assert_eq!(transactions.len(), 11);
     }
 
-    #[test]
-    fn as_commodity_prices() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn as_commodity_prices() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let commodity = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .next()
             .unwrap();
-        let prices = commodity.as_commodity_prices().unwrap();
+        let prices = commodity.as_commodity_prices().await.unwrap();
         assert_eq!(prices.len(), 1);
     }
 
-    #[test]
-    fn as_currency_prices() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn as_currency_prices() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let commodity = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .next()
             .unwrap();
-        let prices = commodity.as_currency_prices().unwrap();
+        let prices = commodity.as_currency_prices().await.unwrap();
         assert_eq!(prices.len(), 2);
     }
 
-    #[test]
-    fn as_commodity_or_currency_prices() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn as_commodity_or_currency_prices() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let commodity = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .next()
             .unwrap();
-        let prices = commodity.as_commodity_or_currency_prices().unwrap();
+        let prices = commodity.as_commodity_or_currency_prices().await.unwrap();
         assert_eq!(prices.len(), 3);
     }
 
-    #[test]
-    fn rate_direct() {
+    #[tokio::test]
+    async fn rate_direct() {
         // ADF => AED
-        let book = MySQLBook::new(URI).unwrap();
+        let book = MySQLBook::new(URI).await.unwrap();
         let commodity = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
@@ -474,6 +494,7 @@ mod commodity {
             .unwrap();
         let currency = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
@@ -486,9 +507,10 @@ mod commodity {
         assert_eq!(rate, 1.5);
 
         // AED => EUR
-        let book = MySQLBook::new(URI).unwrap();
+        let book = MySQLBook::new(URI).await.unwrap();
         let commodity = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
@@ -496,6 +518,7 @@ mod commodity {
             .unwrap();
         let currency = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
@@ -508,11 +531,12 @@ mod commodity {
         assert_approx_eq!(f64, rate, 9.0 / 10.0);
     }
 
-    #[test]
-    fn rate_indirect() {
-        let book = MySQLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn rate_indirect() {
+        let book = MySQLBook::new(URI).await.unwrap();
         let commodity = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "1e5d65e2726a5d4595741cb204992991")
@@ -520,6 +544,7 @@ mod commodity {
             .unwrap();
         let currency = book
             .commodities()
+            .await
             .unwrap()
             .into_iter()
             .filter(|x| x.guid == "5f586908098232e67edb1371408bfaa8")

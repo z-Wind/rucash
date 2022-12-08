@@ -230,48 +230,57 @@ mod tests {
     use super::*;
     #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     use futures::executor::block_on;
-    #[cfg(feature = "sqlite")]
+    use tokio::runtime::Runtime;
 
+    #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
         use chrono::NaiveDateTime;
 
         type DB = sqlx::Sqlite;
 
-        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
             let uri: &str = &format!(
                 "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
             (
-                block_on(async {
+                rt.block_on(async {
                     sqlx::sqlite::SqlitePoolOptions::new()
                         .max_connections(5)
                         .connect(&format!("{}?mode=ro", uri)) // read only
                         .await
                         .unwrap()
                 }),
+                rt,
                 uri.parse().expect("sqlite"),
             )
         }
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup();
-            let result: Vec<Transaction> =
-                block_on(async { Transaction::query().fetch_all(&pool).await }).unwrap();
+            let (pool, rt, _) = setup();
+            let result: Vec<Transaction> = rt
+                .block_on(async { Transaction::query().fetch_all(&pool).await })
+                .unwrap();
             assert_eq!(11, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup();
-            let result: Transaction = block_on(async {
-                Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Transaction = rt
+                .block_on(async {
+                    Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(
                 NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap(),
                 result.post_date.unwrap()
@@ -285,13 +294,14 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Transaction> = block_on(async {
-                Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Transaction> = rt
+                .block_on(async {
+                    Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(11, result.len());
         }
     }
@@ -303,37 +313,45 @@ mod tests {
 
         type DB = sqlx::Postgres;
 
-        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
             let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
             (
-                block_on(async {
+                rt.block_on(async {
                     sqlx::postgres::PgPoolOptions::new()
                         .max_connections(5)
                         .connect(uri)
                         .await
                         .unwrap()
                 }),
+                rt,
                 uri.parse().expect("postgres"),
             )
         }
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup();
-            let result: Vec<Transaction> =
-                block_on(async { Transaction::query().fetch_all(&pool).await }).unwrap();
+            let (pool, rt, _) = setup();
+            let result: Vec<Transaction> = rt
+                .block_on(async { Transaction::query().fetch_all(&pool).await })
+                .unwrap();
             assert_eq!(11, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup();
-            let result: Transaction = block_on(async {
-                Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Transaction = rt
+                .block_on(async {
+                    Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(
                 NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap(),
                 result.post_date.unwrap()
@@ -347,13 +365,14 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Transaction> = block_on(async {
-                Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Transaction> = rt
+                .block_on(async {
+                    Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(11, result.len());
         }
     }
@@ -365,37 +384,45 @@ mod tests {
 
         type DB = sqlx::MySql;
 
-        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
             (
-                block_on(async {
+                rt.block_on(async {
                     sqlx::mysql::MySqlPoolOptions::new()
                         .max_connections(5)
                         .connect(uri)
                         .await
                         .unwrap()
                 }),
+                rt,
                 uri.parse().expect("mysql"),
             )
         }
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup();
-            let result: Vec<Transaction> =
-                block_on(async { Transaction::query().fetch_all(&pool).await }).unwrap();
+            let (pool, rt, _) = setup();
+            let result: Vec<Transaction> = rt
+                .block_on(async { Transaction::query().fetch_all(&pool).await })
+                .unwrap();
             assert_eq!(11, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup();
-            let result: Transaction = block_on(async {
-                Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Transaction = rt
+                .block_on(async {
+                    Transaction::query_by_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(
                 NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap(),
                 result.post_date.unwrap()
@@ -409,13 +436,14 @@ mod tests {
 
         #[test]
         fn query_by_currency_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Transaction> = block_on(async {
-                Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                    .fetch_all(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Vec<Transaction> = rt
+                .block_on(async {
+                    Transaction::query_by_currency_guid("346629655191dcf59a7e2c2a85b70f69", kind)
+                        .fetch_all(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(11, result.len());
         }
     }

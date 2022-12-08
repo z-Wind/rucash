@@ -367,6 +367,7 @@ mod tests {
     use super::*;
     #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
     use futures::executor::block_on;
+    use tokio::runtime::Runtime;
 
     #[cfg(feature = "sqlite")]
     mod sqlite {
@@ -374,80 +375,93 @@ mod tests {
 
         type DB = sqlx::Sqlite;
 
-        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
             let uri: &str = &format!(
                 "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
 
             (
-                block_on(async {
+                rt.block_on(async {
                     sqlx::sqlite::SqlitePoolOptions::new()
                         .max_connections(5)
                         .connect(&format!("{}?mode=ro", uri)) // read only
                         .await
                         .unwrap()
                 }),
+                rt,
                 uri.parse().expect("sqlite"),
             )
         }
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup();
-            let result: Vec<Price> =
-                block_on(async { Price::query().fetch_all(&pool).await }).unwrap();
+            let (pool, rt, _) = setup();
+            let result: Vec<Price> = rt
+                .block_on(async { Price::query().fetch_all(&pool).await })
+                .unwrap();
             assert_eq!(5, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup();
-            let result: Price = block_on(async {
-                Price::query_by_guid("0d6684f44fb018e882de76094ed9c433", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Price = rt
+                .block_on(async {
+                    Price::query_by_guid("0d6684f44fb018e882de76094ed9c433", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(1.5, result.value());
             assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
         fn query_by_commodity_guid() {
-            let (pool, kind) = setup();
-            let result: Price = block_on(async {
-                Price::query_by_commodity_guid("d821d6776fde9f7c2d01b67876406fd3", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Price = rt
+                .block_on(async {
+                    Price::query_by_commodity_guid("d821d6776fde9f7c2d01b67876406fd3", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(1.5, result.value());
             assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
         fn query_by_currency_guid() {
-            let (pool, kind) = setup();
-            let result: Price = block_on(async {
-                Price::query_by_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Price = rt
+                .block_on(async {
+                    Price::query_by_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(1.5, result.value());
             assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
         fn query_by_commodity_or_currency_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Price> = block_on(async {
-                Price::query_by_commodity_or_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
+            let (pool, rt, kind) = setup();
+            let result: Vec<Price> = rt
+                .block_on(async {
+                    Price::query_by_commodity_or_currency_guid(
+                        "5f586908098232e67edb1371408bfaa8",
+                        kind,
+                    )
                     .fetch_all(&pool)
                     .await
-            })
-            .unwrap();
+                })
+                .unwrap();
             assert_eq!(4, result.len());
         }
     }
@@ -458,76 +472,90 @@ mod tests {
 
         type DB = sqlx::Postgres;
 
-        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
             let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
             (
-                block_on(async {
+                rt.block_on(async {
                     sqlx::postgres::PgPoolOptions::new()
                         .max_connections(5)
                         .connect(uri)
                         .await
                         .unwrap()
                 }),
+                rt,
                 uri.parse().expect("postgres"),
             )
         }
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup();
-            let result: Vec<Price> =
-                block_on(async { Price::query().fetch_all(&pool).await }).unwrap();
+            let (pool, rt, _) = setup();
+            let result: Vec<Price> = rt
+                .block_on(async { Price::query().fetch_all(&pool).await })
+                .unwrap();
             assert_eq!(5, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup();
-            let result: Price = block_on(async {
-                Price::query_by_guid("0d6684f44fb018e882de76094ed9c433", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Price = rt
+                .block_on(async {
+                    Price::query_by_guid("0d6684f44fb018e882de76094ed9c433", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(1.5, result.value());
             assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
         fn query_by_commodity_guid() {
-            let (pool, kind) = setup();
-            let result: Price = block_on(async {
-                Price::query_by_commodity_guid("d821d6776fde9f7c2d01b67876406fd3", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Price = rt
+                .block_on(async {
+                    Price::query_by_commodity_guid("d821d6776fde9f7c2d01b67876406fd3", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(1.5, result.value());
             assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
         fn query_by_currency_guid() {
-            let (pool, kind) = setup();
-            let result: Price = block_on(async {
-                Price::query_by_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Price = rt
+                .block_on(async {
+                    Price::query_by_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(1.5, result.value());
             assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
         fn query_by_commodity_or_currency_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Price> = block_on(async {
-                Price::query_by_commodity_or_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
+            let (pool, rt, kind) = setup();
+            let result: Vec<Price> = rt
+                .block_on(async {
+                    Price::query_by_commodity_or_currency_guid(
+                        "5f586908098232e67edb1371408bfaa8",
+                        kind,
+                    )
                     .fetch_all(&pool)
                     .await
-            })
-            .unwrap();
+                })
+                .unwrap();
             assert_eq!(4, result.len());
         }
     }
@@ -538,76 +566,90 @@ mod tests {
 
         type DB = sqlx::MySql;
 
-        fn setup() -> (sqlx::Pool<DB>, SQLKind) {
+        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
             (
-                block_on(async {
+                rt.block_on(async {
                     sqlx::mysql::MySqlPoolOptions::new()
                         .max_connections(5)
                         .connect(uri)
                         .await
                         .unwrap()
                 }),
+                rt,
                 uri.parse().expect("mysql"),
             )
         }
 
         #[test]
         fn query() {
-            let (pool, _kind) = setup();
-            let result: Vec<Price> =
-                block_on(async { Price::query().fetch_all(&pool).await }).unwrap();
+            let (pool, rt, _) = setup();
+            let result: Vec<Price> = rt
+                .block_on(async { Price::query().fetch_all(&pool).await })
+                .unwrap();
             assert_eq!(5, result.len());
         }
 
         #[test]
         fn query_by_guid() {
-            let (pool, kind) = setup();
-            let result: Price = block_on(async {
-                Price::query_by_guid("0d6684f44fb018e882de76094ed9c433", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Price = rt
+                .block_on(async {
+                    Price::query_by_guid("0d6684f44fb018e882de76094ed9c433", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(1.5, result.value());
             assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
         fn query_by_commodity_guid() {
-            let (pool, kind) = setup();
-            let result: Price = block_on(async {
-                Price::query_by_commodity_guid("d821d6776fde9f7c2d01b67876406fd3", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Price = rt
+                .block_on(async {
+                    Price::query_by_commodity_guid("d821d6776fde9f7c2d01b67876406fd3", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(1.5, result.value());
             assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
         fn query_by_currency_guid() {
-            let (pool, kind) = setup();
-            let result: Price = block_on(async {
-                Price::query_by_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
-                    .fetch_one(&pool)
-                    .await
-            })
-            .unwrap();
+            let (pool, rt, kind) = setup();
+            let result: Price = rt
+                .block_on(async {
+                    Price::query_by_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
+                        .fetch_one(&pool)
+                        .await
+                })
+                .unwrap();
             assert_eq!(1.5, result.value());
             assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
         }
 
         #[test]
         fn query_by_commodity_or_currency_guid() {
-            let (pool, kind) = setup();
-            let result: Vec<Price> = block_on(async {
-                Price::query_by_commodity_or_currency_guid("5f586908098232e67edb1371408bfaa8", kind)
+            let (pool, rt, kind) = setup();
+            let result: Vec<Price> = rt
+                .block_on(async {
+                    Price::query_by_commodity_or_currency_guid(
+                        "5f586908098232e67edb1371408bfaa8",
+                        kind,
+                    )
                     .fetch_all(&pool)
                     .await
-            })
-            .unwrap();
+                })
+                .unwrap();
             assert_eq!(4, result.len());
         }
     }

@@ -1,12 +1,12 @@
 use super::exchange::Exchange;
 use crate::kind::SQLKind;
 use crate::model::{self, Commodity};
-use futures::executor::block_on;
+use futures::future::{BoxFuture, FutureExt};
 use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DataWithPool<T> {
     content: T,
     kind: SQLKind,
@@ -75,97 +75,107 @@ where
 }
 
 impl DataWithPool<model::Account> {
-    pub fn splits(&self) -> Result<Vec<DataWithPool<model::Split>>, sqlx::Error> {
-        block_on(async {
-            model::Split::query_by_account_guid(&self.guid, self.kind)
-                .fetch_all(&self.pool)
-                .await
-        })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
+    pub async fn splits(&self) -> Result<Vec<DataWithPool<model::Split>>, sqlx::Error> {
+        model::Split::query_by_account_guid(&self.guid, self.kind)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
     }
 
-    pub fn parent(&self) -> Option<DataWithPool<model::Account>> {
+    pub async fn parent(&self) -> Option<DataWithPool<model::Account>> {
         let guid = self.parent_guid.as_ref()?;
-        block_on(async {
-            model::Account::query_by_guid(guid, self.kind)
-                .fetch_optional(&self.pool)
-                .await
-                .unwrap()
-        })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
+        model::Account::query_by_guid(guid, self.kind)
+            .fetch_optional(&self.pool)
+            .await
+            .unwrap()
+            .map(|x| {
+                DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+            })
     }
 
-    pub fn children(&self) -> Result<Vec<DataWithPool<model::Account>>, sqlx::Error> {
-        block_on(async {
-            model::Account::query_by_parent_guid(&self.guid, self.kind)
-                .fetch_all(&self.pool)
-                .await
-        })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
+    pub async fn children(&self) -> Result<Vec<DataWithPool<model::Account>>, sqlx::Error> {
+        model::Account::query_by_parent_guid(&self.guid, self.kind)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
     }
 
-    pub fn commodity(&self) -> Option<DataWithPool<model::Commodity>> {
+    pub async fn commodity(&self) -> Option<DataWithPool<model::Commodity>> {
         let guid = self.commodity_guid.as_ref()?;
-        block_on(async {
-            model::Commodity::query_by_guid(guid, self.kind)
-                .fetch_optional(&self.pool)
-                .await
-                .unwrap()
-        })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
+
+        model::Commodity::query_by_guid(guid, self.kind)
+            .fetch_optional(&self.pool)
+            .await
+            .unwrap()
+            .map(|x| {
+                DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+            })
     }
 
-    fn balance_into_currency(
-        &self,
-        currency: &DataWithPool<Commodity>,
-    ) -> Result<f64, sqlx::Error> {
-        let mut net: f64 = self.splits()?.iter().map(|s| s.quantity()).sum();
-        let commodity = self.commodity().expect("must have commodity");
+    fn balance_into_currency<'a>(
+        &'a self,
+        currency: &'a DataWithPool<Commodity>,
+    ) -> BoxFuture<'a, Result<f64, sqlx::Error>> {
+        async move {
+            let mut net: f64 = self.splits().await?.iter().map(|s| s.quantity()).sum();
+            let commodity = self.commodity().await.expect("must have commodity");
 
-        for child in self.children()? {
-            let child_net = child.balance_into_currency(&commodity)?;
-            net += child_net;
+            for child in self.children().await? {
+                let child_net = child.balance_into_currency(&commodity).await?;
+                net += child_net;
+            }
+
+            let rate = commodity.sell(currency).unwrap_or_else(|| {
+                panic!(
+                    "must have rate {} to {}",
+                    commodity.mnemonic, currency.mnemonic
+                )
+            });
+            // dbg!((
+            //     &commodity.mnemonic,
+            //     &currency.mnemonic,
+            //     rate,
+            //     &self.name,
+            //     net
+            // ));
+
+            Ok(net * rate)
         }
-
-        let rate = commodity.sell(currency).unwrap_or_else(|| {
-            panic!(
-                "must have rate {} to {}",
-                commodity.mnemonic, currency.mnemonic
-            )
-        });
-        // dbg!((
-        //     &commodity.mnemonic,
-        //     &currency.mnemonic,
-        //     rate,
-        //     &self.name,
-        //     net
-        // ));
-
-        Ok(net * rate)
+        .boxed()
     }
 
-    pub fn balance(&self) -> Result<f64, sqlx::Error> {
-        let mut net: f64 = self.splits()?.iter().map(|s| s.quantity()).sum();
+    pub async fn balance(&self) -> Result<f64, sqlx::Error> {
+        let mut net: f64 = self.splits().await?.iter().map(|s| s.quantity()).sum();
 
-        let commodity = match self.commodity() {
+        let commodity = match self.commodity().await {
             Some(commodity) => commodity,
             None => return Ok(net),
         };
 
-        for child in self.children()? {
-            let child_net = child.balance_into_currency(&commodity)?;
+        for child in self.children().await? {
+            let child_net = child.balance_into_currency(&commodity).await?;
             net += child_net;
         }
         // dbg!((&self.name, net));
@@ -175,158 +185,189 @@ impl DataWithPool<model::Account> {
 }
 
 impl DataWithPool<model::Split> {
-    pub fn transaction(&self) -> Result<DataWithPool<model::Transaction>, sqlx::Error> {
+    pub async fn transaction(&self) -> Result<DataWithPool<model::Transaction>, sqlx::Error> {
         let guid = &self.tx_guid;
-        block_on(async {
-            model::Transaction::query_by_guid(guid, self.kind)
-                .fetch_one(&self.pool)
-                .await
-        })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
+
+        model::Transaction::query_by_guid(guid, self.kind)
+            .fetch_one(&self.pool)
+            .await
+            .map(|x| {
+                DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+            })
     }
 
-    pub fn account(&self) -> Result<DataWithPool<model::Account>, sqlx::Error> {
+    pub async fn account(&self) -> Result<DataWithPool<model::Account>, sqlx::Error> {
         let guid = &self.account_guid;
-        block_on(async {
-            model::Account::query_by_guid(guid, self.kind)
-                .fetch_one(&self.pool)
-                .await
-        })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
+
+        model::Account::query_by_guid(guid, self.kind)
+            .fetch_one(&self.pool)
+            .await
+            .map(|x| {
+                DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+            })
     }
 }
 
 impl DataWithPool<model::Transaction> {
-    pub fn currency(&self) -> Result<DataWithPool<model::Commodity>, sqlx::Error> {
+    pub async fn currency(&self) -> Result<DataWithPool<model::Commodity>, sqlx::Error> {
         let guid = &self.currency_guid;
-        block_on(async {
-            model::Commodity::query_by_guid(guid, self.kind)
-                .fetch_one(&self.pool)
-                .await
-        })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
+
+        model::Commodity::query_by_guid(guid, self.kind)
+            .fetch_one(&self.pool)
+            .await
+            .map(|x| {
+                DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+            })
     }
 
-    pub fn splits(&self) -> Result<Vec<DataWithPool<model::Split>>, sqlx::Error> {
+    pub async fn splits(&self) -> Result<Vec<DataWithPool<model::Split>>, sqlx::Error> {
         let guid = &self.guid;
-        block_on(async {
-            model::Split::query_by_tx_guid(guid, self.kind)
-                .fetch_all(&self.pool)
-                .await
-        })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
+
+        model::Split::query_by_tx_guid(guid, self.kind)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
     }
 }
 
 impl DataWithPool<model::Price> {
-    pub fn commodity(&self) -> Result<DataWithPool<model::Commodity>, sqlx::Error> {
+    pub async fn commodity(&self) -> Result<DataWithPool<model::Commodity>, sqlx::Error> {
         let guid = &self.commodity_guid;
-        block_on(async {
-            model::Commodity::query_by_guid(guid, self.kind)
-                .fetch_one(&self.pool)
-                .await
-        })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
+
+        model::Commodity::query_by_guid(guid, self.kind)
+            .fetch_one(&self.pool)
+            .await
+            .map(|x| {
+                DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+            })
     }
 
-    pub fn currency(&self) -> Result<DataWithPool<model::Commodity>, sqlx::Error> {
+    pub async fn currency(&self) -> Result<DataWithPool<model::Commodity>, sqlx::Error> {
         let guid = &self.currency_guid;
-        block_on(async {
-            model::Commodity::query_by_guid(guid, self.kind)
-                .fetch_one(&self.pool)
-                .await
-        })
-        .map(|x| DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone()))
+
+        model::Commodity::query_by_guid(guid, self.kind)
+            .fetch_one(&self.pool)
+            .await
+            .map(|x| {
+                DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
+            })
     }
 }
 
 impl DataWithPool<model::Commodity> {
-    pub fn accounts(&self) -> Result<Vec<DataWithPool<model::Account>>, sqlx::Error> {
+    pub async fn accounts(&self) -> Result<Vec<DataWithPool<model::Account>>, sqlx::Error> {
         let guid = &self.guid;
-        block_on(async {
-            model::Account::query_by_commodity_guid(guid, self.kind)
-                .fetch_all(&self.pool)
-                .await
-        })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
+
+        model::Account::query_by_commodity_guid(guid, self.kind)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
     }
 
-    pub fn transactions(&self) -> Result<Vec<DataWithPool<model::Transaction>>, sqlx::Error> {
+    pub async fn transactions(&self) -> Result<Vec<DataWithPool<model::Transaction>>, sqlx::Error> {
         let guid = &self.guid;
-        block_on(async {
-            model::Transaction::query_by_currency_guid(guid, self.kind)
-                .fetch_all(&self.pool)
-                .await
-        })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
+
+        model::Transaction::query_by_currency_guid(guid, self.kind)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
     }
 
-    pub fn as_commodity_prices(&self) -> Result<Vec<DataWithPool<model::Price>>, sqlx::Error> {
-        let guid = &self.guid;
-        block_on(async {
-            model::Price::query_by_commodity_guid(guid, self.kind)
-                .fetch_all(&self.pool)
-                .await
-        })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
-    }
-
-    pub fn as_currency_prices(&self) -> Result<Vec<DataWithPool<model::Price>>, sqlx::Error> {
-        let guid = &self.guid;
-        block_on(async {
-            model::Price::query_by_currency_guid(guid, self.kind)
-                .fetch_all(&self.pool)
-                .await
-        })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
-    }
-
-    pub fn as_commodity_or_currency_prices(
+    pub async fn as_commodity_prices(
         &self,
     ) -> Result<Vec<DataWithPool<model::Price>>, sqlx::Error> {
         let guid = &self.guid;
-        block_on(async {
-            model::Price::query_by_commodity_or_currency_guid(guid, self.kind)
-                .fetch_all(&self.pool)
-                .await
-        })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
+
+        model::Price::query_by_commodity_guid(guid, self.kind)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
+    }
+
+    pub async fn as_currency_prices(&self) -> Result<Vec<DataWithPool<model::Price>>, sqlx::Error> {
+        let guid = &self.guid;
+
+        model::Price::query_by_currency_guid(guid, self.kind)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
+    }
+
+    pub async fn as_commodity_or_currency_prices(
+        &self,
+    ) -> Result<Vec<DataWithPool<model::Price>>, sqlx::Error> {
+        let guid = &self.guid;
+
+        model::Price::query_by_commodity_or_currency_guid(guid, self.kind)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
     }
 
     pub fn sell(&self, currency: &DataWithPool<model::Commodity>) -> Option<f64> {
@@ -347,13 +388,14 @@ impl DataWithPool<model::Commodity> {
             .cal(commodity, self)
     }
 
-    pub fn update_exchange_graph(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn update_exchange_graph(&self) -> Result<(), Box<dyn std::error::Error>> {
         let graph = self.exchange_graph.as_ref().ok_or("No exchange graph")?;
-        graph
+
+        Ok(graph
             .write()
             .expect("graph must could be written")
-            .update()?;
-        Ok(())
+            .update()
+            .await?)
     }
 }
 
@@ -369,78 +411,84 @@ mod tests {
 
         type DB = sqlx::Sqlite;
 
-        fn setup() -> crate::SqliteBook {
+        async fn setup() -> crate::SqliteBook {
             let uri: &str = &format!(
                 "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
-            crate::SqliteBook::new(uri).expect("right path")
+            crate::SqliteBook::new(uri).await.expect("right path")
         }
 
-        #[test]
-        fn account() {
-            let book = setup();
+        #[tokio::test]
+        async fn account() {
+            let book = setup().await;
 
-            let account = book.account_by_name("Foo stock").unwrap().unwrap();
+            let account = book.account_by_name("Foo stock").await.unwrap().unwrap();
             assert_eq!("Foo stock", account.name);
-            assert_eq!(1, account.splits().unwrap().len());
-            assert_eq!("Broker", account.parent().unwrap().name);
-            assert_eq!(0, account.children().unwrap().len());
-            assert_eq!("FOO", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 130.0, account.balance().unwrap());
+            assert_eq!(1, account.splits().await.unwrap().len());
+            assert_eq!("Broker", account.parent().await.unwrap().name);
+            assert_eq!(0, account.children().await.unwrap().len());
+            assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(f64, 130.0, account.balance().await.unwrap());
 
-            let account = book.account_by_name("Cash").unwrap().unwrap();
+            let account = book.account_by_name("Cash").await.unwrap().unwrap();
             assert_eq!("Cash", account.name);
-            assert_eq!(3, account.splits().unwrap().len());
-            assert_eq!("Current", account.parent().unwrap().name);
-            assert_eq!(0, account.children().unwrap().len());
-            assert_eq!("EUR", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 220.0, account.balance().unwrap());
+            assert_eq!(3, account.splits().await.unwrap().len());
+            assert_eq!("Current", account.parent().await.unwrap().name);
+            assert_eq!(0, account.children().await.unwrap().len());
+            assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(f64, 220.0, account.balance().await.unwrap());
 
-            let account = book.account_by_name("Mouvements").unwrap().unwrap();
+            let account = book.account_by_name("Mouvements").await.unwrap().unwrap();
             assert_eq!("Mouvements", account.name);
-            assert_eq!(0, account.splits().unwrap().len());
-            assert_eq!("Root Account", account.parent().unwrap().name);
-            assert_eq!(2, account.children().unwrap().len());
-            assert_eq!("FOO", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 1351.4815, account.balance().unwrap(), epsilon = 1e-4);
+            assert_eq!(0, account.splits().await.unwrap().len());
+            assert_eq!("Root Account", account.parent().await.unwrap().name);
+            assert_eq!(2, account.children().await.unwrap().len());
+            assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(
+                f64,
+                1351.4815,
+                account.balance().await.unwrap(),
+                epsilon = 1e-4
+            );
 
-            let account = book.account_by_name("Asset").unwrap().unwrap();
+            let account = book.account_by_name("Asset").await.unwrap().unwrap();
             assert_eq!("Asset", account.name);
-            assert_eq!(0, account.splits().unwrap().len());
-            assert_eq!("Root Account", account.parent().unwrap().name);
-            assert_eq!(3, account.children().unwrap().len());
-            assert_eq!("EUR", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 24695.30, account.balance().unwrap());
+            assert_eq!(0, account.splits().await.unwrap().len());
+            assert_eq!("Root Account", account.parent().await.unwrap().name);
+            assert_eq!(3, account.children().await.unwrap().len());
+            assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(f64, 24695.30, account.balance().await.unwrap());
         }
 
-        #[test]
-        fn split() {
-            let book = setup();
+        #[tokio::test]
+        async fn split() {
+            let book = setup().await;
             let split = book
                 .splits()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|s| s.guid == "de832fe97e37811a7fff7e28b3a43425")
                 .unwrap();
 
             assert_eq!(
-                split.transaction().unwrap().guid,
+                split.transaction().await.unwrap().guid,
                 "6c8876003c4a6026e38e3afb67d6f2b1"
             );
             assert_eq!(
-                split.transaction().unwrap().description,
+                split.transaction().await.unwrap().description,
                 Some("income 1".into())
             );
             assert_eq!(
-                split.transaction().unwrap().post_date,
+                split.transaction().await.unwrap().post_date,
                 Some(
                     NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 )
             );
             assert_eq!(
-                split.transaction().unwrap().enter_date,
+                split.transaction().await.unwrap().enter_date,
                 Some(
                     NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
@@ -448,61 +496,69 @@ mod tests {
             );
 
             assert_eq!(
-                split.account().unwrap().guid,
+                split.account().await.unwrap().guid,
                 "93fc043c3062aaa1297b30e543d2cd0d",
             );
-            assert_eq!(split.account().unwrap().name, "Cash",);
+            assert_eq!(split.account().await.unwrap().name, "Cash",);
         }
 
-        #[test]
-        fn transaction() {
-            let book = setup();
+        #[tokio::test]
+        async fn transaction() {
+            let book = setup().await;
             let transaction = book
                 .transactions()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|t| t.description == Some("buy foo".into()))
                 .unwrap();
 
-            assert_eq!(transaction.currency().unwrap().mnemonic, "EUR");
-            assert_eq!(transaction.splits().unwrap().len(), 4);
+            assert_eq!(transaction.currency().await.unwrap().mnemonic, "EUR");
+            assert_eq!(transaction.splits().await.unwrap().len(), 4);
         }
 
-        #[test]
-        fn price() {
-            let book = setup();
+        #[tokio::test]
+        async fn price() {
+            let book = setup().await;
             let price = book
                 .prices()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|p| p.guid == "0d6684f44fb018e882de76094ed9c433")
                 .unwrap();
 
-            assert_eq!(price.commodity().unwrap().mnemonic, "ADF");
-            assert_eq!(price.currency().unwrap().mnemonic, "AED");
+            assert_eq!(price.commodity().await.unwrap().mnemonic, "ADF");
+            assert_eq!(price.currency().await.unwrap().mnemonic, "AED");
         }
 
-        #[test]
-        fn commodity() {
-            let book = setup();
+        #[tokio::test]
+        async fn commodity() {
+            let book = setup().await;
             let commodity = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|p| p.mnemonic == "EUR")
                 .unwrap();
 
-            assert_eq!(commodity.accounts().unwrap().len(), 14);
-            assert_eq!(commodity.transactions().unwrap().len(), 11);
-            assert_eq!(commodity.as_commodity_prices().unwrap().len(), 1);
-            assert_eq!(commodity.as_currency_prices().unwrap().len(), 2);
+            assert_eq!(commodity.accounts().await.unwrap().len(), 14);
+            assert_eq!(commodity.transactions().await.unwrap().len(), 11);
+            assert_eq!(commodity.as_commodity_prices().await.unwrap().len(), 1);
+            assert_eq!(commodity.as_currency_prices().await.unwrap().len(), 2);
             assert_eq!(
-                commodity.as_commodity_or_currency_prices().unwrap().len(),
+                commodity
+                    .as_commodity_or_currency_prices()
+                    .await
+                    .unwrap()
+                    .len(),
                 3
             );
 
             let currency = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|p| p.mnemonic == "FOO")
@@ -518,75 +574,81 @@ mod tests {
 
         type DB = sqlx::Postgres;
 
-        fn setup() -> crate::PostgreSQLBook {
+        async fn setup() -> crate::PostgreSQLBook {
             let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
-            crate::PostgreSQLBook::new(&uri).expect("right path")
+            crate::PostgreSQLBook::new(&uri).await.expect("right path")
         }
 
-        #[test]
-        fn account() {
-            let book = setup();
+        #[tokio::test]
+        async fn account() {
+            let book = setup().await;
 
-            let account = book.account_by_name("Foo stock").unwrap().unwrap();
+            let account = book.account_by_name("Foo stock").await.unwrap().unwrap();
             assert_eq!("Foo stock", account.name);
-            assert_eq!(1, account.splits().unwrap().len());
-            assert_eq!("Broker", account.parent().unwrap().name);
-            assert_eq!(0, account.children().unwrap().len());
-            assert_eq!("FOO", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 130.0, account.balance().unwrap());
+            assert_eq!(1, account.splits().await.unwrap().len());
+            assert_eq!("Broker", account.parent().await.unwrap().name);
+            assert_eq!(0, account.children().await.unwrap().len());
+            assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(f64, 130.0, account.balance().await.unwrap());
 
-            let account = book.account_by_name("Cash").unwrap().unwrap();
+            let account = book.account_by_name("Cash").await.unwrap().unwrap();
             assert_eq!("Cash", account.name);
-            assert_eq!(3, account.splits().unwrap().len());
-            assert_eq!("Current", account.parent().unwrap().name);
-            assert_eq!(0, account.children().unwrap().len());
-            assert_eq!("EUR", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 220.0, account.balance().unwrap());
+            assert_eq!(3, account.splits().await.unwrap().len());
+            assert_eq!("Current", account.parent().await.unwrap().name);
+            assert_eq!(0, account.children().await.unwrap().len());
+            assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(f64, 220.0, account.balance().await.unwrap());
 
-            let account = book.account_by_name("Mouvements").unwrap().unwrap();
+            let account = book.account_by_name("Mouvements").await.unwrap().unwrap();
             assert_eq!("Mouvements", account.name);
-            assert_eq!(0, account.splits().unwrap().len());
-            assert_eq!("Root Account", account.parent().unwrap().name);
-            assert_eq!(2, account.children().unwrap().len());
-            assert_eq!("FOO", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 1351.4815, account.balance().unwrap(), epsilon = 1e-4);
+            assert_eq!(0, account.splits().await.unwrap().len());
+            assert_eq!("Root Account", account.parent().await.unwrap().name);
+            assert_eq!(2, account.children().await.unwrap().len());
+            assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(
+                f64,
+                1351.4815,
+                account.balance().await.unwrap(),
+                epsilon = 1e-4
+            );
 
-            let account = book.account_by_name("Asset").unwrap().unwrap();
+            let account = book.account_by_name("Asset").await.unwrap().unwrap();
             assert_eq!("Asset", account.name);
-            assert_eq!(0, account.splits().unwrap().len());
-            assert_eq!("Root Account", account.parent().unwrap().name);
-            assert_eq!(3, account.children().unwrap().len());
-            assert_eq!("EUR", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 24695.30, account.balance().unwrap());
+            assert_eq!(0, account.splits().await.unwrap().len());
+            assert_eq!("Root Account", account.parent().await.unwrap().name);
+            assert_eq!(3, account.children().await.unwrap().len());
+            assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(f64, 24695.30, account.balance().await.unwrap());
         }
 
-        #[test]
-        fn split() {
-            let book = setup();
+        #[tokio::test]
+        async fn split() {
+            let book = setup().await;
             let split = book
                 .splits()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|s| s.guid == "de832fe97e37811a7fff7e28b3a43425")
                 .unwrap();
 
             assert_eq!(
-                split.transaction().unwrap().guid,
+                split.transaction().await.unwrap().guid,
                 "6c8876003c4a6026e38e3afb67d6f2b1"
             );
             assert_eq!(
-                split.transaction().unwrap().description,
+                split.transaction().await.unwrap().description,
                 Some("income 1".into())
             );
             assert_eq!(
-                split.transaction().unwrap().post_date,
+                split.transaction().await.unwrap().post_date,
                 Some(
                     NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 )
             );
             assert_eq!(
-                split.transaction().unwrap().enter_date,
+                split.transaction().await.unwrap().enter_date,
                 Some(
                     NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
@@ -594,31 +656,33 @@ mod tests {
             );
 
             assert_eq!(
-                split.account().unwrap().guid,
+                split.account().await.unwrap().guid,
                 "93fc043c3062aaa1297b30e543d2cd0d",
             );
-            assert_eq!(split.account().unwrap().name, "Cash",);
+            assert_eq!(split.account().await.unwrap().name, "Cash",);
         }
 
-        #[test]
-        fn transaction() {
-            let book = setup();
+        #[tokio::test]
+        async fn transaction() {
+            let book = setup().await;
             let transaction = book
                 .transactions()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|t| t.description == Some("buy foo".into()))
                 .unwrap();
 
-            assert_eq!(transaction.currency().unwrap().mnemonic, "EUR");
-            assert_eq!(transaction.splits().unwrap().len(), 4);
+            assert_eq!(transaction.currency().await.unwrap().mnemonic, "EUR");
+            assert_eq!(transaction.splits().await.unwrap().len(), 4);
         }
 
-        #[test]
-        fn price() {
-            let book = setup();
+        #[tokio::test]
+        async fn price() {
+            let book = setup().await;
             let price = book
                 .prices()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|p| p.guid == "0d6684f44fb018e882de76094ed9c433")
@@ -628,27 +692,33 @@ mod tests {
             assert_eq!(price.currency().unwrap().mnemonic, "AED");
         }
 
-        #[test]
-        fn commodity() {
+        #[tokio::test]
+        async fn commodity() {
             let book = setup();
             let commodity = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|p| p.mnemonic == "EUR")
                 .unwrap();
 
-            assert_eq!(commodity.accounts().unwrap().len(), 14);
-            assert_eq!(commodity.transactions().unwrap().len(), 11);
-            assert_eq!(commodity.as_commodity_prices().unwrap().len(), 1);
-            assert_eq!(commodity.as_currency_prices().unwrap().len(), 2);
+            assert_eq!(commodity.accounts().await.unwrap().len(), 14);
+            assert_eq!(commodity.transactions().await.unwrap().len(), 11);
+            assert_eq!(commodity.as_commodity_prices().await.unwrap().len(), 1);
+            assert_eq!(commodity.as_currency_prices().await.unwrap().len(), 2);
             assert_eq!(
-                commodity.as_commodity_or_currency_prices().unwrap().len(),
+                commodity
+                    .as_commodity_or_currency_prices()
+                    .await
+                    .unwrap()
+                    .len(),
                 3
             );
 
             let currency = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|p| p.mnemonic == "FOO")
@@ -664,75 +734,81 @@ mod tests {
 
         type DB = sqlx::MySql;
 
-        fn setup() -> crate::MySQLBook {
+        async fn setup() -> crate::MySQLBook {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
-            crate::MySQLBook::new(uri).expect("right path")
+            crate::MySQLBook::new(uri).await.expect("right path")
         }
 
-        #[test]
-        fn account() {
-            let book = setup();
+        #[tokio::test]
+        async fn account() {
+            let book = setup().await;
 
-            let account = book.account_by_name("Foo stock").unwrap().unwrap();
+            let account = book.account_by_name("Foo stock").await.unwrap().unwrap();
             assert_eq!("Foo stock", account.name);
-            assert_eq!(1, account.splits().unwrap().len());
-            assert_eq!("Broker", account.parent().unwrap().name);
-            assert_eq!(0, account.children().unwrap().len());
-            assert_eq!("FOO", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 130.0, account.balance().unwrap());
+            assert_eq!(1, account.splits().await.unwrap().len());
+            assert_eq!("Broker", account.parent().await.unwrap().name);
+            assert_eq!(0, account.children().await.unwrap().len());
+            assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(f64, 130.0, account.balance().await.unwrap());
 
-            let account = book.account_by_name("Cash").unwrap().unwrap();
+            let account = book.account_by_name("Cash").await.unwrap().unwrap();
             assert_eq!("Cash", account.name);
-            assert_eq!(3, account.splits().unwrap().len());
-            assert_eq!("Current", account.parent().unwrap().name);
-            assert_eq!(0, account.children().unwrap().len());
-            assert_eq!("EUR", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 220.0, account.balance().unwrap());
+            assert_eq!(3, account.splits().await.unwrap().len());
+            assert_eq!("Current", account.parent().await.unwrap().name);
+            assert_eq!(0, account.children().await.unwrap().len());
+            assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(f64, 220.0, account.balance().await.unwrap());
 
-            let account = book.account_by_name("Mouvements").unwrap().unwrap();
+            let account = book.account_by_name("Mouvements").await.unwrap().unwrap();
             assert_eq!("Mouvements", account.name);
-            assert_eq!(0, account.splits().unwrap().len());
-            assert_eq!("Root Account", account.parent().unwrap().name);
-            assert_eq!(2, account.children().unwrap().len());
-            assert_eq!("FOO", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 1351.4815, account.balance().unwrap(), epsilon = 1e-4);
+            assert_eq!(0, account.splits().await.unwrap().len());
+            assert_eq!("Root Account", account.parent().await.unwrap().name);
+            assert_eq!(2, account.children().await.unwrap().len());
+            assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(
+                f64,
+                1351.4815,
+                account.balance().await.unwrap(),
+                epsilon = 1e-4
+            );
 
-            let account = book.account_by_name("Asset").unwrap().unwrap();
+            let account = book.account_by_name("Asset").await.unwrap().unwrap();
             assert_eq!("Asset", account.name);
-            assert_eq!(0, account.splits().unwrap().len());
-            assert_eq!("Root Account", account.parent().unwrap().name);
-            assert_eq!(3, account.children().unwrap().len());
-            assert_eq!("EUR", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 24695.30, account.balance().unwrap());
+            assert_eq!(0, account.splits().await.unwrap().len());
+            assert_eq!("Root Account", account.parent().await.unwrap().name);
+            assert_eq!(3, account.children().await.unwrap().len());
+            assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
+            assert_approx_eq!(f64, 24695.30, account.balance().await.unwrap());
         }
 
-        #[test]
-        fn split() {
-            let book = setup();
+        #[tokio::test]
+        async fn split() {
+            let book = setup().await;
             let split = book
                 .splits()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|s| s.guid == "de832fe97e37811a7fff7e28b3a43425")
                 .unwrap();
 
             assert_eq!(
-                split.transaction().unwrap().guid,
+                split.transaction().await.unwrap().guid,
                 "6c8876003c4a6026e38e3afb67d6f2b1"
             );
             assert_eq!(
-                split.transaction().unwrap().description,
+                split.transaction().await.unwrap().description,
                 Some("income 1".into())
             );
             assert_eq!(
-                split.transaction().unwrap().post_date,
+                split.transaction().await.unwrap().post_date,
                 Some(
                     NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 )
             );
             assert_eq!(
-                split.transaction().unwrap().enter_date,
+                split.transaction().await.unwrap().enter_date,
                 Some(
                     NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
@@ -740,61 +816,69 @@ mod tests {
             );
 
             assert_eq!(
-                split.account().unwrap().guid,
+                split.account().await.unwrap().guid,
                 "93fc043c3062aaa1297b30e543d2cd0d",
             );
-            assert_eq!(split.account().unwrap().name, "Cash",);
+            assert_eq!(split.account().await.unwrap().name, "Cash",);
         }
 
-        #[test]
-        fn transaction() {
-            let book = setup();
+        #[tokio::test]
+        async fn transaction() {
+            let book = setup().await;
             let transaction = book
                 .transactions()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|t| t.description == Some("buy foo".into()))
                 .unwrap();
 
-            assert_eq!(transaction.currency().unwrap().mnemonic, "EUR");
-            assert_eq!(transaction.splits().unwrap().len(), 4);
+            assert_eq!(transaction.currency().await.unwrap().mnemonic, "EUR");
+            assert_eq!(transaction.splits().await.unwrap().len(), 4);
         }
 
-        #[test]
-        fn price() {
-            let book = setup();
+        #[tokio::test]
+        async fn price() {
+            let book = setup().await;
             let price = book
                 .prices()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|p| p.guid == "0d6684f44fb018e882de76094ed9c433")
                 .unwrap();
 
-            assert_eq!(price.commodity().unwrap().mnemonic, "ADF");
-            assert_eq!(price.currency().unwrap().mnemonic, "AED");
+            assert_eq!(price.commodity().await.unwrap().mnemonic, "ADF");
+            assert_eq!(price.currency().await.unwrap().mnemonic, "AED");
         }
 
-        #[test]
-        fn commodity() {
-            let book = setup();
+        #[tokio::test]
+        async fn commodity() {
+            let book = setup().await;
             let commodity = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|p| p.mnemonic == "EUR")
                 .unwrap();
 
-            assert_eq!(commodity.accounts().unwrap().len(), 14);
-            assert_eq!(commodity.transactions().unwrap().len(), 11);
-            assert_eq!(commodity.as_commodity_prices().unwrap().len(), 1);
-            assert_eq!(commodity.as_currency_prices().unwrap().len(), 2);
+            assert_eq!(commodity.accounts().await.unwrap().len(), 14);
+            assert_eq!(commodity.transactions().await.unwrap().len(), 11);
+            assert_eq!(commodity.as_commodity_prices().await.unwrap().len(), 1);
+            assert_eq!(commodity.as_currency_prices().await.unwrap().len(), 2);
             assert_eq!(
-                commodity.as_commodity_or_currency_prices().unwrap().len(),
+                commodity
+                    .as_commodity_or_currency_prices()
+                    .await
+                    .unwrap()
+                    .len(),
                 3
             );
 
             let currency = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .find(|p| p.mnemonic == "FOO")

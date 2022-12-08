@@ -10,7 +10,7 @@ test:
 clean:
 	cargo clean
 bench:
-	cargo bench --features sqlite
+	cargo bench --features sqlite,xml
 check:
 	cargo check --all-features
 	cargo clippy --all-features

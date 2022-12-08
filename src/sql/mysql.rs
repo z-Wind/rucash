@@ -1,5 +1,4 @@
 use super::SQLBook;
-use futures::executor::block_on;
 use std::ops::Deref;
 
 pub struct MySQLBook(SQLBook);
@@ -34,13 +33,12 @@ impl MySQLBook {
     /// ```text
     /// mysql://root:password@localhost/db
     /// ```
-    pub fn new(uri: &str) -> Result<Self, sqlx::Error> {
-        let pool = block_on(async {
-            sqlx::any::AnyPoolOptions::new()
-                .max_connections(5)
-                .connect(uri)
-                .await
-        });
-        Ok(Self(SQLBook::new(uri.parse()?, pool?)))
+    pub async fn new(uri: &str) -> Result<Self, sqlx::Error> {
+        let pool = sqlx::any::AnyPoolOptions::new()
+            .max_connections(10)
+            .connect(uri)
+            .await;
+
+        Ok(Self(SQLBook::new(uri.parse()?, pool?).await))
     }
 }

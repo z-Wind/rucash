@@ -13,7 +13,6 @@ use std::sync::{Arc, RwLock};
 use super::kind::SQLKind;
 use super::model;
 use exchange::Exchange;
-use futures::executor::block_on;
 use wrap::DataWithPool;
 
 #[derive(Debug)]
@@ -24,8 +23,9 @@ pub struct SQLBook {
 }
 
 impl SQLBook {
-    fn new(kind: SQLKind, pool: sqlx::AnyPool) -> Self {
-        let exchange_graph = Exchange::new(kind.clone(), pool.clone())
+    async fn new(kind: SQLKind, pool: sqlx::AnyPool) -> Self {
+        let exchange_graph = Exchange::new(kind, pool.clone())
+            .await
             .map(|x| Arc::new(RwLock::new(x)))
             .ok();
         Self {
@@ -35,34 +35,56 @@ impl SQLBook {
         }
     }
 
-    pub fn accounts(&self) -> Result<Vec<DataWithPool<model::Account>>, sqlx::Error> {
-        block_on(async { model::Account::query().fetch_all(&self.pool).await }).map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
+    pub async fn accounts(&self) -> Result<Vec<DataWithPool<model::Account>>, sqlx::Error> {
+        model::Account::query()
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
     }
 
-    pub fn account_by_name(
+    pub async fn account_by_name(
         &self,
         name: &str,
     ) -> Result<Option<DataWithPool<model::Account>>, sqlx::Error> {
-        self.accounts_contains_name(name).map(|mut x| x.pop())
+        self.accounts_contains_name(name).await.map(|mut x| x.pop())
     }
 
-    pub fn accounts_contains_name(
+    pub async fn accounts_contains_name(
         &self,
         name: &str,
     ) -> Result<Vec<DataWithPool<model::Account>>, sqlx::Error> {
         let name = format!("%{}%", name);
-        block_on(async {
-            model::Account::query_like_name(&name, self.kind)
-                .fetch_all(&self.pool)
-                .await
-        })
-        .map(|v| {
+
+        model::Account::query_like_name(&name, self.kind)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
+    }
+
+    pub async fn splits(&self) -> Result<Vec<DataWithPool<model::Split>>, sqlx::Error> {
+        model::Split::query().fetch_all(&self.pool).await.map(|v| {
             v.into_iter()
                 .map(|x| {
                     DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
@@ -71,8 +93,26 @@ impl SQLBook {
         })
     }
 
-    pub fn splits(&self) -> Result<Vec<DataWithPool<model::Split>>, sqlx::Error> {
-        block_on(async { model::Split::query().fetch_all(&self.pool).await }).map(|v| {
+    pub async fn transactions(&self) -> Result<Vec<DataWithPool<model::Transaction>>, sqlx::Error> {
+        model::Transaction::query()
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
+    }
+
+    pub async fn prices(&self) -> Result<Vec<DataWithPool<model::Price>>, sqlx::Error> {
+        model::Price::query().fetch_all(&self.pool).await.map(|v| {
             v.into_iter()
                 .map(|x| {
                     DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
@@ -81,48 +121,39 @@ impl SQLBook {
         })
     }
 
-    pub fn transactions(&self) -> Result<Vec<DataWithPool<model::Transaction>>, sqlx::Error> {
-        block_on(async { model::Transaction::query().fetch_all(&self.pool).await }).map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
+    pub async fn currencies(&self) -> Result<Vec<DataWithPool<model::Commodity>>, sqlx::Error> {
+        model::Commodity::query_by_namespace("CURRENCY", self.kind)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
     }
 
-    pub fn prices(&self) -> Result<Vec<DataWithPool<model::Price>>, sqlx::Error> {
-        block_on(async { model::Price::query().fetch_all(&self.pool).await }).map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
-    }
-
-    pub fn currencies(&self) -> Result<Vec<DataWithPool<model::Commodity>>, sqlx::Error> {
-        block_on(async {
-            model::Commodity::query_by_namespace("CURRENCY", self.kind)
-                .fetch_all(&self.pool)
-                .await
-        })
-        .map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
-    }
-
-    pub fn commodities(&self) -> Result<Vec<DataWithPool<model::Commodity>>, sqlx::Error> {
-        block_on(async { model::Commodity::query().fetch_all(&self.pool).await }).map(|v| {
-            v.into_iter()
-                .map(|x| {
-                    DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-                })
-                .collect()
-        })
+    pub async fn commodities(&self) -> Result<Vec<DataWithPool<model::Commodity>>, sqlx::Error> {
+        model::Commodity::query()
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|x| {
+                        DataWithPool::new(
+                            x,
+                            self.kind,
+                            self.pool.clone(),
+                            self.exchange_graph.clone(),
+                        )
+                    })
+                    .collect()
+            })
     }
 }

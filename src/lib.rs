@@ -2,8 +2,12 @@
 //! #[cfg(feature = "sqlite")]
 //! {
 //!     use rucash::SqliteBook;
-//!     let book = SqliteBook::new("sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro").unwrap();
-//!     let accounts = book.accounts();
+//!
+//!     #[tokio::main]
+//!     async fn main() {
+//!         let book = SqliteBook::new("sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro").await.unwrap();
+//!         let accounts = book.accounts();
+//!     }
 //! }
 //! ```
 pub mod model;

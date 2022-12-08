@@ -1,5 +1,4 @@
 use super::SQLBook;
-use futures::executor::block_on;
 use std::ops::Deref;
 
 pub struct PostgreSQLBook(SQLBook);
@@ -49,13 +48,12 @@ impl PostgreSQLBook {
     /// postgresql://user:secret@localhost
     /// postgresql://localhost?dbname=mydb&user=postgres&password=postgres
     /// ```
-    pub fn new(uri: &str) -> Result<Self, sqlx::Error> {
-        let pool = block_on(async {
-            sqlx::any::AnyPoolOptions::new()
-                .max_connections(5)
-                .connect(uri)
-                .await
-        });
-        Ok(Self(SQLBook::new(uri.parse()?, pool?)))
+    pub async fn new(uri: &str) -> Result<Self, sqlx::Error> {
+        let pool = sqlx::any::AnyPoolOptions::new()
+            .max_connections(10)
+            .connect(uri)
+            .await;
+
+        Ok(Self(SQLBook::new(uri.parse()?, pool?).await))
     }
 }

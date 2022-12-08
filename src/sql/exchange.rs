@@ -2,7 +2,6 @@ use super::wrap::DataWithPool;
 use crate::kind::SQLKind;
 use crate::model;
 use chrono::NaiveDateTime;
-use futures::executor::block_on;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -15,12 +14,12 @@ pub(crate) struct Exchange {
 }
 
 impl Exchange {
-    fn new_graph(
+    async fn new_graph(
         kind: SQLKind,
         pool: sqlx::AnyPool,
     ) -> Result<HashMap<String, HashMap<String, (f64, NaiveDateTime)>>, sqlx::Error> {
         let prices: Vec<DataWithPool<model::Price>> =
-            block_on(async { model::Price::query().fetch_all(&pool).await }).map(|v| {
+            model::Price::query().fetch_all(&pool).await.map(|v| {
                 v.into_iter()
                     .map(|x| DataWithPool::new(x, kind, pool.clone(), None))
                     .collect()
@@ -28,8 +27,8 @@ impl Exchange {
 
         let mut graph: HashMap<String, HashMap<String, (f64, NaiveDateTime)>> = HashMap::new();
         for p in prices {
-            let commodity = &p.commodity()?.mnemonic;
-            let currency = &p.currency()?.mnemonic;
+            let commodity = &p.commodity().await?.mnemonic;
+            let currency = &p.currency().await?.mnemonic;
 
             graph
                 .entry(commodity.clone())
@@ -56,9 +55,9 @@ impl Exchange {
 
         Ok(graph)
     }
-    pub(crate) fn new(kind: SQLKind, pool: sqlx::AnyPool) -> Result<Self, sqlx::Error> {
+    pub(crate) async fn new(kind: SQLKind, pool: sqlx::AnyPool) -> Result<Self, sqlx::Error> {
         Ok(Self {
-            graph: Self::new_graph(kind, pool.clone())?,
+            graph: Self::new_graph(kind, pool.clone()).await?,
             kind,
             pool,
         })
@@ -118,8 +117,8 @@ impl Exchange {
         None
     }
 
-    pub(crate) fn update(&mut self) -> Result<(), sqlx::Error> {
-        self.graph = Self::new_graph(self.kind, self.pool.clone())?;
+    pub(crate) async fn update(&mut self) -> Result<(), sqlx::Error> {
+        self.graph = Self::new_graph(self.kind, self.pool.clone()).await?;
         Ok(())
     }
 }
@@ -128,28 +127,30 @@ impl Exchange {
 mod tests {
     use super::*;
     use float_cmp::assert_approx_eq;
+
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
 
         type DB = sqlx::Sqlite;
 
-        fn setup() -> crate::SqliteBook {
+        async fn setup() -> crate::SqliteBook {
             let uri: &str = &format!(
                 "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
-            crate::SqliteBook::new(uri).expect("right path")
+            crate::SqliteBook::new(uri).await.expect("right path")
         }
 
-        #[test]
-        fn test_exchange() {
-            let book = setup();
-            let mut exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
-            exchange.update().expect("ok");
+        #[tokio::test]
+        async fn test_exchange() {
+            let book = setup().await;
+            let mut exchange = Exchange::new(book.kind, book.pool.clone()).await.unwrap();
+            exchange.update().await.expect("ok");
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "ADF")
@@ -157,6 +158,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "AED")
@@ -166,6 +168,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -173,6 +176,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -182,6 +186,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -189,6 +194,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "AED")
@@ -198,6 +204,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -205,6 +212,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "USD")
@@ -214,6 +222,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "AED")
@@ -221,6 +230,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -230,6 +240,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -237,6 +248,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -246,6 +258,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -253,6 +266,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -261,6 +275,7 @@ mod tests {
             assert_approx_eq!(f64, 1.0 / 0.81, exchange.cal(&from, &to).unwrap());
         }
     }
+
     #[cfg(feature = "postgresql")]
     mod postgresql {
         use super::*;
@@ -268,18 +283,19 @@ mod tests {
         const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
         type DB = sqlx::Postgres;
 
-        fn setup(uri: &str) -> crate::PostgreSQLBook {
-            crate::PostgreSQLBook::new(&uri).expect("right path")
+        async fn setup(uri: &str) -> crate::PostgreSQLBook {
+            crate::PostgreSQLBook::new(&uri).await.expect("right path")
         }
 
-        #[test]
-        fn test_exchange() {
-            let book = setup();
-            let mut exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
-            exchange.update().expect("ok");
+        #[tokio::test]
+        async fn test_exchange() {
+            let book = setup().await;
+            let mut exchange = Exchange::new(book.kind, book.pool.clone()).await.unwrap();
+            exchange.update().await.expect("ok");
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "ADF")
@@ -287,6 +303,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "AED")
@@ -296,6 +313,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -303,6 +321,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -312,6 +331,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -319,6 +339,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "AED")
@@ -328,6 +349,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -335,6 +357,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "USD")
@@ -344,6 +367,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "AED")
@@ -351,6 +375,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -360,6 +385,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -367,6 +393,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -376,6 +403,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -383,6 +411,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -397,19 +426,20 @@ mod tests {
 
         type DB = sqlx::MySql;
 
-        fn setup() -> crate::MySQLBook {
+        async fn setup() -> crate::MySQLBook {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
-            crate::MySQLBook::new(uri).expect("right path")
+            crate::MySQLBook::new(uri).await.expect("right path")
         }
 
-        #[test]
-        fn test_exchange() {
-            let book = setup();
-            let mut exchange = Exchange::new(book.kind, book.pool.clone()).unwrap();
-            exchange.update().expect("ok");
+        #[tokio::test]
+        async fn test_exchange() {
+            let book = setup().await;
+            let mut exchange = Exchange::new(book.kind, book.pool.clone()).await.unwrap();
+            exchange.update().await.expect("ok");
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "ADF")
@@ -417,6 +447,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "AED")
@@ -426,6 +457,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -433,6 +465,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -442,6 +475,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -449,6 +483,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "AED")
@@ -458,6 +493,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -465,6 +501,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "USD")
@@ -474,6 +511,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "AED")
@@ -481,6 +519,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -490,6 +529,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")
@@ -497,6 +537,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -506,6 +547,7 @@ mod tests {
 
             let from = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "EUR")
@@ -513,6 +555,7 @@ mod tests {
                 .unwrap();
             let to = book
                 .commodities()
+                .await
                 .unwrap()
                 .into_iter()
                 .filter(|c| c.mnemonic == "FOO")

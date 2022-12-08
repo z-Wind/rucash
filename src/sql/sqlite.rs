@@ -1,5 +1,4 @@
 use super::SQLBook;
-use futures::executor::block_on;
 use std::ops::Deref;
 
 pub struct SqliteBook(SQLBook);
@@ -23,13 +22,12 @@ impl SqliteBook {
     /// `sqlite://data.db` | Open the file `data.db` in the current directory. |
     /// `sqlite:///data.db` | Open the file `data.db` from the root (`/`) directory. |
     /// `sqlite://data.db?mode=ro` | Open the file `data.db` for read-only access. |
-    pub fn new(uri: &str) -> Result<Self, sqlx::Error> {
-        let pool = block_on(async {
-            sqlx::any::AnyPoolOptions::new()
-                .max_connections(5)
-                .connect(uri)
-                .await
-        });
-        Ok(Self(SQLBook::new(uri.parse()?, pool?)))
+    pub async fn new(uri: &str) -> Result<Self, sqlx::Error> {
+        let pool = sqlx::any::AnyPoolOptions::new()
+            .max_connections(10)
+            .connect(uri)
+            .await;
+
+        Ok(Self(SQLBook::new(uri.parse()?, pool?).await))
     }
 }
