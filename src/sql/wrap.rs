@@ -4,9 +4,10 @@ use crate::model::{self, Commodity};
 use futures::future::{BoxFuture, FutureExt};
 use std::hash::Hash;
 use std::ops::Deref;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DataWithPool<T> {
     content: T,
     kind: SQLKind,
@@ -147,7 +148,7 @@ impl DataWithPool<model::Account> {
                 net += child_net;
             }
 
-            let rate = commodity.sell(currency).unwrap_or_else(|| {
+            let rate = commodity.sell(currency).await.unwrap_or_else(|| {
                 panic!(
                     "must have rate {} to {}",
                     commodity.mnemonic, currency.mnemonic
@@ -370,21 +371,21 @@ impl DataWithPool<model::Commodity> {
             })
     }
 
-    pub fn sell(&self, currency: &DataWithPool<model::Commodity>) -> Option<f64> {
+    pub async fn sell(&self, currency: &DataWithPool<model::Commodity>) -> Option<f64> {
         // println!("{} to {}", self.mnemonic, currency.mnemonic);
         self.exchange_graph
             .as_ref()?
             .read()
-            .ok()?
+            .await
             .cal(self, currency)
     }
 
-    pub fn buy(&self, commodity: &DataWithPool<model::Commodity>) -> Option<f64> {
+    pub async fn buy(&self, commodity: &DataWithPool<model::Commodity>) -> Option<f64> {
         // println!("{} to {}", commodity.mnemonic, self.mnemonic);
         self.exchange_graph
             .as_ref()?
             .read()
-            .ok()?
+            .await
             .cal(commodity, self)
     }
 
@@ -393,7 +394,7 @@ impl DataWithPool<model::Commodity> {
 
         Ok(graph
             .write()
-            .expect("graph must could be written")
+            .await
             .update()
             .await?)
     }
@@ -563,8 +564,8 @@ mod tests {
                 .into_iter()
                 .find(|p| p.mnemonic == "FOO")
                 .unwrap();
-            assert_approx_eq!(f64, 1.2345679012345678, currency.buy(&commodity).unwrap());
-            assert_approx_eq!(f64, 1.2345679012345678, commodity.sell(&currency).unwrap());
+            assert_approx_eq!(f64, 1.2345679012345678, currency.buy(&commodity).await.unwrap());
+            assert_approx_eq!(f64, 1.2345679012345678, commodity.sell(&currency).await.unwrap());
         }
     }
 
@@ -883,8 +884,8 @@ mod tests {
                 .into_iter()
                 .find(|p| p.mnemonic == "FOO")
                 .unwrap();
-            assert_approx_eq!(f64, 1.2345679012345678, currency.buy(&commodity).unwrap());
-            assert_approx_eq!(f64, 1.2345679012345678, commodity.sell(&currency).unwrap());
+            assert_approx_eq!(f64, 1.2345679012345678, currency.buy(&commodity).await.unwrap());
+            assert_approx_eq!(f64, 1.2345679012345678, commodity.sell(&currency).await.unwrap());
         }
     }
 }

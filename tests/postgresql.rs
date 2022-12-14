@@ -503,9 +503,9 @@ mod commodity {
             .next()
             .unwrap();
 
-        let rate = commodity.sell(&currency).unwrap();
+        let rate = commodity.sell(&currency).await.unwrap();
         assert_eq!(rate, 1.5);
-        let rate = currency.buy(&commodity).unwrap();
+        let rate = currency.buy(&commodity).await.unwrap();
         assert_eq!(rate, 1.5);
 
         // AED => EUR
@@ -527,9 +527,9 @@ mod commodity {
             .next()
             .unwrap();
 
-        let rate = commodity.sell(&currency).unwrap();
+        let rate = commodity.sell(&currency).await.unwrap();
         assert_approx_eq!(f64, rate, 9.0 / 10.0);
-        let rate = currency.buy(&commodity).unwrap();
+        let rate = currency.buy(&commodity).await.unwrap();
         assert_approx_eq!(f64, rate, 9.0 / 10.0);
     }
 
@@ -553,7 +553,7 @@ mod commodity {
             .next()
             .unwrap();
 
-        let rate = commodity.sell(&currency).unwrap();
+        let rate = commodity.sell(&currency).await.unwrap();
         assert_approx_eq!(f64, rate, 7.0 / 5.0 * 10.0 / 9.0);
     }
 }

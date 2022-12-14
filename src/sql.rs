@@ -8,7 +8,8 @@ pub(crate) mod sqlite;
 mod exchange;
 pub mod wrap;
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use super::kind::SQLKind;
 use super::model;
