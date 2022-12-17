@@ -35,7 +35,7 @@ impl MySQLBook {
     /// ```
     pub async fn new(uri: &str) -> Result<Self, sqlx::Error> {
         let pool = sqlx::any::AnyPoolOptions::new()
-            .max_connections(10)
+            .max_connections(super::MAX_CONNECTIONS)
             .connect(uri)
             .await;
 

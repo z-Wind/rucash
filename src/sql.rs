@@ -16,6 +16,8 @@ use super::model;
 use exchange::Exchange;
 use wrap::DataWithPool;
 
+const MAX_CONNECTIONS: u32 = 10;
+
 #[derive(Debug)]
 pub struct SQLBook {
     kind: SQLKind,
