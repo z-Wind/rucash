@@ -1,5 +1,6 @@
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 use super::TestSchemas;
+#[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
 
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
@@ -282,11 +283,13 @@ impl<'q> Price {
         }
     }
 
+    #[cfg(not(feature = "decimal"))]
     pub fn value(&self) -> f64 {
         self.value_num as f64 / self.value_denom as f64
     }
 
-    pub fn value_into_decimal(&self) -> Decimal {
+    #[cfg(feature = "decimal")]
+    pub fn value(&self) -> Decimal {
         Decimal::new(self.value_num, 0) / Decimal::new(self.value_denom, 0)
     }
 }
@@ -366,7 +369,6 @@ impl Price {
 mod tests {
     use super::*;
     #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    use futures::executor::block_on;
     use tokio::runtime::Runtime;
 
     #[cfg(feature = "sqlite")]
@@ -417,8 +419,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(1.5, result.value());
-            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), result.value());
         }
 
         #[test]
@@ -431,8 +435,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(1.5, result.value());
-            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), result.value());
         }
 
         #[test]
@@ -445,8 +451,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(1.5, result.value());
-            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), result.value());
         }
 
         #[test]
@@ -511,8 +519,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(1.5, result.value());
-            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), result.value());
         }
 
         #[test]
@@ -525,8 +535,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(1.5, result.value());
-            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), result.value());
         }
 
         #[test]
@@ -539,8 +551,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(1.5, result.value());
-            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), result.value());
         }
 
         #[test]
@@ -605,8 +619,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(1.5, result.value());
-            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), result.value());
         }
 
         #[test]
@@ -619,8 +635,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(1.5, result.value());
-            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), result.value());
         }
 
         #[test]
@@ -633,8 +651,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(1.5, result.value());
-            assert_eq!(Decimal::new(15, 1), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), result.value());
         }
 
         #[test]
@@ -665,7 +685,7 @@ mod tests {
                 "{}/tests/db/xml/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
-            crate::XMLBook::new(uri).unwrap().pool.0.clone()
+            crate::XMLBook::new(uri).unwrap().pool.0
         }
 
         #[test]
@@ -740,7 +760,10 @@ mod tests {
             assert_eq!(price.r#type.as_ref().unwrap(), "unknown");
             assert_eq!(price.value_num, 3);
             assert_eq!(price.value_denom, 2);
-            assert_eq!(price.value(), 1.5);
+            #[cfg(not(feature = "decimal"))]
+            assert_eq!(1.5, price.value());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), price.value());
         }
     }
 }

@@ -1,4 +1,6 @@
 use rucash::SqliteBook;
+#[cfg(feature = "decimal")]
+use rust_decimal::Decimal;
 
 pub const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro";
 
@@ -28,14 +30,13 @@ mod book {
     #[tokio::test]
     async fn accounts_filter() {
         let book = SqliteBook::new(URI).await.unwrap();
-        let accounts: Vec<_> = book
+        let accounts = book
             .accounts()
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.name.to_lowercase().contains(&"aS".to_lowercase()))
-            .collect();
-        assert_eq!(accounts.len(), 3);
+            .filter(|x| x.name.to_lowercase().contains(&"aS".to_lowercase()));
+        assert_eq!(accounts.count(), 3);
     }
 
     #[tokio::test]
@@ -97,8 +98,7 @@ mod account {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "fcd795021c976ba75621ec39e75f6214")
-            .next()
+            .find(|x| x.guid == "fcd795021c976ba75621ec39e75f6214")
             .unwrap();
 
         assert_eq!(account.guid, "fcd795021c976ba75621ec39e75f6214");
@@ -128,11 +128,13 @@ mod account {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.name == "Current")
-            .next()
+            .find(|x| x.name == "Current")
             .unwrap();
 
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(account.balance().await.unwrap(), 4590.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(account.balance().await.unwrap(), Decimal::new(4590, 0));
     }
     #[tokio::test]
     async fn balance_diff_currency() {
@@ -142,11 +144,13 @@ mod account {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.name == "Asset")
-            .next()
+            .find(|x| x.name == "Asset")
             .unwrap();
 
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(account.balance().await.unwrap(), 24695.3);
+        #[cfg(feature = "decimal")]
+        assert_eq!(account.balance().await.unwrap(), Decimal::new(246953, 1));
     }
     #[tokio::test]
     async fn splits() {
@@ -200,8 +204,7 @@ mod split {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
-            .next()
+            .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .unwrap();
 
         assert_eq!(split.guid, "de832fe97e37811a7fff7e28b3a43425");
@@ -213,10 +216,20 @@ mod split {
         assert_eq!(split.reconcile_date, None);
         assert_eq!(split.value_num, 15000);
         assert_eq!(split.value_denom, 100);
+
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(split.value(), 150.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(split.value(), Decimal::new(150, 0));
+
         assert_eq!(split.quantity_num, 15000);
         assert_eq!(split.quantity_denom, 100);
+
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(split.quantity(), 150.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(split.quantity(), Decimal::new(150, 0));
+
         assert_eq!(split.lot_guid, None);
     }
 
@@ -228,8 +241,7 @@ mod split {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
-            .next()
+            .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .unwrap();
         let transaction = split.transaction().await.unwrap();
         assert_eq!(transaction.description.as_ref().unwrap(), "income 1");
@@ -243,8 +255,7 @@ mod split {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
-            .next()
+            .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .unwrap();
         let account = split.account().await.unwrap();
         assert_eq!(account.name, "Cash");
@@ -262,8 +273,7 @@ mod transaction {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
-            .next()
+            .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .unwrap();
 
         assert_eq!(transaction.guid, "6c8876003c4a6026e38e3afb67d6f2b1");
@@ -301,8 +311,7 @@ mod transaction {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
-            .next()
+            .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .unwrap();
         let currency = transaction.currency().await.unwrap();
         assert_eq!(currency.fullname.as_ref().unwrap(), "Euro");
@@ -316,8 +325,7 @@ mod transaction {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
-            .next()
+            .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .unwrap();
         let splits = transaction.splits().await.unwrap();
         assert_eq!(splits.len(), 2);
@@ -335,8 +343,7 @@ mod price {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
-            .next()
+            .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .unwrap();
 
         assert_eq!(price.guid, "0d6684f44fb018e882de76094ed9c433");
@@ -350,7 +357,11 @@ mod price {
         assert_eq!(price.r#type.as_ref().unwrap(), "unknown");
         assert_eq!(price.value_num, 3);
         assert_eq!(price.value_denom, 2);
+
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(price.value(), 1.5);
+        #[cfg(feature = "decimal")]
+        assert_eq!(price.value(), Decimal::new(15, 1));
     }
 
     #[tokio::test]
@@ -361,8 +372,7 @@ mod price {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
-            .next()
+            .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .unwrap();
         let commodity = price.commodity().await.unwrap();
         assert_eq!(commodity.fullname.as_ref().unwrap(), "Andorran Franc");
@@ -376,8 +386,7 @@ mod price {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
-            .next()
+            .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .unwrap();
         let currency = price.currency().await.unwrap();
         assert_eq!(currency.fullname.as_ref().unwrap(), "UAE Dirham");
@@ -386,6 +395,7 @@ mod price {
 
 mod commodity {
     use super::*;
+    #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
 
     #[tokio::test]
@@ -396,8 +406,7 @@ mod commodity {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .next()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .unwrap();
 
         assert_eq!(commodity.guid, "346629655191dcf59a7e2c2a85b70f69");
@@ -419,8 +428,7 @@ mod commodity {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .next()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .unwrap();
         let accounts = commodity.accounts().await.unwrap();
         assert_eq!(accounts.len(), 14);
@@ -434,8 +442,7 @@ mod commodity {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .next()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .unwrap();
         let transactions = commodity.transactions().await.unwrap();
         assert_eq!(transactions.len(), 11);
@@ -449,8 +456,7 @@ mod commodity {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .next()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .unwrap();
         let prices = commodity.as_commodity_prices().await.unwrap();
         assert_eq!(prices.len(), 1);
@@ -464,8 +470,7 @@ mod commodity {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .next()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .unwrap();
         let prices = commodity.as_currency_prices().await.unwrap();
         assert_eq!(prices.len(), 2);
@@ -479,8 +484,7 @@ mod commodity {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .next()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .unwrap();
         let prices = commodity.as_commodity_or_currency_prices().await.unwrap();
         assert_eq!(prices.len(), 3);
@@ -495,22 +499,27 @@ mod commodity {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
-            .next()
+            .find(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
             .unwrap();
         let currency = book
             .commodities()
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
-            .next()
+            .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
             .unwrap();
 
         let rate = commodity.sell(&currency).await.unwrap();
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(rate, 1.5);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(15, 1));
+
         let rate = currency.buy(&commodity).await.unwrap();
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(rate, 1.5);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(15, 1));
 
         // AED => EUR
         let book = SqliteBook::new(URI).await.unwrap();
@@ -519,22 +528,27 @@ mod commodity {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
-            .next()
+            .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
             .unwrap();
         let currency = book
             .commodities()
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .next()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
             .unwrap();
 
         let rate = commodity.sell(&currency).await.unwrap();
+        #[cfg(not(feature = "decimal"))]
         assert_approx_eq!(f64, rate, 9.0 / 10.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+
         let rate = currency.buy(&commodity).await.unwrap();
+        #[cfg(not(feature = "decimal"))]
         assert_approx_eq!(f64, rate, 9.0 / 10.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
     }
 
     #[tokio::test]
@@ -546,19 +560,23 @@ mod commodity {
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "1e5d65e2726a5d4595741cb204992991")
-            .next()
+            .find(|x| x.guid == "1e5d65e2726a5d4595741cb204992991")
             .unwrap();
         let currency = book
             .commodities()
             .await
             .unwrap()
             .into_iter()
-            .filter(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
-            .next()
+            .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
             .unwrap();
 
         let rate = commodity.sell(&currency).await.unwrap();
+        #[cfg(not(feature = "decimal"))]
         assert_approx_eq!(f64, rate, 7.0 / 5.0 * 10.0 / 9.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(
+            rate,
+            (Decimal::new(7, 0) / Decimal::new(5, 0)) * (Decimal::new(10, 0) / Decimal::new(9, 0)),
+        );
     }
 }

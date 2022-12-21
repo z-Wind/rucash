@@ -79,21 +79,18 @@ mod consistency {
         v_xml.sort_by_key(|x| &x.guid);
 
         println!("vec_match(&v_sqlite, &v_postgresql)");
-        assert_eq!(vec_match(&v_sqlite, &v_postgresql, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
         println!("vec_match(&v_sqlite, &v_mysql)");
-        assert_eq!(vec_match(&v_sqlite, &v_mysql, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_mysql, cmp));
         println!("vec_match(&v_sqlite, &v_xml)");
-        assert_eq!(
-            vec_match(
-                &v_sqlite
-                    .into_iter()
-                    .filter(|x| x.name != "Template Root")
-                    .collect(),
-                &v_xml,
-                cmp
-            ),
-            true
-        );
+        assert!(vec_match(
+            &v_sqlite
+                .into_iter()
+                .filter(|x| x.name != "Template Root")
+                .collect(),
+            &v_xml,
+            cmp
+        ));
     }
 
     #[tokio::test]
@@ -122,11 +119,11 @@ mod consistency {
         v_xml.sort_by_key(|x| &x.guid);
 
         println!("vec_match(&v_sqlite, &v_postgresql)");
-        assert_eq!(vec_match(&v_sqlite, &v_postgresql, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
         println!("vec_match(&v_sqlite, &v_mysql)");
-        assert_eq!(vec_match(&v_sqlite, &v_mysql, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_mysql, cmp));
         println!("vec_match(&v_sqlite, &v_xml)");
-        assert_eq!(vec_match(&v_sqlite, &v_xml, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_xml, cmp));
     }
 
     #[tokio::test]
@@ -163,11 +160,11 @@ mod consistency {
         v_xml.sort_by_key(|x| &x.guid);
 
         println!("vec_match(&v_sqlite, &v_postgresql)");
-        assert_eq!(vec_match(&v_sqlite, &v_postgresql, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
         println!("vec_match(&v_sqlite, &v_mysql)");
-        assert_eq!(vec_match(&v_sqlite, &v_mysql, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_mysql, cmp));
         println!("vec_match(&v_sqlite, &v_xml)");
-        assert_eq!(vec_match(&v_sqlite, &v_xml, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_xml, cmp));
     }
 
     #[tokio::test]
@@ -205,11 +202,11 @@ mod consistency {
         v_xml.sort_by_key(|x| &x.guid);
 
         println!("vec_match(&v_sqlite, &v_postgresql)");
-        assert_eq!(vec_match(&v_sqlite, &v_postgresql, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
         println!("vec_match(&v_sqlite, &v_mysql)");
-        assert_eq!(vec_match(&v_sqlite, &v_mysql, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_mysql, cmp));
         println!("vec_match(&v_sqlite, &v_xml)");
-        assert_eq!(vec_match(&v_sqlite, &v_xml, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_xml, cmp));
     }
 
     #[tokio::test]
@@ -249,17 +246,14 @@ mod consistency {
         v_xml.sort_by_key(|x| &x.mnemonic);
 
         println!("vec_match(&v_sqlite, &v_postgresql)");
-        assert_eq!(vec_match(&v_sqlite, &v_postgresql, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
         println!("vec_match(&v_sqlite, &v_mysql)");
-        assert_eq!(vec_match(&v_sqlite, &v_mysql, cmp), true);
+        assert!(vec_match(&v_sqlite, &v_mysql, cmp));
         println!("vec_match(&v_sqlite, &v_xml)");
-        assert_eq!(
-            vec_match(
-                &v_sqlite,
-                &v_xml.into_iter().filter(|x| x.guid != "template").collect(),
-                cmp
-            ),
-            true
-        );
+        assert!(vec_match(
+            &v_sqlite,
+            &v_xml.into_iter().filter(|x| x.guid != "template").collect(),
+            cmp
+        ),);
     }
 }

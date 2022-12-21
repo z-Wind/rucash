@@ -229,7 +229,6 @@ impl Transaction {
 mod tests {
     use super::*;
     #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    use futures::executor::block_on;
     use tokio::runtime::Runtime;
 
     #[cfg(feature = "sqlite")]
@@ -459,7 +458,7 @@ mod tests {
                 "{}/tests/db/xml/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
-            crate::XMLBook::new(uri).unwrap().pool.0.clone()
+            crate::XMLBook::new(uri).unwrap().pool.0
         }
 
         #[test]

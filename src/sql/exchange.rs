@@ -10,14 +10,14 @@ use std::collections::VecDeque;
 pub(crate) struct Exchange {
     kind: SQLKind,
     pool: sqlx::AnyPool,
-    graph: HashMap<String, HashMap<String, (f64, NaiveDateTime)>>,
+    graph: HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>>,
 }
 
 impl Exchange {
     async fn new_graph(
         kind: SQLKind,
         pool: sqlx::AnyPool,
-    ) -> Result<HashMap<String, HashMap<String, (f64, NaiveDateTime)>>, sqlx::Error> {
+    ) -> Result<HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>>, sqlx::Error> {
         let prices: Vec<DataWithPool<model::Price>> =
             model::Price::query().fetch_all(&pool).await.map(|v| {
                 v.into_iter()
@@ -25,7 +25,8 @@ impl Exchange {
                     .collect()
             })?;
 
-        let mut graph: HashMap<String, HashMap<String, (f64, NaiveDateTime)>> = HashMap::new();
+        let mut graph: HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>> =
+            HashMap::new();
         for p in prices {
             let commodity = &p.commodity().await?.mnemonic;
             let currency = &p.currency().await?.mnemonic;
@@ -47,10 +48,10 @@ impl Exchange {
                 .entry(commodity.clone())
                 .and_modify(|e| {
                     if e.1 < p.date {
-                        *e = (1.0 / p.value(), p.date);
+                        *e = (num_traits::one::<crate::Num>() / p.value(), p.date);
                     }
                 })
-                .or_insert((1.0 / p.value(), p.date));
+                .or_insert((num_traits::one::<crate::Num>() / p.value(), p.date));
         }
 
         Ok(graph)
@@ -67,16 +68,20 @@ impl Exchange {
         &self,
         commodity: &DataWithPool<model::Commodity>,
         currency: &DataWithPool<model::Commodity>,
-    ) -> Option<f64> {
+    ) -> Option<crate::Num> {
         let commodity = &commodity.mnemonic;
         let currency = &currency.mnemonic;
         if commodity == currency {
-            return Some(1.0);
+            return Some(num_traits::one());
         }
 
         let mut visited: HashSet<(&str, &str)> = HashSet::new();
-        let mut queue: VecDeque<(&str, f64, chrono::NaiveDateTime)> = VecDeque::new();
-        queue.push_back((commodity, 1.0f64, chrono::Local::now().naive_local()));
+        let mut queue: VecDeque<(&str, crate::Num, chrono::NaiveDateTime)> = VecDeque::new();
+        queue.push_back((
+            commodity,
+            num_traits::one(),
+            chrono::Local::now().naive_local(),
+        ));
 
         while !queue.is_empty() {
             let n = queue.len();
@@ -126,13 +131,16 @@ impl Exchange {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
+    #[cfg(feature = "decimal")]
+    use rust_decimal::Decimal;
 
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
 
-        type DB = sqlx::Sqlite;
+        //type DB = sqlx::Sqlite;
 
         async fn setup() -> crate::SqliteBook {
             let uri: &str = &format!(
@@ -153,126 +161,166 @@ mod tests {
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "ADF")
-                .next()
+                .find(|c| c.mnemonic == "ADF")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.5, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.0, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(10, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 0.9, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(9, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "EUR")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "USD")
-                .next()
+                .find(|c| c.mnemonic == "USD")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.0 / 1.4, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(10, 1) / Decimal::new(14, 1),
+                exchange.cal(&from, &to).unwrap()
+            );
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "EUR")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 0.9, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(9, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "USD")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(
+                f64,
+                7.0 / 5.0 * 10.0 / 9.0,
+                exchange.cal(&from, &to).unwrap()
+            );
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                (Decimal::new(7, 0) / Decimal::new(5, 0))
+                    * (Decimal::new(10, 0) / Decimal::new(9, 0)),
+                exchange.cal(&from, &to).unwrap()
+            );
+
+            let from = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "FOO")
+                .unwrap();
+            let to = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "EUR")
+                .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 0.81, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(81, 2), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "EUR")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.0 / 0.81, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(10, 1) / Decimal::new(81, 2),
+                exchange.cal(&from, &to).unwrap()
+            );
         }
     }
 
@@ -281,7 +329,7 @@ mod tests {
         use super::*;
 
         const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
-        type DB = sqlx::Postgres;
+        //type DB = sqlx::Postgres;
 
         async fn setup(uri: &str) -> crate::PostgreSQLBook {
             crate::PostgreSQLBook::new(&uri).await.expect("right path")
@@ -298,133 +346,174 @@ mod tests {
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "ADF")
-                .next()
+                .find(|c| c.mnemonic == "ADF")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.5, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.0, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(10, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 0.9, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(9, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "EUR")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "USD")
-                .next()
+                .find(|c| c.mnemonic == "USD")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.0 / 1.4, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(10, 1) / Decimal::new(14, 1),
+                exchange.cal(&from, &to).unwrap()
+            );
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "EUR")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 0.9, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(9, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "USD")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(
+                f64,
+                7.0 / 5.0 * 10.0 / 9.0,
+                exchange.cal(&from, &to).unwrap()
+            );
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                (Decimal::new(7, 0) / Decimal::new(5, 0))
+                    * (Decimal::new(10, 0) / Decimal::new(9, 0)),
+                exchange.cal(&from, &to).unwrap()
+            );
+
+            let from = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "FOO")
+                .unwrap();
+            let to = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "EUR")
+                .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 0.81, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(81, 2), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "EUR")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.0 / 0.81, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(10, 1) / Decimal::new(81, 2),
+                exchange.cal(&from, &to).unwrap()
+            );
         }
     }
+
     #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
 
-        type DB = sqlx::MySql;
+        //type DB = sqlx::MySql;
 
         async fn setup() -> crate::MySQLBook {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
@@ -442,126 +531,166 @@ mod tests {
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "ADF")
-                .next()
+                .find(|c| c.mnemonic == "ADF")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.5, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.0, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(10, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 0.9, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(9, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "EUR")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "USD")
-                .next()
+                .find(|c| c.mnemonic == "USD")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.0 / 1.4, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(10, 1) / Decimal::new(14, 1),
+                exchange.cal(&from, &to).unwrap()
+            );
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "AED")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "EUR")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 0.9, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(9, 1), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "USD")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "AED")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(
+                f64,
+                7.0 / 5.0 * 10.0 / 9.0,
+                exchange.cal(&from, &to).unwrap()
+            );
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                (Decimal::new(7, 0) / Decimal::new(5, 0))
+                    * (Decimal::new(10, 0) / Decimal::new(9, 0)),
+                exchange.cal(&from, &to).unwrap()
+            );
+
+            let from = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "FOO")
+                .unwrap();
+            let to = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "EUR")
+                .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 0.81, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(81, 2), exchange.cal(&from, &to).unwrap());
 
             let from = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "EUR")
-                .next()
+                .find(|c| c.mnemonic == "EUR")
                 .unwrap();
             let to = book
                 .commodities()
                 .await
                 .unwrap()
                 .into_iter()
-                .filter(|c| c.mnemonic == "FOO")
-                .next()
+                .find(|c| c.mnemonic == "FOO")
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.0 / 0.81, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(10, 1) / Decimal::new(81, 2),
+                exchange.cal(&from, &to).unwrap()
+            );
         }
     }
 }

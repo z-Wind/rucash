@@ -1,5 +1,6 @@
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
 use super::TestSchemas;
+#[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
 
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
@@ -272,19 +273,23 @@ impl<'q> Split {
         }
     }
 
+    #[cfg(not(feature = "decimal"))]
     pub fn value(&self) -> f64 {
         self.value_num as f64 / self.value_denom as f64
     }
 
-    pub fn value_into_decimal(&self) -> Decimal {
+    #[cfg(feature = "decimal")]
+    pub fn value(&self) -> Decimal {
         Decimal::new(self.value_num, 0) / Decimal::new(self.value_denom, 0)
     }
 
+    #[cfg(not(feature = "decimal"))]
     pub fn quantity(&self) -> f64 {
         self.quantity_num as f64 / self.quantity_denom as f64
     }
 
-    pub fn quantity_into_decimal(&self) -> Decimal {
+    #[cfg(feature = "decimal")]
+    pub fn quantity(&self) -> Decimal {
         Decimal::new(self.quantity_num, 0) / Decimal::new(self.quantity_denom, 0)
     }
 }
@@ -375,7 +380,6 @@ impl Split {
 mod tests {
     use super::*;
     #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    use futures::executor::block_on;
     use tokio::runtime::Runtime;
 
     #[cfg(feature = "sqlite")]
@@ -426,8 +430,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(150.0, result.value());
-            assert_eq!(Decimal::new(150, 0), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(150, 0), result.value());
         }
 
         #[test]
@@ -502,8 +508,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(150.0, result.value());
-            assert_eq!(Decimal::new(150, 0), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(150, 0), result.value());
         }
 
         #[test]
@@ -578,8 +586,10 @@ mod tests {
                         .await
                 })
                 .unwrap();
+            #[cfg(not(feature = "decimal"))]
             assert_eq!(150.0, result.value());
-            assert_eq!(Decimal::new(150, 0), result.value_into_decimal());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(150, 0), result.value());
         }
 
         #[test]
@@ -620,7 +630,7 @@ mod tests {
                 "{}/tests/db/xml/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
-            crate::XMLBook::new(uri).unwrap().pool.0.clone()
+            crate::XMLBook::new(uri).unwrap().pool.0
         }
 
         #[test]
@@ -683,10 +693,16 @@ mod tests {
             assert_eq!(split.reconcile_date, None);
             assert_eq!(split.value_num, 15000);
             assert_eq!(split.value_denom, 100);
-            assert_eq!(split.value(), 150.0);
+            #[cfg(not(feature = "decimal"))]
+            assert_eq!(150.0, split.value());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(150, 0), split.value());
             assert_eq!(split.quantity_num, 15000);
             assert_eq!(split.quantity_denom, 100);
-            assert_eq!(split.quantity(), 150.0);
+            #[cfg(not(feature = "decimal"))]
+            assert_eq!(150.0, split.quantity());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(150, 0), split.quantity());
             assert_eq!(split.lot_guid, None);
         }
     }

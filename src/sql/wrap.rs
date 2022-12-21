@@ -138,9 +138,9 @@ impl DataWithPool<model::Account> {
     fn balance_into_currency<'a>(
         &'a self,
         currency: &'a DataWithPool<Commodity>,
-    ) -> BoxFuture<'a, Result<f64, sqlx::Error>> {
+    ) -> BoxFuture<'a, Result<crate::Num, sqlx::Error>> {
         async move {
-            let mut net: f64 = self.splits().await?.iter().map(|s| s.quantity()).sum();
+            let mut net: crate::Num = self.splits().await?.iter().map(|s| s.quantity()).sum();
             let commodity = self.commodity().await.expect("must have commodity");
 
             for child in self.children().await? {
@@ -167,8 +167,8 @@ impl DataWithPool<model::Account> {
         .boxed()
     }
 
-    pub async fn balance(&self) -> Result<f64, sqlx::Error> {
-        let mut net: f64 = self.splits().await?.iter().map(|s| s.quantity()).sum();
+    pub async fn balance(&self) -> Result<crate::Num, sqlx::Error> {
+        let mut net: crate::Num = self.splits().await?.iter().map(|s| s.quantity()).sum();
 
         let commodity = match self.commodity().await {
             Some(commodity) => commodity,
@@ -371,7 +371,7 @@ impl DataWithPool<model::Commodity> {
             })
     }
 
-    pub async fn sell(&self, currency: &DataWithPool<model::Commodity>) -> Option<f64> {
+    pub async fn sell(&self, currency: &DataWithPool<model::Commodity>) -> Option<crate::Num> {
         // println!("{} to {}", self.mnemonic, currency.mnemonic);
         self.exchange_graph
             .as_ref()?
@@ -380,7 +380,7 @@ impl DataWithPool<model::Commodity> {
             .cal(self, currency)
     }
 
-    pub async fn buy(&self, commodity: &DataWithPool<model::Commodity>) -> Option<f64> {
+    pub async fn buy(&self, commodity: &DataWithPool<model::Commodity>) -> Option<crate::Num> {
         // println!("{} to {}", commodity.mnemonic, self.mnemonic);
         self.exchange_graph
             .as_ref()?
@@ -392,25 +392,24 @@ impl DataWithPool<model::Commodity> {
     pub async fn update_exchange_graph(&self) -> Result<(), Box<dyn std::error::Error>> {
         let graph = self.exchange_graph.as_ref().ok_or("No exchange graph")?;
 
-        Ok(graph
-            .write()
-            .await
-            .update()
-            .await?)
+        Ok(graph.write().await.update().await?)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    //use super::*;
     use chrono::NaiveDateTime;
+    #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
+    #[cfg(feature = "decimal")]
+    use rust_decimal::Decimal;
 
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
 
-        type DB = sqlx::Sqlite;
+        //type DB = sqlx::Sqlite;
 
         async fn setup() -> crate::SqliteBook {
             let uri: &str = &format!(
@@ -430,7 +429,10 @@ mod tests {
             assert_eq!("Broker", account.parent().await.unwrap().name);
             assert_eq!(0, account.children().await.unwrap().len());
             assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 130.0, account.balance().await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(130, 0), account.balance().await.unwrap());
 
             let account = book.account_by_name("Cash").await.unwrap().unwrap();
             assert_eq!("Cash", account.name);
@@ -438,7 +440,10 @@ mod tests {
             assert_eq!("Current", account.parent().await.unwrap().name);
             assert_eq!(0, account.children().await.unwrap().len());
             assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 220.0, account.balance().await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(220, 0), account.balance().await.unwrap());
 
             let account = book.account_by_name("Mouvements").await.unwrap().unwrap();
             assert_eq!("Mouvements", account.name);
@@ -446,11 +451,17 @@ mod tests {
             assert_eq!("Root Account", account.parent().await.unwrap().name);
             assert_eq!(2, account.children().await.unwrap().len());
             assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(
                 f64,
                 1351.4815,
                 account.balance().await.unwrap(),
                 epsilon = 1e-4
+            );
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(13514815, 4),
+                account.balance().await.unwrap().round_dp(4)
             );
 
             let account = book.account_by_name("Asset").await.unwrap().unwrap();
@@ -459,7 +470,10 @@ mod tests {
             assert_eq!("Root Account", account.parent().await.unwrap().name);
             assert_eq!(3, account.children().await.unwrap().len());
             assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
-            assert_approx_eq!(f64, 24695.30, account.balance().await.unwrap());
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 24695.3, account.balance().await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(2469530, 2), account.balance().await.unwrap());
         }
 
         #[tokio::test]
@@ -564,8 +578,21 @@ mod tests {
                 .into_iter()
                 .find(|p| p.mnemonic == "FOO")
                 .unwrap();
-            assert_approx_eq!(f64, 1.2345679012345678, currency.buy(&commodity).await.unwrap());
-            assert_approx_eq!(f64, 1.2345679012345678, commodity.sell(&currency).await.unwrap());
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 1.0 / 0.81, currency.buy(&commodity).await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(1, 0) / Decimal::new(81, 2),
+                currency.buy(&commodity).await.unwrap()
+            );
+
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 1.0 / 0.81, commodity.sell(&currency).await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(1, 0) / Decimal::new(81, 2),
+                commodity.sell(&currency).await.unwrap()
+            );
         }
     }
 
@@ -573,7 +600,7 @@ mod tests {
     mod postgresql {
         use super::*;
 
-        type DB = sqlx::Postgres;
+        //type DB = sqlx::Postgres;
 
         async fn setup() -> crate::PostgreSQLBook {
             let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
@@ -590,7 +617,10 @@ mod tests {
             assert_eq!("Broker", account.parent().await.unwrap().name);
             assert_eq!(0, account.children().await.unwrap().len());
             assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 130.0, account.balance().await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(130, 0), account.balance().await.unwrap());
 
             let account = book.account_by_name("Cash").await.unwrap().unwrap();
             assert_eq!("Cash", account.name);
@@ -598,7 +628,10 @@ mod tests {
             assert_eq!("Current", account.parent().await.unwrap().name);
             assert_eq!(0, account.children().await.unwrap().len());
             assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 220.0, account.balance().await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(220, 0), account.balance().await.unwrap());
 
             let account = book.account_by_name("Mouvements").await.unwrap().unwrap();
             assert_eq!("Mouvements", account.name);
@@ -606,11 +639,17 @@ mod tests {
             assert_eq!("Root Account", account.parent().await.unwrap().name);
             assert_eq!(2, account.children().await.unwrap().len());
             assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(
                 f64,
                 1351.4815,
                 account.balance().await.unwrap(),
                 epsilon = 1e-4
+            );
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(13514815, 4),
+                account.balance().await.unwrap().round_dp(4)
             );
 
             let account = book.account_by_name("Asset").await.unwrap().unwrap();
@@ -619,7 +658,10 @@ mod tests {
             assert_eq!("Root Account", account.parent().await.unwrap().name);
             assert_eq!(3, account.children().await.unwrap().len());
             assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
-            assert_approx_eq!(f64, 24695.30, account.balance().await.unwrap());
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 24695.3, account.balance().await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(2469530, 2), account.balance().await.unwrap());
         }
 
         #[tokio::test]
@@ -733,7 +775,7 @@ mod tests {
     mod mysql {
         use super::*;
 
-        type DB = sqlx::MySql;
+        //type DB = sqlx::MySql;
 
         async fn setup() -> crate::MySQLBook {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
@@ -750,7 +792,10 @@ mod tests {
             assert_eq!("Broker", account.parent().await.unwrap().name);
             assert_eq!(0, account.children().await.unwrap().len());
             assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 130.0, account.balance().await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(130, 0), account.balance().await.unwrap());
 
             let account = book.account_by_name("Cash").await.unwrap().unwrap();
             assert_eq!("Cash", account.name);
@@ -758,7 +803,10 @@ mod tests {
             assert_eq!("Current", account.parent().await.unwrap().name);
             assert_eq!(0, account.children().await.unwrap().len());
             assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 220.0, account.balance().await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(220, 0), account.balance().await.unwrap());
 
             let account = book.account_by_name("Mouvements").await.unwrap().unwrap();
             assert_eq!("Mouvements", account.name);
@@ -766,11 +814,17 @@ mod tests {
             assert_eq!("Root Account", account.parent().await.unwrap().name);
             assert_eq!(2, account.children().await.unwrap().len());
             assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(
                 f64,
                 1351.4815,
                 account.balance().await.unwrap(),
                 epsilon = 1e-4
+            );
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(13514815, 4),
+                account.balance().await.unwrap().round_dp(4)
             );
 
             let account = book.account_by_name("Asset").await.unwrap().unwrap();
@@ -779,7 +833,10 @@ mod tests {
             assert_eq!("Root Account", account.parent().await.unwrap().name);
             assert_eq!(3, account.children().await.unwrap().len());
             assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
-            assert_approx_eq!(f64, 24695.30, account.balance().await.unwrap());
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 24695.3, account.balance().await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(2469530, 2), account.balance().await.unwrap());
         }
 
         #[tokio::test]
@@ -884,8 +941,21 @@ mod tests {
                 .into_iter()
                 .find(|p| p.mnemonic == "FOO")
                 .unwrap();
-            assert_approx_eq!(f64, 1.2345679012345678, currency.buy(&commodity).await.unwrap());
-            assert_approx_eq!(f64, 1.2345679012345678, commodity.sell(&currency).await.unwrap());
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 1.0 / 0.81, currency.buy(&commodity).await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(1, 0) / Decimal::new(81, 2),
+                currency.buy(&commodity).await.unwrap()
+            );
+
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 1.0 / 0.81, commodity.sell(&currency).await.unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(1, 0) / Decimal::new(81, 2),
+                commodity.sell(&currency).await.unwrap()
+            );
         }
     }
 }

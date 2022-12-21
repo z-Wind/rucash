@@ -1,4 +1,6 @@
 use rucash::XMLBook;
+#[cfg(feature = "decimal")]
+use rust_decimal::Decimal;
 
 pub const URI: &str = "tests/db/xml/complex_sample.gnucash";
 
@@ -27,12 +29,11 @@ mod book {
     #[test]
     fn accounts_filter() {
         let book = XMLBook::new(URI).unwrap();
-        let accounts: Vec<_> = book
+        let accounts = book
             .accounts()
             .into_iter()
-            .filter(|x| x.name.to_lowercase().contains(&"aS".to_lowercase()))
-            .collect();
-        assert_eq!(accounts.len(), 3);
+            .filter(|x| x.name.to_lowercase().contains(&"aS".to_lowercase()));
+        assert_eq!(accounts.count(), 3);
     }
 
     #[test]
@@ -93,8 +94,7 @@ mod account {
         let account = book
             .accounts()
             .into_iter()
-            .filter(|x| x.guid == "fcd795021c976ba75621ec39e75f6214")
-            .next()
+            .find(|x| x.guid == "fcd795021c976ba75621ec39e75f6214")
             .unwrap();
 
         assert_eq!(account.guid, "fcd795021c976ba75621ec39e75f6214");
@@ -119,11 +119,13 @@ mod account {
         let account = book
             .accounts()
             .into_iter()
-            .filter(|x| x.name == "Current")
-            .next()
+            .find(|x| x.name == "Current")
             .unwrap();
 
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(account.balance(), 4590.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(account.balance(), Decimal::new(4590, 0));
     }
     #[test]
     fn balance_diff_currency() {
@@ -131,11 +133,13 @@ mod account {
         let account = book
             .accounts()
             .into_iter()
-            .filter(|x| x.name == "Asset")
-            .next()
+            .find(|x| x.name == "Asset")
             .unwrap();
 
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(account.balance(), 24695.3);
+        #[cfg(feature = "decimal")]
+        assert_eq!(account.balance(), Decimal::new(246953, 1));
     }
     #[test]
     fn splits() {
@@ -186,8 +190,7 @@ mod split {
         let split = book
             .splits()
             .into_iter()
-            .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
-            .next()
+            .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .unwrap();
 
         assert_eq!(split.guid, "de832fe97e37811a7fff7e28b3a43425");
@@ -199,10 +202,20 @@ mod split {
         assert_eq!(split.reconcile_date, None);
         assert_eq!(split.value_num, 15000);
         assert_eq!(split.value_denom, 100);
+
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(split.value(), 150.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(split.value(), Decimal::new(150, 0));
+
         assert_eq!(split.quantity_num, 15000);
         assert_eq!(split.quantity_denom, 100);
+
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(split.quantity(), 150.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(split.quantity(), Decimal::new(150, 0));
+
         assert_eq!(split.lot_guid, None);
     }
     #[test]
@@ -211,8 +224,7 @@ mod split {
         let split = book
             .splits()
             .into_iter()
-            .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
-            .next()
+            .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .unwrap();
         let transaction = split.transaction();
         assert_eq!(transaction.description.as_ref().unwrap(), "income 1");
@@ -224,8 +236,7 @@ mod split {
         let split = book
             .splits()
             .into_iter()
-            .filter(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
-            .next()
+            .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .unwrap();
         let account = split.account();
         assert_eq!(account.name, "Cash");
@@ -240,8 +251,7 @@ mod transaction {
         let transaction = book
             .transactions()
             .into_iter()
-            .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
-            .next()
+            .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .unwrap();
 
         assert_eq!(transaction.guid, "6c8876003c4a6026e38e3afb67d6f2b1");
@@ -274,8 +284,7 @@ mod transaction {
         let transaction = book
             .transactions()
             .into_iter()
-            .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
-            .next()
+            .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .unwrap();
         let currency = transaction.currency();
         assert_eq!(currency.mnemonic, "EUR");
@@ -287,8 +296,7 @@ mod transaction {
         let transaction = book
             .transactions()
             .into_iter()
-            .filter(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
-            .next()
+            .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .unwrap();
         let splits = transaction.splits();
         assert_eq!(splits.len(), 2);
@@ -303,8 +311,7 @@ mod price {
         let price = book
             .prices()
             .into_iter()
-            .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
-            .next()
+            .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .unwrap();
 
         assert_eq!(price.guid, "0d6684f44fb018e882de76094ed9c433");
@@ -318,7 +325,11 @@ mod price {
         assert_eq!(price.r#type.as_ref().unwrap(), "unknown");
         assert_eq!(price.value_num, 3);
         assert_eq!(price.value_denom, 2);
+
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(price.value(), 1.5);
+        #[cfg(feature = "decimal")]
+        assert_eq!(price.value(), Decimal::new(15, 1));
     }
 
     #[test]
@@ -327,8 +338,7 @@ mod price {
         let price = book
             .prices()
             .into_iter()
-            .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
-            .next()
+            .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .unwrap();
         let commodity = price.commodity();
         assert_eq!(commodity.mnemonic, "ADF");
@@ -340,8 +350,7 @@ mod price {
         let price = book
             .prices()
             .into_iter()
-            .filter(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
-            .next()
+            .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .unwrap();
         let currency = price.currency();
         assert_eq!(currency.mnemonic, "AED");
@@ -350,6 +359,7 @@ mod price {
 
 mod commodity {
     use super::*;
+    #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
 
     #[test]
@@ -358,8 +368,7 @@ mod commodity {
         let commodity = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "EUR")
-            .next()
+            .find(|x| x.guid == "EUR")
             .unwrap();
 
         assert_eq!(commodity.guid, "EUR");
@@ -379,8 +388,7 @@ mod commodity {
         let commodity = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "EUR")
-            .next()
+            .find(|x| x.guid == "EUR")
             .unwrap();
         let accounts = commodity.accounts();
         assert_eq!(accounts.len(), 14);
@@ -392,8 +400,7 @@ mod commodity {
         let commodity = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "EUR")
-            .next()
+            .find(|x| x.guid == "EUR")
             .unwrap();
         let transactions = commodity.transactions();
         assert_eq!(transactions.len(), 11);
@@ -405,8 +412,7 @@ mod commodity {
         let commodity = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "EUR")
-            .next()
+            .find(|x| x.guid == "EUR")
             .unwrap();
         let prices = commodity.as_commodity_prices();
         assert_eq!(prices.len(), 1);
@@ -418,8 +424,7 @@ mod commodity {
         let commodity = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "EUR")
-            .next()
+            .find(|x| x.guid == "EUR")
             .unwrap();
         let prices = commodity.as_currency_prices();
         assert_eq!(prices.len(), 2);
@@ -431,8 +436,7 @@ mod commodity {
         let commodity = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "EUR")
-            .next()
+            .find(|x| x.guid == "EUR")
             .unwrap();
         let prices = commodity.as_commodity_or_currency_prices();
         assert_eq!(prices.len(), 3);
@@ -445,40 +449,50 @@ mod commodity {
         let commodity = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "ADF")
-            .next()
+            .find(|x| x.guid == "ADF")
             .unwrap();
         let currency = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "AED")
-            .next()
+            .find(|x| x.guid == "AED")
             .unwrap();
 
         let rate = commodity.sell(&currency).unwrap();
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(rate, 1.5);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(15, 1));
+
         let rate = currency.buy(&commodity).unwrap();
+        #[cfg(not(feature = "decimal"))]
         assert_eq!(rate, 1.5);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(15, 1));
 
         // AED => EUR
         let book = XMLBook::new(URI).unwrap();
         let commodity = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "AED")
-            .next()
+            .find(|x| x.guid == "AED")
             .unwrap();
         let currency = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "EUR")
-            .next()
+            .find(|x| x.guid == "EUR")
             .unwrap();
 
         let rate = commodity.sell(&currency).unwrap();
+        #[cfg(not(feature = "decimal"))]
         assert_approx_eq!(f64, rate, 9.0 / 10.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+
         let rate = currency.buy(&commodity).unwrap();
+        #[cfg(not(feature = "decimal"))]
         assert_approx_eq!(f64, rate, 9.0 / 10.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
     }
 
     #[test]
@@ -487,17 +501,21 @@ mod commodity {
         let commodity = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "USD")
-            .next()
+            .find(|x| x.guid == "USD")
             .unwrap();
         let currency = book
             .commodities()
             .into_iter()
-            .filter(|x| x.guid == "AED")
-            .next()
+            .find(|x| x.guid == "AED")
             .unwrap();
 
         let rate = commodity.sell(&currency).unwrap();
+        #[cfg(not(feature = "decimal"))]
         assert_approx_eq!(f64, rate, 7.0 / 5.0 * 10.0 / 9.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(
+            rate,
+            (Decimal::new(7, 0) / Decimal::new(5, 0)) * (Decimal::new(10, 0) / Decimal::new(9, 0)),
+        );
     }
 }

@@ -30,17 +30,23 @@
 rucash provides a simple interface to GnuCash files stored in xml and SQL (sqlite3, PostgreSQL and MySQL).
 ## Example
 ```rust
-use rucash::SqliteBook;
+#[cfg(feature = "sqlite")]
+{
+    use rucash::SqliteBook;
 
-let book = SqliteBook::new("sqlite://money.gnucash").unwrap();
-let accounts = book.accounts();
+    #[tokio::main]
+    async fn main() {
+        let book = SqliteBook::new("sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro").await.unwrap();
+        let accounts = book.accounts();
+    }
+}
 ```
 
 ## Install
 ```toml
 # Cargo.toml
 [dependencies]
-rucash = { version = "0.2", features = [ "sqlite" ] }
+rucash = { version = "0.3", features = [ "sqlite", "decimal" ] }
 ```
 
 #### Cargo Feature Flags
@@ -48,3 +54,4 @@ rucash = { version = "0.2", features = [ "sqlite" ] }
 -   `postgres`: Add support for the Postgres database server.
 -   `mysql`: Add support for the MySQL database server.
 -   `xml`: Add support for xml.
+-   `decimal`: Add support for Decimal.

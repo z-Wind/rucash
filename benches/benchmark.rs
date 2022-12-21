@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro";
+//const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro";
 fn uri() -> String {
     format!(
         "sqlite://{}/tests/db/sqlite/complex_sample.gnucash?mode=ro",

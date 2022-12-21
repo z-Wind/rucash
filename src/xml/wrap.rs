@@ -86,8 +86,8 @@ impl DataWithPool<model::Account> {
             .find(|x| Some(x.guid.clone()) == self.commodity_guid)
     }
 
-    fn balance_into_currency(&self, currency: &DataWithPool<Commodity>) -> f64 {
-        let mut net: f64 = self.splits().iter().map(|s| s.quantity()).sum();
+    fn balance_into_currency(&self, currency: &DataWithPool<Commodity>) -> crate::Num {
+        let mut net: crate::Num = self.splits().iter().map(|s| s.quantity()).sum();
         let commodity = self.commodity().expect("must have commodity");
 
         for child in self.children() {
@@ -112,8 +112,8 @@ impl DataWithPool<model::Account> {
         net * rate
     }
 
-    pub fn balance(&self) -> f64 {
-        let mut net: f64 = self.splits().iter().map(|s| s.quantity()).sum();
+    pub fn balance(&self) -> crate::Num {
+        let mut net: crate::Num = self.splits().iter().map(|s| s.quantity()).sum();
 
         let commodity = match self.commodity() {
             Some(commodity) => commodity,
@@ -225,13 +225,13 @@ impl DataWithPool<model::Commodity> {
             .collect()
     }
 
-    pub fn sell(&self, currency: &DataWithPool<model::Commodity>) -> Option<f64> {
+    pub fn sell(&self, currency: &DataWithPool<model::Commodity>) -> Option<crate::Num> {
         // println!("{} to {}", self.mnemonic, currency.mnemonic);
         let exchange = Exchange::new(self.pool.clone());
         exchange.cal(self, currency)
     }
 
-    pub fn buy(&self, commodity: &DataWithPool<model::Commodity>) -> Option<f64> {
+    pub fn buy(&self, commodity: &DataWithPool<model::Commodity>) -> Option<crate::Num> {
         // println!("{} to {}", commodity.mnemonic, self.mnemonic);
         let exchange = Exchange::new(self.pool.clone());
         exchange.cal(commodity, self)
@@ -246,9 +246,12 @@ impl DataWithPool<model::Commodity> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    //use super::*;
     use chrono::NaiveDateTime;
+    #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
+    #[cfg(feature = "decimal")]
+    use rust_decimal::Decimal;
 
     #[cfg(feature = "xml")]
     mod xml {
@@ -272,7 +275,10 @@ mod tests {
             assert_eq!("Broker", account.parent().unwrap().name);
             assert_eq!(0, account.children().len());
             assert_eq!("FOO", account.commodity().unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 130.0, account.balance());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(130, 0), account.balance());
 
             let account = book.account_by_name("Cash").unwrap();
             assert_eq!("Cash", account.name);
@@ -280,7 +286,10 @@ mod tests {
             assert_eq!("Current", account.parent().unwrap().name);
             assert_eq!(0, account.children().len());
             assert_eq!("EUR", account.commodity().unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 220.0, account.balance());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(220, 0), account.balance());
 
             let account = book.account_by_name("Mouvements").unwrap();
             assert_eq!("Mouvements", account.name);
@@ -288,7 +297,10 @@ mod tests {
             assert_eq!("Root Account", account.parent().unwrap().name);
             assert_eq!(2, account.children().len());
             assert_eq!("FOO", account.commodity().unwrap().mnemonic);
+            #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1351.4815, account.balance(), epsilon = 1e-4);
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(13514815, 4), account.balance().round_dp(4));
 
             let account = book.account_by_name("Asset").unwrap();
             assert_eq!("Asset", account.name);
@@ -296,7 +308,10 @@ mod tests {
             assert_eq!("Root Account", account.parent().unwrap().name);
             assert_eq!(3, account.children().len());
             assert_eq!("EUR", account.commodity().unwrap().mnemonic);
-            assert_approx_eq!(f64, 24695.30, account.balance());
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 24695.3, account.balance());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(2469530, 2), account.balance());
         }
 
         #[test]
@@ -375,8 +390,21 @@ mod tests {
                 .into_iter()
                 .find(|p| p.mnemonic == "FOO")
                 .unwrap();
-            assert_approx_eq!(f64, 1.2345679012345678, currency.buy(&commodity).unwrap());
-            assert_approx_eq!(f64, 1.2345679012345678, commodity.sell(&currency).unwrap());
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 1.0 / 0.81, currency.buy(&commodity).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(1, 0) / Decimal::new(81, 2),
+                currency.buy(&commodity).unwrap()
+            );
+
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 1.0 / 0.81, commodity.sell(&currency).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(1, 0) / Decimal::new(81, 2),
+                commodity.sell(&currency).unwrap()
+            );
         }
     }
 }

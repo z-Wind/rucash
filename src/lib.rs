@@ -12,6 +12,11 @@
 //! ```
 pub mod model;
 
+#[cfg(not(feature = "decimal"))]
+type Num = f64;
+#[cfg(feature = "decimal")]
+type Num = rust_decimal::Decimal;
+
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 mod kind;
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
