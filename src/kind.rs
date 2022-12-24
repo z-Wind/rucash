@@ -1,12 +1,12 @@
 use sqlx::error::Error;
 use std::str::FromStr;
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum SQLKind {
     Postgres,
     MySql,
     Sqlite,
-    #[allow(dead_code)]
     Mssql,
 }
 

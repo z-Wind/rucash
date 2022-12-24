@@ -21,7 +21,7 @@ sqlx = { version = "0.6", optional = true }
 futures = "0.3"
 chrono = "0.4"
 rust_decimal = { version = "1.13", optional = true }
-xmltree =  { version = "0.10", optional = true }
+xmltree = { version = "0.10", optional = true }
 itertools = "0.10"
 flate2 = "1.0"
 tokio = { version = "1.23.0", features = ["full"] }
@@ -42,12 +42,17 @@ required-features = ["sqlite", "xml"]
 
 [features]
 default = []
-sqlx_common = [ "sqlx/any", "sqlx/runtime-tokio-rustls", "sqlx/macros", "sqlx/chrono"]
-sqlite = [ "sqlx_common", "sqlx/sqlite" ]
-postgres = [ "sqlx_common", "sqlx/postgres" ]
-mysql = [ "sqlx_common", "sqlx/mysql" ]
-xml = [ "xmltree" ]
-decimal = [ "rust_decimal" ]
+sqlx_common = [
+    "sqlx/any",
+    "sqlx/runtime-tokio-rustls",
+    "sqlx/macros",
+    "sqlx/chrono",
+]
+sqlite = ["sqlx_common", "sqlx/sqlite"]
+postgres = ["sqlx_common", "sqlx/postgres"]
+mysql = ["sqlx_common", "sqlx/mysql"]
+xml = ["xmltree"]
+decimal = ["rust_decimal"]
 
 [[test]]
 name = "sqlite"

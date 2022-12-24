@@ -416,7 +416,9 @@ mod tests {
                 "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
-            crate::SqliteBook::new(uri).await.expect("right path")
+            crate::SqliteBook::new(uri)
+                .await
+                .unwrap_or_else(|e| panic!("{} uri:{:?}", e, uri))
         }
 
         #[tokio::test]
@@ -604,7 +606,9 @@ mod tests {
 
         async fn setup() -> crate::PostgreSQLBook {
             let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
-            crate::PostgreSQLBook::new(&uri).await.expect("right path")
+            crate::PostgreSQLBook::new(&uri)
+                .await
+                .unwrap_or_else(|e| panic!("{} uri:{:?}", e, uri))
         }
 
         #[tokio::test]
@@ -779,7 +783,9 @@ mod tests {
 
         async fn setup() -> crate::MySQLBook {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
-            crate::MySQLBook::new(uri).await.expect("right path")
+            crate::MySQLBook::new(uri)
+                .await
+                .unwrap_or_else(|e| panic!("{} uri:{:?}", e, uri))
         }
 
         #[tokio::test]

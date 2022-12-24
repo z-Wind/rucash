@@ -262,7 +262,7 @@ mod tests {
                 "{}/tests/db/xml/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
-            crate::XMLBook::new(uri).expect("right path")
+            crate::XMLBook::new(uri).unwrap_or_else(|e| panic!("{} uri:{:?}", e, uri))
         }
 
         #[test]
