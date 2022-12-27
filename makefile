@@ -17,9 +17,9 @@ clean:
 bench:
 	cargo bench --features sqlite,xml
 check:
-	cargo check --all-features
-	cargo check --features sqlite,postgres,mysql,xml
-	cargo clippy --all-features
-	cargo clippy --features sqlite,postgres,mysql,xml
+	cargo check --all-features --all-targets
+	cargo check --features sqlite,postgres,mysql,xml --all-targets
+	cargo clippy --all-features --all-targets
+	cargo clippy --features sqlite,postgres,mysql,xml --all-targets
 publish:
 	cargo publish --all-features
