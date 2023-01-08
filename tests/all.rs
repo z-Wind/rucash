@@ -45,7 +45,7 @@ mod consistency {
             assert_eq!(a.guid, b.guid);
             assert_eq!(a.name, b.name);
             assert_eq!(a.account_type, b.account_type);
-            if a.commodity_guid.as_ref().or(b.commodity_guid.as_ref()) == None {
+            if a.commodity_guid.as_ref().or(b.commodity_guid.as_ref()).is_none() {
                 assert_eq!(a.commodity_guid, b.commodity_guid);
             }
             assert_eq!(a.commodity_scu, b.commodity_scu);

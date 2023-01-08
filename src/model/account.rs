@@ -449,7 +449,7 @@ impl Account {
             .and_then(|e| e.get_child("value"))
             .and_then(|s| s.get_text())
             .map(|x| x.into_owned())
-            .map(|x| if x == "true" { 1 } else { 0 });
+            .map(|x| i32::from(x == "true"));
 
         Self {
             guid,
