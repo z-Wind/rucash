@@ -167,7 +167,7 @@ impl<'q> Account {
                 "#,
             )
             .bind(guid),
-            _ => panic!("{:?} not support", kind),
+            _ => panic!("{kind:?} not support"),
         }
     }
 
@@ -219,7 +219,7 @@ impl<'q> Account {
             "#,
             )
             .bind(guid),
-            _ => panic!("{:?} not support", kind),
+            _ => panic!("{kind:?} not support"),
         }
     }
 
@@ -271,7 +271,7 @@ impl<'q> Account {
             "#,
             )
             .bind(guid),
-            _ => panic!("{:?} not support", kind),
+            _ => panic!("{kind:?} not support"),
         }
     }
 
@@ -324,7 +324,7 @@ impl<'q> Account {
             "#,
             )
             .bind(name),
-            _ => panic!("{:?} not support", kind),
+            _ => panic!("{kind:?} not support"),
         }
     }
 
@@ -376,7 +376,7 @@ impl<'q> Account {
             "#,
             )
             .bind(name),
-            _ => panic!("{:?} not support", kind),
+            _ => panic!("{kind:?} not support"),
         }
     }
 }
@@ -500,7 +500,7 @@ mod tests {
                 rt.block_on(async {
                     sqlx::sqlite::SqlitePoolOptions::new()
                         .max_connections(5)
-                        .connect(&format!("{}?mode=ro", uri)) // read only
+                        .connect(&format!("{uri}?mode=ro")) // read only
                         .await
                         .unwrap()
                 }),

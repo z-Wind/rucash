@@ -67,7 +67,7 @@ impl SQLBook {
         &self,
         name: &str,
     ) -> Result<Vec<DataWithPool<model::Account>>, sqlx::Error> {
-        let name = format!("%{}%", name);
+        let name = format!("%{name}%");
 
         model::Account::query_like_name(&name, self.kind)
             .fetch_all(&self.pool)

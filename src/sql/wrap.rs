@@ -418,7 +418,7 @@ mod tests {
             );
             crate::SqliteBook::new(uri)
                 .await
-                .unwrap_or_else(|e| panic!("{} uri:{:?}", e, uri))
+                .unwrap_or_else(|e| panic!("{e} uri:{uri:?}"))
         }
 
         #[tokio::test]
@@ -785,7 +785,7 @@ mod tests {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
             crate::MySQLBook::new(uri)
                 .await
-                .unwrap_or_else(|e| panic!("{} uri:{:?}", e, uri))
+                .unwrap_or_else(|e| panic!("{e} uri:{uri:?}"))
         }
 
         #[tokio::test]

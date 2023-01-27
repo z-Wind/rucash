@@ -55,7 +55,7 @@ impl FromStr for SQLKind {
                 Err(Error::Configuration("database URL has the scheme of a MSSQL database but the `mssql` feature is not enabled".into()))
             }
 
-            _ => Err(Error::Configuration(format!("unrecognized database url: {:?}", url).into()))
+            _ => Err(Error::Configuration(format!("unrecognized database url: {url:?}").into()))
         }
     }
 }
