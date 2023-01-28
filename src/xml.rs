@@ -23,14 +23,16 @@ impl Clone for XMLPool {
 
 impl XMLPool {
     /// read gnucash xml file in gzip
-    fn new(uri: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    fn new(uri: &str) -> Result<Self, anyhow::Error> {
         let f = File::open(uri)?;
         let mut d = GzDecoder::new(f);
         let mut data = String::new();
         d.read_to_string(&mut data)?;
 
         let mut root: Element = Element::parse(data.as_bytes())?;
-        root = root.take_child("book").ok_or("None")?;
+        root = root
+            .take_child("book")
+            .ok_or(anyhow::anyhow!("No book in {}", uri))?;
 
         Ok(Self(Arc::new(root)))
     }
@@ -186,7 +188,7 @@ pub struct XMLBook {
 
 impl XMLBook {
     /// read gnucash xml file in gzip
-    pub fn new(uri: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(uri: &str) -> Result<Self, anyhow::Error> {
         let pool = XMLPool::new(uri)?;
         let exchange_graph = Some(Arc::new(RwLock::new(Exchange::new(pool.clone()))));
 

@@ -381,16 +381,14 @@ impl DataWithPool<model::Commodity> {
     }
 
     pub async fn buy(&self, commodity: &DataWithPool<model::Commodity>) -> Option<crate::Num> {
-        // println!("{} to {}", commodity.mnemonic, self.mnemonic);
-        self.exchange_graph
-            .as_ref()?
-            .read()
-            .await
-            .cal(commodity, self)
+        commodity.sell(self).await
     }
 
-    pub async fn update_exchange_graph(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let graph = self.exchange_graph.as_ref().ok_or("No exchange graph")?;
+    pub async fn update_exchange_graph(&self) -> Result<(), anyhow::Error> {
+        let graph = self
+            .exchange_graph
+            .as_ref()
+            .ok_or(anyhow::anyhow!("No exchange graph"))?;
 
         Ok(graph.write().await.update().await?)
     }

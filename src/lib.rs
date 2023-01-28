@@ -57,4 +57,4 @@ pub type XMLPrice = xml::wrap::DataWithPool<model::Price>;
 #[cfg(feature = "xml")]
 pub type XMLCommodity = xml::wrap::DataWithPool<model::Commodity>;
 #[cfg(feature = "xml")]
-pub type XMLError = Box<dyn std::error::Error>;
+pub type XMLError = anyhow::Error;

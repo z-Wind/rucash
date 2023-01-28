@@ -232,13 +232,14 @@ impl DataWithPool<model::Commodity> {
     }
 
     pub fn buy(&self, commodity: &DataWithPool<model::Commodity>) -> Option<crate::Num> {
-        // println!("{} to {}", commodity.mnemonic, self.mnemonic);
-        let exchange = Exchange::new(self.pool.clone());
-        exchange.cal(commodity, self)
+        commodity.sell(self)
     }
 
-    pub fn update_exchange_graph(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let graph = self.exchange_graph.as_ref().ok_or("No exchange graph")?;
+    pub fn update_exchange_graph(&self) -> Result<(), anyhow::Error> {
+        let graph = self
+            .exchange_graph
+            .as_ref()
+            .ok_or(anyhow::anyhow!("No exchange graph"))?;
         graph.write().expect("graph must could be written").update();
         Ok(())
     }
