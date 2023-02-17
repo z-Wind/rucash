@@ -41,8 +41,8 @@ impl super::NullNone for Split {
         });
 
         Self {
-            lot_guid,
             reconcile_date,
+            lot_guid,
             ..self
         }
     }
@@ -279,6 +279,7 @@ impl<'q> Split {
     }
 
     #[cfg(feature = "decimal")]
+    #[must_use]
     pub fn value(&self) -> Decimal {
         Decimal::new(self.value_num, 0) / Decimal::new(self.value_denom, 0)
     }
@@ -289,6 +290,7 @@ impl<'q> Split {
     }
 
     #[cfg(feature = "decimal")]
+    #[must_use]
     pub fn quantity(&self) -> Decimal {
         Decimal::new(self.quantity_num, 0) / Decimal::new(self.quantity_denom, 0)
     }
@@ -301,34 +303,34 @@ impl Split {
     pub(crate) fn new_by_element(tx_guid: String, e: &Element) -> Self {
         let guid = e
             .get_child("id")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("id must exist");
         let tx_guid = tx_guid;
         let account_guid = e
             .get_child("account")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("account must exist");
         let memo = e
             .get_child("memo")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .unwrap_or_default();
         let action = e
             .get_child("action")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .unwrap_or_default();
         let reconcile_state = e
             .get_child("reconciled-state")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .unwrap_or_default();
         let reconcile_date = e
             .get_child("reconciled-date")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .map(|x| {
                 chrono::NaiveDateTime::parse_from_str(&x, "%Y-%m-%d %H:%M:%S")
                     .expect("%Y-%m-%d %H:%M:%S")
@@ -385,6 +387,7 @@ mod tests {
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::Sqlite;
 
@@ -466,6 +469,7 @@ mod tests {
     #[cfg(feature = "postgres")]
     mod postgresql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::Postgres;
 
@@ -544,6 +548,7 @@ mod tests {
     #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::MySql;
 
@@ -622,6 +627,7 @@ mod tests {
     #[cfg(feature = "xml")]
     mod xml {
         use super::*;
+        use pretty_assertions::assert_eq;
         use std::sync::Arc;
 
         #[allow(dead_code)]

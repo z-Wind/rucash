@@ -1,6 +1,7 @@
 use super::SQLBook;
 use std::ops::Deref;
 
+#[derive(Debug)]
 pub struct MySQLBook(SQLBook);
 
 impl Deref for MySQLBook {
@@ -12,8 +13,8 @@ impl Deref for MySQLBook {
 }
 
 impl MySQLBook {
-    /// Options and flags which can be used to configure a MySQL connection.
-    /// Described by [MySQL](https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html).
+    /// Options and flags which can be used to configure a `MySQL` connection.
+    /// Described by [`MySQL`](https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html).
     ///
     /// The generic format of the connection URL:
     ///

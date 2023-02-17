@@ -209,41 +209,40 @@ impl Commodity {
     pub(crate) fn new_by_element(e: &Element) -> Self {
         let guid = e
             .get_child("id")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("id must exist");
         let namespace = e
             .get_child("space")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("space must exist");
         let mnemonic = guid.clone();
         let fullname = e
             .get_child("fullname")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned());
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned);
         let cusip = e
             .get_child("cusip")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned());
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned);
         let fraction = e
             .get_child("fraction")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
-            .map(|x| x.parse().expect("must be i32"))
-            .unwrap_or(100);
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
+            .map_or(100, |x| x.parse().expect("must be i32"));
         let quote_flag = match e.get_child("get_quotes") {
             Some(_) => 1,
             None => 0,
         };
         let quote_source = e
             .get_child("quote_source")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned());
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned);
         let quote_tz = e
             .get_child("quote_tz")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned());
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned);
 
         Self {
             guid,
@@ -274,6 +273,7 @@ mod tests {
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::Sqlite;
 
@@ -339,6 +339,7 @@ mod tests {
     #[cfg(feature = "postgres")]
     mod postgresql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::Postgres;
 
@@ -401,6 +402,7 @@ mod tests {
     #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::MySql;
 
@@ -463,6 +465,7 @@ mod tests {
     #[cfg(feature = "xml")]
     mod xml {
         use super::*;
+        use pretty_assertions::assert_eq;
         use std::sync::Arc;
 
         #[allow(dead_code)]

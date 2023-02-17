@@ -59,29 +59,36 @@ where
 }
 
 impl DataWithPool<model::Account> {
+    #[must_use]
     pub fn splits(&self) -> Vec<DataWithPool<model::Split>> {
         self.pool
-            .splits(self.exchange_graph.clone())
+            .splits(&self.exchange_graph)
             .into_iter()
             .filter(|x| x.account_guid == self.guid)
             .collect()
     }
+
+    #[must_use]
     pub fn parent(&self) -> Option<DataWithPool<model::Account>> {
         self.pool
-            .accounts(self.exchange_graph.clone())
+            .accounts(&self.exchange_graph)
             .into_iter()
             .find(|x| Some(x.guid.clone()) == self.parent_guid)
     }
+
+    #[must_use]
     pub fn children(&self) -> Vec<DataWithPool<model::Account>> {
         self.pool
-            .accounts(self.exchange_graph.clone())
+            .accounts(&self.exchange_graph)
             .into_iter()
             .filter(|x| x.parent_guid == Some(self.guid.clone()))
             .collect()
     }
+
+    #[must_use]
     pub fn commodity(&self) -> Option<DataWithPool<model::Commodity>> {
         self.pool
-            .commodities(self.exchange_graph.clone())
+            .commodities(&self.exchange_graph)
             .into_iter()
             .find(|x| Some(x.guid.clone()) == self.commodity_guid)
     }
@@ -112,13 +119,11 @@ impl DataWithPool<model::Account> {
         net * rate
     }
 
+    #[must_use]
     pub fn balance(&self) -> crate::Num {
         let mut net: crate::Num = self.splits().iter().map(|s| s.quantity()).sum();
 
-        let commodity = match self.commodity() {
-            Some(commodity) => commodity,
-            None => return net,
-        };
+        let Some(commodity) = self.commodity() else { return net };
 
         for child in self.children() {
             let child_net = child.balance_into_currency(&commodity);
@@ -131,17 +136,19 @@ impl DataWithPool<model::Account> {
 }
 
 impl DataWithPool<model::Split> {
+    #[must_use]
     pub fn transaction(&self) -> DataWithPool<model::Transaction> {
         self.pool
-            .transactions(self.exchange_graph.clone())
+            .transactions(&self.exchange_graph)
             .into_iter()
             .find(|x| x.guid == self.tx_guid)
             .expect("tx_guid must match one")
     }
 
+    #[must_use]
     pub fn account(&self) -> DataWithPool<model::Account> {
         self.pool
-            .accounts(self.exchange_graph.clone())
+            .accounts(&self.exchange_graph)
             .into_iter()
             .find(|x| x.guid == self.account_guid)
             .expect("account_guid must match one")
@@ -149,17 +156,19 @@ impl DataWithPool<model::Split> {
 }
 
 impl DataWithPool<model::Transaction> {
+    #[must_use]
     pub fn currency(&self) -> DataWithPool<model::Commodity> {
         self.pool
-            .commodities(self.exchange_graph.clone())
+            .commodities(&self.exchange_graph)
             .into_iter()
             .find(|x| x.guid == self.currency_guid)
             .expect("currency_guid must match one")
     }
 
+    #[must_use]
     pub fn splits(&self) -> Vec<DataWithPool<model::Split>> {
         self.pool
-            .splits(self.exchange_graph.clone())
+            .splits(&self.exchange_graph)
             .into_iter()
             .filter(|x| x.tx_guid == self.guid)
             .collect()
@@ -167,17 +176,19 @@ impl DataWithPool<model::Transaction> {
 }
 
 impl DataWithPool<model::Price> {
+    #[must_use]
     pub fn commodity(&self) -> DataWithPool<model::Commodity> {
         self.pool
-            .commodities(self.exchange_graph.clone())
+            .commodities(&self.exchange_graph)
             .into_iter()
             .find(|x| x.guid == self.commodity_guid)
             .expect("commodity_guid must match one")
     }
 
+    #[must_use]
     pub fn currency(&self) -> DataWithPool<model::Commodity> {
         self.pool
-            .commodities(self.exchange_graph.clone())
+            .commodities(&self.exchange_graph)
             .into_iter()
             .find(|x| x.guid == self.currency_guid)
             .expect("currency_guid must match one")
@@ -185,52 +196,59 @@ impl DataWithPool<model::Price> {
 }
 
 impl DataWithPool<model::Commodity> {
+    #[must_use]
     pub fn accounts(&self) -> Vec<DataWithPool<model::Account>> {
         self.pool
-            .accounts(self.exchange_graph.clone())
+            .accounts(&self.exchange_graph)
             .into_iter()
             .filter(|x| x.commodity_guid == Some(self.guid.clone()))
             .collect()
     }
 
+    #[must_use]
     pub fn transactions(&self) -> Vec<DataWithPool<model::Transaction>> {
         self.pool
-            .transactions(self.exchange_graph.clone())
+            .transactions(&self.exchange_graph)
             .into_iter()
             .filter(|x| x.currency_guid == self.guid)
             .collect()
     }
 
+    #[must_use]
     pub fn as_commodity_prices(&self) -> Vec<DataWithPool<model::Price>> {
         self.pool
-            .prices(self.exchange_graph.clone())
+            .prices(&self.exchange_graph)
             .into_iter()
             .filter(|x| x.commodity_guid == self.guid)
             .collect()
     }
 
+    #[must_use]
     pub fn as_currency_prices(&self) -> Vec<DataWithPool<model::Price>> {
         self.pool
-            .prices(self.exchange_graph.clone())
+            .prices(&self.exchange_graph)
             .into_iter()
             .filter(|x| x.currency_guid == self.guid)
             .collect()
     }
 
+    #[must_use]
     pub fn as_commodity_or_currency_prices(&self) -> Vec<DataWithPool<model::Price>> {
         self.pool
-            .prices(self.exchange_graph.clone())
+            .prices(&self.exchange_graph)
             .into_iter()
             .filter(|x| x.commodity_guid == self.guid || x.currency_guid == self.guid)
             .collect()
     }
 
+    #[must_use]
     pub fn sell(&self, currency: &DataWithPool<model::Commodity>) -> Option<crate::Num> {
         // println!("{} to {}", self.mnemonic, currency.mnemonic);
         let exchange = Exchange::new(self.pool.clone());
         exchange.cal(self, currency)
     }
 
+    #[must_use]
     pub fn buy(&self, commodity: &DataWithPool<model::Commodity>) -> Option<crate::Num> {
         commodity.sell(self)
     }
@@ -247,7 +265,7 @@ impl DataWithPool<model::Commodity> {
 
 #[cfg(test)]
 mod tests {
-    //use super::*;
+    //use super::*;use pretty_assertions::assert_eq;
     use chrono::NaiveDateTime;
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
@@ -257,6 +275,7 @@ mod tests {
     #[cfg(feature = "xml")]
     mod xml {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         fn setup() -> crate::XMLBook {
             let uri: &str = &format!(

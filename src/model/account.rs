@@ -388,67 +388,69 @@ impl Account {
     pub(crate) fn new_by_element(e: &Element) -> Self {
         let guid = e
             .get_child("id")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("id must exist");
         let name = e
             .get_child("name")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("name must exist");
         let account_type = e
             .get_child("type")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("type must exist");
         let commodity_guid = e
             .get_child("commodity")
             .and_then(|x| x.get_child("id"))
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned());
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned);
         let commodity_scu = e
             .get_child("commodity-scu")
-            .and_then(|x| x.get_text())
-            .map(|x| x.parse().expect("must be i32"))
-            .unwrap_or(0);
+            .and_then(xmltree::Element::get_text)
+            .map_or(0, |x| x.parse().expect("must be i32"));
         let non_std_scu = e
             .get_child("non-std-scu")
-            .and_then(|x| x.get_text())
-            .map(|x| x.parse().expect("must be i32"))
-            .unwrap_or(0);
+            .and_then(xmltree::Element::get_text)
+            .map_or(0, |x| x.parse().expect("must be i32"));
         let parent_guid = e
             .get_child("parent")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned());
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned);
         let code = e
             .get_child("code")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned());
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned);
         let description = e
             .get_child("description")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned());
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned);
         let hidden = e
             .get_child("hidden")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .map(|x| x.parse().unwrap_or(0));
 
         let slots: Vec<&Element> = match e.get_child("slots") {
             None => Vec::new(),
-            Some(x) => x.children.iter().filter_map(|x| x.as_element()).collect(),
+            Some(x) => x
+                .children
+                .iter()
+                .filter_map(xmltree::XMLNode::as_element)
+                .collect(),
         };
         let placeholder = slots
             .iter()
             .find(|e| {
                 e.get_child("key")
-                    .and_then(|e| e.get_text())
-                    .map(|s| s.into_owned())
+                    .and_then(xmltree::Element::get_text)
+                    .map(std::borrow::Cow::into_owned)
                     == Some("placeholder".to_string())
             })
             .and_then(|e| e.get_child("value"))
-            .and_then(|s| s.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .map(|x| i32::from(x == "true"));
 
         Self {
@@ -482,6 +484,7 @@ mod tests {
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::Sqlite;
 
@@ -583,6 +586,7 @@ mod tests {
     #[cfg(feature = "postgres")]
     mod postgresql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::Postgres;
 
@@ -680,6 +684,7 @@ mod tests {
     #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::MySql;
 
@@ -777,6 +782,7 @@ mod tests {
     #[cfg(feature = "xml")]
     mod xml {
         use super::*;
+        use pretty_assertions::assert_eq;
         use std::sync::Arc;
 
         #[allow(dead_code)]

@@ -6,6 +6,7 @@ pub const URI: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
 
 mod book {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[tokio::test]
     async fn new() {
@@ -88,6 +89,7 @@ mod book {
 }
 mod account {
     use super::*;
+    use pretty_assertions::assert_eq;
     #[tokio::test]
     async fn property() {
         let book = MySQLBook::new(URI).await.unwrap();
@@ -193,6 +195,7 @@ mod account {
 
 mod split {
     use super::*;
+    use pretty_assertions::assert_eq;
     #[tokio::test]
     async fn property() {
         let book = MySQLBook::new(URI).await.unwrap();
@@ -260,6 +263,7 @@ mod split {
 
 mod transaction {
     use super::*;
+    use pretty_assertions::assert_eq;
     #[tokio::test]
     async fn property() {
         let book = MySQLBook::new(URI).await.unwrap();
@@ -329,6 +333,7 @@ mod transaction {
 
 mod price {
     use super::*;
+    use pretty_assertions::assert_eq;
     #[tokio::test]
     async fn property() {
         let book = MySQLBook::new(URI).await.unwrap();
@@ -391,6 +396,7 @@ mod commodity {
     use super::*;
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
+    use pretty_assertions::assert_eq;
 
     #[tokio::test]
     async fn property() {

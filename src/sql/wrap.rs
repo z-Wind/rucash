@@ -170,10 +170,7 @@ impl DataWithPool<model::Account> {
     pub async fn balance(&self) -> Result<crate::Num, sqlx::Error> {
         let mut net: crate::Num = self.splits().await?.iter().map(|s| s.quantity()).sum();
 
-        let commodity = match self.commodity().await {
-            Some(commodity) => commodity,
-            None => return Ok(net),
-        };
+        let Some(commodity) = self.commodity().await else { return Ok(net) };
 
         for child in self.children().await? {
             let child_net = child.balance_into_currency(&commodity).await?;
@@ -396,7 +393,7 @@ impl DataWithPool<model::Commodity> {
 
 #[cfg(test)]
 mod tests {
-    //use super::*;
+    //use super::*;use pretty_assertions::assert_eq;
     use chrono::NaiveDateTime;
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
@@ -406,6 +403,7 @@ mod tests {
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         //type DB = sqlx::Sqlite;
 
@@ -599,6 +597,7 @@ mod tests {
     #[cfg(feature = "postgresql")]
     mod postgresql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         //type DB = sqlx::Postgres;
 
@@ -776,6 +775,7 @@ mod tests {
     #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         //type DB = sqlx::MySql;
 

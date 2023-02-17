@@ -13,8 +13,8 @@ pub(crate) struct Exchange {
 }
 
 impl Exchange {
-    fn new_graph(pool: XMLPool) -> HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>> {
-        let prices: Vec<DataWithPool<model::Price>> = pool.prices(None);
+    fn new_graph(pool: &XMLPool) -> HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>> {
+        let prices: Vec<DataWithPool<model::Price>> = pool.prices(&None);
 
         let mut graph: HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>> =
             HashMap::new();
@@ -50,7 +50,7 @@ impl Exchange {
 
     pub(crate) fn new(pool: XMLPool) -> Self {
         Self {
-            graph: Self::new_graph(pool.clone()),
+            graph: Self::new_graph(&pool),
             pool,
         }
     }
@@ -91,7 +91,7 @@ impl Exchange {
                         visited.insert((k, c));
 
                         // println!("{} to {} = {:?}", c, k, v);
-                        queue.push_back((k, rate * v.0, date.min(v.1)))
+                        queue.push_back((k, rate * v.0, date.min(v.1)));
                     }
                 }
             }
@@ -114,7 +114,7 @@ impl Exchange {
     }
 
     pub(crate) fn update(&mut self) {
-        self.graph = Self::new_graph(self.pool.clone());
+        self.graph = Self::new_graph(&self.pool);
     }
 }
 
@@ -129,6 +129,7 @@ mod tests {
     #[cfg(feature = "xml")]
     mod xml {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         fn setup() -> crate::XMLBook {
             let uri: &str = &format!(

@@ -100,7 +100,7 @@ impl Exchange {
                         visited.insert((k, c));
 
                         // println!("{} to {} = {:?}", c, k, v);
-                        queue.push_back((k, rate * v.0, date.min(v.1)))
+                        queue.push_back((k, rate * v.0, date.min(v.1)));
                     }
                 }
             }
@@ -139,6 +139,7 @@ mod tests {
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         //type DB = sqlx::Sqlite;
 
@@ -329,6 +330,7 @@ mod tests {
     #[cfg(feature = "postgresql")]
     mod postgresql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
         //type DB = sqlx::Postgres;
@@ -516,6 +518,7 @@ mod tests {
     #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         //type DB = sqlx::MySql;
 

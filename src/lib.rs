@@ -10,6 +10,27 @@
 //!     }
 //! }
 //! ```
+
+#![forbid(unsafe_code)]
+#![warn(
+    clippy::pedantic,
+    missing_copy_implementations,
+    missing_debug_implementations,
+    //missing_docs,
+    rustdoc::broken_intra_doc_links,
+    trivial_numeric_casts,
+    unused_allocation
+)]
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::too_many_lines,
+    clippy::similar_names,
+    clippy::unreadable_literal,
+    clippy::module_name_repetitions,
+    clippy::match_wildcard_for_single_variants
+)]
+
 pub mod model;
 
 #[cfg(not(feature = "decimal"))]

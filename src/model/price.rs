@@ -289,6 +289,7 @@ impl<'q> Price {
     }
 
     #[cfg(feature = "decimal")]
+    #[must_use]
     pub fn value(&self) -> Decimal {
         Decimal::new(self.value_num, 0) / Decimal::new(self.value_denom, 0)
     }
@@ -302,26 +303,26 @@ impl Price {
     pub(crate) fn new_by_element(e: &Element) -> Self {
         let guid = e
             .get_child("id")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("id must exist");
         let commodity_guid = e
             .get_child("commodity")
             .and_then(|x| x.get_child("id"))
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("commodity must exist");
         let currency_guid = e
             .get_child("currency")
             .and_then(|x| x.get_child("id"))
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("currency must exist");
         let date = e
             .get_child("time")
             .and_then(|x| x.get_child("date"))
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .map(|x| {
                 chrono::NaiveDateTime::parse_from_str(&x, "%Y-%m-%d %H:%M:%S%z")
                     .expect("%Y-%m-%d %H:%M:%S%z")
@@ -329,13 +330,13 @@ impl Price {
             .expect("time must exist");
         let source = e
             .get_child("source")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned());
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned);
 
         let r#type = e
             .get_child("type")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned());
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned);
 
         let splits = e
             .get_child("value")
@@ -374,6 +375,7 @@ mod tests {
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::Sqlite;
 
@@ -477,6 +479,7 @@ mod tests {
     #[cfg(feature = "postgres")]
     mod postgresql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::Postgres;
 
@@ -577,6 +580,7 @@ mod tests {
     #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::MySql;
 
@@ -677,6 +681,7 @@ mod tests {
     #[cfg(feature = "xml")]
     mod xml {
         use super::*;
+        use pretty_assertions::assert_eq;
         use std::sync::Arc;
 
         #[allow(dead_code)]

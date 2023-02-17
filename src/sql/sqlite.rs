@@ -1,6 +1,7 @@
 use super::SQLBook;
 use std::ops::Deref;
 
+#[derive(Debug)]
 pub struct SqliteBook(SQLBook);
 
 impl Deref for SqliteBook {
@@ -12,8 +13,8 @@ impl Deref for SqliteBook {
 }
 
 impl SqliteBook {
-    /// Options and flags which can be used to configure a SQLite connection.
-    /// Described by [SQLite](https://www.sqlite.org/uri.html).
+    /// Options and flags which can be used to configure a `SQLite` connection.
+    /// Described by [`SQLite`](https://www.sqlite.org/uri.html).
     ///
     /// | URI | Description |
     /// | -- | -- |

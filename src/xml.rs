@@ -39,12 +39,12 @@ impl XMLPool {
 
     fn accounts(
         &self,
-        exchange_graph: Option<Arc<RwLock<Exchange>>>,
+        exchange_graph: &Option<Arc<RwLock<Exchange>>>,
     ) -> Vec<DataWithPool<model::Account>> {
         self.0
             .children
             .iter()
-            .filter_map(|x| x.as_element())
+            .filter_map(xmltree::XMLNode::as_element)
             .filter(|e| e.name == "account")
             .map(|e| {
                 let content = model::Account::new_by_element(e);
@@ -55,12 +55,12 @@ impl XMLPool {
 
     fn splits(
         &self,
-        exchange_graph: Option<Arc<RwLock<Exchange>>>,
+        exchange_graph: &Option<Arc<RwLock<Exchange>>>,
     ) -> Vec<DataWithPool<model::Split>> {
         self.0
             .children
             .iter()
-            .filter_map(|x| x.as_element())
+            .filter_map(xmltree::XMLNode::as_element)
             .filter(|e| e.name == "transaction")
             .flat_map(|e| {
                 let tx_guid = e
@@ -74,7 +74,7 @@ impl XMLPool {
                     .expect("splits")
                     .children
                     .iter()
-                    .filter_map(|e| e.as_element())
+                    .filter_map(xmltree::XMLNode::as_element)
                     .map(move |e| {
                         let content = model::Split::new_by_element(tx_guid.clone(), e);
                         DataWithPool::<model::Split>::new(
@@ -89,12 +89,12 @@ impl XMLPool {
 
     fn transactions(
         &self,
-        exchange_graph: Option<Arc<RwLock<Exchange>>>,
+        exchange_graph: &Option<Arc<RwLock<Exchange>>>,
     ) -> Vec<DataWithPool<model::Transaction>> {
         self.0
             .children
             .iter()
-            .filter_map(|x| x.as_element())
+            .filter_map(xmltree::XMLNode::as_element)
             .filter(|e| e.name == "transaction")
             .map(|e| {
                 let content = model::Transaction::new_by_element(e);
@@ -109,14 +109,14 @@ impl XMLPool {
 
     fn prices(
         &self,
-        exchange_graph: Option<Arc<RwLock<Exchange>>>,
+        exchange_graph: &Option<Arc<RwLock<Exchange>>>,
     ) -> Vec<DataWithPool<model::Price>> {
         match self.0.get_child("pricedb") {
             None => Vec::new(),
             Some(node) => node
                 .children
                 .iter()
-                .filter_map(|x| x.as_element())
+                .filter_map(xmltree::XMLNode::as_element)
                 .filter(|e| e.name == "price")
                 .map(|e| {
                     let content = model::Price::new_by_element(e);
@@ -128,13 +128,13 @@ impl XMLPool {
 
     fn commodities(
         &self,
-        exchange_graph: Option<Arc<RwLock<Exchange>>>,
+        exchange_graph: &Option<Arc<RwLock<Exchange>>>,
     ) -> Vec<DataWithPool<model::Commodity>> {
         let mut commodities: Vec<DataWithPool<model::Commodity>> = self
             .0
             .children
             .iter()
-            .filter_map(|x| x.as_element())
+            .filter_map(xmltree::XMLNode::as_element)
             .filter(|e| e.name == "commodity")
             .map(|e| {
                 let content = model::Commodity::new_by_element(e);
@@ -147,7 +147,7 @@ impl XMLPool {
             Some(node) => node
                 .children
                 .iter()
-                .filter_map(|x| x.as_element())
+                .filter_map(xmltree::XMLNode::as_element)
                 .filter(|e| e.name == "price")
                 .flat_map(|e| {
                     let cmdty = e.get_child("commodity").expect("must exist");
@@ -198,14 +198,17 @@ impl XMLBook {
         })
     }
 
+    #[must_use]
     pub fn accounts(&self) -> Vec<DataWithPool<model::Account>> {
-        self.pool.accounts(self.exchange_graph.clone())
+        self.pool.accounts(&self.exchange_graph)
     }
 
+    #[must_use]
     pub fn account_by_name(&self, name: &str) -> Option<DataWithPool<model::Account>> {
         self.accounts_contains_name(name).pop()
     }
 
+    #[must_use]
     pub fn accounts_contains_name(&self, name: &str) -> Vec<DataWithPool<model::Account>> {
         self.accounts()
             .into_iter()
@@ -213,22 +216,27 @@ impl XMLBook {
             .collect()
     }
 
+    #[must_use]
     pub fn splits(&self) -> Vec<DataWithPool<model::Split>> {
-        self.pool.splits(self.exchange_graph.clone())
+        self.pool.splits(&self.exchange_graph)
     }
 
+    #[must_use]
     pub fn transactions(&self) -> Vec<DataWithPool<model::Transaction>> {
-        self.pool.transactions(self.exchange_graph.clone())
+        self.pool.transactions(&self.exchange_graph)
     }
 
+    #[must_use]
     pub fn prices(&self) -> Vec<DataWithPool<model::Price>> {
-        self.pool.prices(self.exchange_graph.clone())
+        self.pool.prices(&self.exchange_graph)
     }
 
+    #[must_use]
     pub fn commodities(&self) -> Vec<DataWithPool<model::Commodity>> {
-        self.pool.commodities(self.exchange_graph.clone())
+        self.pool.commodities(&self.exchange_graph)
     }
 
+    #[must_use]
     pub fn currencies(&self) -> Vec<DataWithPool<model::Commodity>> {
         self.commodities()
             .into_iter()

@@ -172,25 +172,25 @@ impl Transaction {
     pub(crate) fn new_by_element(e: &Element) -> Self {
         let guid = e
             .get_child("id")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("id must exist");
         let currency_guid = e
             .get_child("currency")
             .and_then(|x| x.get_child("id"))
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .expect("currency must exist");
         let num = e
             .get_child("num")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned)
             .unwrap_or_default();
         let post_date = e
             .get_child("date-posted")
             .and_then(|x| x.get_child("date"))
-            .and_then(|x| x.get_text())
-            // .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            // .map(std::borrow::Cow::into_owned)
             .map(|x| {
                 chrono::NaiveDateTime::parse_from_str(&x, "%Y-%m-%d %H:%M:%S%z")
                     .expect("date-posted must be %Y-%m-%d %H:%M:%S%z")
@@ -198,16 +198,16 @@ impl Transaction {
         let enter_date = e
             .get_child("date-entered")
             .and_then(|x| x.get_child("date"))
-            .and_then(|x| x.get_text())
-            // .map(|x| x.into_owned())
+            .and_then(xmltree::Element::get_text)
+            // .map(std::borrow::Cow::into_owned)
             .map(|x| {
                 chrono::NaiveDateTime::parse_from_str(&x, "%Y-%m-%d %H:%M:%S%z")
                     .expect("date-entered must be %Y-%m-%d %H:%M:%S%z")
             });
         let description = e
             .get_child("description")
-            .and_then(|x| x.get_text())
-            .map(|x| x.into_owned());
+            .and_then(xmltree::Element::get_text)
+            .map(std::borrow::Cow::into_owned);
 
         Self {
             guid,
@@ -235,6 +235,7 @@ mod tests {
     mod sqlite {
         use super::*;
         use chrono::NaiveDateTime;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::Sqlite;
 
@@ -309,6 +310,7 @@ mod tests {
     mod postgresql {
         use super::*;
         use chrono::NaiveDateTime;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::Postgres;
 
@@ -380,6 +382,7 @@ mod tests {
     mod mysql {
         use super::*;
         use chrono::NaiveDateTime;
+        use pretty_assertions::assert_eq;
 
         type DB = sqlx::MySql;
 
@@ -450,6 +453,7 @@ mod tests {
     #[cfg(feature = "xml")]
     mod xml {
         use super::*;
+        use pretty_assertions::assert_eq;
         use std::sync::Arc;
 
         #[allow(dead_code)]
