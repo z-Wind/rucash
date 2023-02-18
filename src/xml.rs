@@ -1,9 +1,8 @@
+pub mod error;
 mod exchange;
 pub mod wrap;
 
-use super::model;
-use flate2::read::GzDecoder;
-
+use anyhow::anyhow;
 use exchange::Exchange;
 use itertools::Itertools;
 use std::fs::File;
@@ -11,6 +10,10 @@ use std::io::Read;
 use std::sync::{Arc, RwLock};
 use wrap::DataWithPool;
 use xmltree::Element;
+
+use super::model;
+use crate::XMLError;
+use flate2::read::GzDecoder;
 
 #[derive(Debug)]
 pub(crate) struct XMLPool(pub(crate) Arc<Element>);
@@ -23,7 +26,7 @@ impl Clone for XMLPool {
 
 impl XMLPool {
     /// read gnucash xml file in gzip
-    fn new(uri: &str) -> Result<Self, anyhow::Error> {
+    fn new(uri: &str) -> Result<Self, XMLError> {
         let f = File::open(uri)?;
         let mut d = GzDecoder::new(f);
         let mut data = String::new();
@@ -32,7 +35,7 @@ impl XMLPool {
         let mut root: Element = Element::parse(data.as_bytes())?;
         root = root
             .take_child("book")
-            .ok_or(anyhow::anyhow!("No book in {}", uri))?;
+            .ok_or(anyhow!("No book in {}", uri))?;
 
         Ok(Self(Arc::new(root)))
     }
@@ -181,14 +184,14 @@ impl XMLPool {
 }
 
 #[derive(Debug)]
-pub struct XMLBook {
+pub struct Book {
     pub(crate) pool: XMLPool,
     exchange_graph: Option<Arc<RwLock<Exchange>>>,
 }
 
-impl XMLBook {
+impl Book {
     /// read gnucash xml file in gzip
-    pub fn new(uri: &str) -> Result<Self, anyhow::Error> {
+    pub fn new(uri: &str) -> Result<Self, XMLError> {
         let pool = XMLPool::new(uri)?;
         let exchange_graph = Some(Arc::new(RwLock::new(Exchange::new(pool.clone()))));
 

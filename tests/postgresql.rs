@@ -166,7 +166,7 @@ mod account {
     async fn parent() {
         let book = PostgreSQLBook::new(URI).await.unwrap();
         let account = book.account_by_name("Cash").await.unwrap().unwrap();
-        let parent = account.parent().await.unwrap();
+        let parent = account.parent().await.unwrap().unwrap();
         assert_eq!(parent.name, "Current");
     }
 
@@ -174,7 +174,7 @@ mod account {
     async fn no_parent() {
         let book = PostgreSQLBook::new(URI).await.unwrap();
         let account = book.account_by_name("Root Account").await.unwrap().unwrap();
-        let parent = account.parent().await;
+        let parent = account.parent().await.unwrap();
         assert!(parent.is_none());
     }
 

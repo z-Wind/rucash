@@ -78,7 +78,7 @@ impl Exchange {
             let n = queue.len();
             let mut done = false;
             for _ in 0..n {
-                let (c, rate, date) = queue.pop_front().unwrap();
+                let (c, r, date) = queue.pop_front().unwrap();
                 if let Some(map) = self.graph.get(c) {
                     for (k, v) in map.iter() {
                         if visited.contains(&(c, k)) {
@@ -91,7 +91,7 @@ impl Exchange {
                         visited.insert((k, c));
 
                         // println!("{} to {} = {:?}", c, k, v);
-                        queue.push_back((k, rate * v.0, date.min(v.1)));
+                        queue.push_back((k, r * v.0, date.min(v.1)));
                     }
                 }
             }
@@ -129,6 +129,7 @@ mod tests {
     #[cfg(feature = "xml")]
     mod xml {
         use super::*;
+        #[cfg(feature = "decimal")]
         use pretty_assertions::assert_eq;
 
         fn setup() -> crate::XMLBook {

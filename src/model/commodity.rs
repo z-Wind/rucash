@@ -147,7 +147,7 @@ impl<'q> Commodity {
             "#,
             )
             .bind(guid),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 
@@ -196,7 +196,7 @@ impl<'q> Commodity {
             "#,
             )
             .bind(namespace),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 }

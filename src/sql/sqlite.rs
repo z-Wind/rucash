@@ -1,10 +1,12 @@
-use super::SQLBook;
 use std::ops::Deref;
 
-#[derive(Debug)]
-pub struct SqliteBook(SQLBook);
+use super::SQLBook;
+use crate::SQLError;
 
-impl Deref for SqliteBook {
+#[derive(Debug)]
+pub struct Book(SQLBook);
+
+impl Deref for Book {
     type Target = SQLBook;
 
     fn deref(&self) -> &Self::Target {
@@ -12,7 +14,7 @@ impl Deref for SqliteBook {
     }
 }
 
-impl SqliteBook {
+impl Book {
     /// Options and flags which can be used to configure a `SQLite` connection.
     /// Described by [`SQLite`](https://www.sqlite.org/uri.html).
     ///
@@ -23,7 +25,7 @@ impl SqliteBook {
     /// `sqlite://data.db` | Open the file `data.db` in the current directory. |
     /// `sqlite:///data.db` | Open the file `data.db` from the root (`/`) directory. |
     /// `sqlite://data.db?mode=ro` | Open the file `data.db` for read-only access. |
-    pub async fn new(uri: &str) -> Result<Self, sqlx::Error> {
+    pub async fn new(uri: &str) -> Result<Self, SQLError> {
         let pool = sqlx::any::AnyPoolOptions::new()
             .max_connections(super::MAX_CONNECTIONS)
             .connect(uri)

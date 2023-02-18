@@ -135,7 +135,7 @@ impl<'q> Price {
             "#,
             )
             .bind(guid),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 
@@ -182,7 +182,7 @@ impl<'q> Price {
             "#,
             )
             .bind(guid),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 
@@ -229,7 +229,7 @@ impl<'q> Price {
             "#,
             )
             .bind(guid),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 
@@ -279,7 +279,7 @@ impl<'q> Price {
             )
             .bind(guid.clone())
             .bind(guid),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 

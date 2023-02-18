@@ -1,6 +1,7 @@
 use super::wrap::DataWithPool;
 use crate::kind::SQLKind;
 use crate::model;
+use crate::SQLError;
 use chrono::NaiveDateTime;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -17,7 +18,7 @@ impl Exchange {
     async fn new_graph(
         kind: SQLKind,
         pool: sqlx::AnyPool,
-    ) -> Result<HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>>, sqlx::Error> {
+    ) -> Result<HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>>, SQLError> {
         let prices: Vec<DataWithPool<model::Price>> =
             model::Price::query().fetch_all(&pool).await.map(|v| {
                 v.into_iter()
@@ -56,7 +57,7 @@ impl Exchange {
 
         Ok(graph)
     }
-    pub(crate) async fn new(kind: SQLKind, pool: sqlx::AnyPool) -> Result<Self, sqlx::Error> {
+    pub(crate) async fn new(kind: SQLKind, pool: sqlx::AnyPool) -> Result<Self, SQLError> {
         Ok(Self {
             graph: Self::new_graph(kind, pool.clone()).await?,
             kind,
@@ -87,7 +88,7 @@ impl Exchange {
             let n = queue.len();
             let mut done = false;
             for _ in 0..n {
-                let (c, rate, date) = queue.pop_front().unwrap();
+                let (c, r, date) = queue.pop_front().unwrap();
                 if let Some(map) = self.graph.get(c) {
                     for (k, v) in map.iter() {
                         if visited.contains(&(c, k)) {
@@ -100,7 +101,7 @@ impl Exchange {
                         visited.insert((k, c));
 
                         // println!("{} to {} = {:?}", c, k, v);
-                        queue.push_back((k, rate * v.0, date.min(v.1)));
+                        queue.push_back((k, r * v.0, date.min(v.1)));
                     }
                 }
             }
@@ -122,7 +123,7 @@ impl Exchange {
         None
     }
 
-    pub(crate) async fn update(&mut self) -> Result<(), sqlx::Error> {
+    pub(crate) async fn update(&mut self) -> Result<(), SQLError> {
         self.graph = Self::new_graph(self.kind, self.pool.clone()).await?;
         Ok(())
     }
@@ -139,6 +140,7 @@ mod tests {
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
+        #[cfg(feature = "decimal")]
         use pretty_assertions::assert_eq;
 
         //type DB = sqlx::Sqlite;

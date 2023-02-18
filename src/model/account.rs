@@ -167,7 +167,7 @@ impl<'q> Account {
                 "#,
             )
             .bind(guid),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 
@@ -219,7 +219,7 @@ impl<'q> Account {
             "#,
             )
             .bind(guid),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 
@@ -271,7 +271,7 @@ impl<'q> Account {
             "#,
             )
             .bind(guid),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 
@@ -324,7 +324,7 @@ impl<'q> Account {
             "#,
             )
             .bind(name),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 
@@ -376,7 +376,7 @@ impl<'q> Account {
             "#,
             )
             .bind(name),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 }

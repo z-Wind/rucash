@@ -1,10 +1,12 @@
-use super::SQLBook;
 use std::ops::Deref;
 
-#[derive(Debug)]
-pub struct MySQLBook(SQLBook);
+use super::SQLBook;
+use crate::SQLError;
 
-impl Deref for MySQLBook {
+#[derive(Debug)]
+pub struct Book(SQLBook);
+
+impl Deref for Book {
     type Target = SQLBook;
 
     fn deref(&self) -> &Self::Target {
@@ -12,7 +14,7 @@ impl Deref for MySQLBook {
     }
 }
 
-impl MySQLBook {
+impl Book {
     /// Options and flags which can be used to configure a `MySQL` connection.
     /// Described by [`MySQL`](https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html).
     ///
@@ -34,7 +36,7 @@ impl MySQLBook {
     /// ```text
     /// mysql://root:password@localhost/db
     /// ```
-    pub async fn new(uri: &str) -> Result<Self, sqlx::Error> {
+    pub async fn new(uri: &str) -> Result<Self, SQLError> {
         let pool = sqlx::any::AnyPoolOptions::new()
             .max_connections(super::MAX_CONNECTIONS)
             .connect(uri)

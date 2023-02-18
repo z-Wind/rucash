@@ -117,7 +117,7 @@ impl<'q> Transaction {
             "#,
             )
             .bind(guid),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 
@@ -160,7 +160,7 @@ impl<'q> Transaction {
             "#,
             )
             .bind(guid),
-            _ => panic!("{kind:?} not support"),
+            SQLKind::Mssql => panic!("{kind:?} not support"),
         }
     }
 }

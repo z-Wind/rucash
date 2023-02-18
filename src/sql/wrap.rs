@@ -1,6 +1,8 @@
 use super::exchange::Exchange;
 use crate::kind::SQLKind;
 use crate::model::{self, Commodity};
+use crate::SQLError;
+use anyhow::anyhow;
 use futures::future::{BoxFuture, FutureExt};
 use std::hash::Hash;
 use std::ops::Deref;
@@ -76,7 +78,7 @@ where
 }
 
 impl DataWithPool<model::Account> {
-    pub async fn splits(&self) -> Result<Vec<DataWithPool<model::Split>>, sqlx::Error> {
+    pub async fn splits(&self) -> Result<Vec<DataWithPool<model::Split>>, SQLError> {
         model::Split::query_by_account_guid(&self.guid, self.kind)
             .fetch_all(&self.pool)
             .await
@@ -92,20 +94,23 @@ impl DataWithPool<model::Account> {
                     })
                     .collect()
             })
+            .map_err(std::convert::Into::into)
     }
 
-    pub async fn parent(&self) -> Option<DataWithPool<model::Account>> {
-        let guid = self.parent_guid.as_ref()?;
-        model::Account::query_by_guid(guid, self.kind)
+    pub async fn parent(&self) -> Result<Option<DataWithPool<model::Account>>, SQLError> {
+        let Some(ref guid )= self.parent_guid else{
+            return Ok(None);
+        };
+
+        Ok(model::Account::query_by_guid(guid, self.kind)
             .fetch_optional(&self.pool)
-            .await
-            .unwrap()
+            .await?
             .map(|x| {
                 DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
-            })
+            }))
     }
 
-    pub async fn children(&self) -> Result<Vec<DataWithPool<model::Account>>, sqlx::Error> {
+    pub async fn children(&self) -> Result<Vec<DataWithPool<model::Account>>, SQLError> {
         model::Account::query_by_parent_guid(&self.guid, self.kind)
             .fetch_all(&self.pool)
             .await
@@ -121,24 +126,29 @@ impl DataWithPool<model::Account> {
                     })
                     .collect()
             })
+            .map_err(std::convert::Into::into)
     }
 
-    pub async fn commodity(&self) -> Option<DataWithPool<model::Commodity>> {
-        let guid = self.commodity_guid.as_ref()?;
+    pub async fn commodity(&self) -> Result<DataWithPool<model::Commodity>, SQLError> {
+        let guid = self
+            .commodity_guid
+            .as_ref()
+            .ok_or(anyhow!("No commodity_guid"))?;
 
         model::Commodity::query_by_guid(guid, self.kind)
             .fetch_optional(&self.pool)
-            .await
-            .unwrap()
+            .await?
             .map(|x| {
                 DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
             })
+            .ok_or(anyhow!("Can not find commodity by {guid}"))
+            .map_err(std::convert::Into::into)
     }
 
     fn balance_into_currency<'a>(
         &'a self,
         currency: &'a DataWithPool<Commodity>,
-    ) -> BoxFuture<'a, Result<crate::Num, sqlx::Error>> {
+    ) -> BoxFuture<'a, Result<crate::Num, SQLError>> {
         async move {
             let mut net: crate::Num = self.splits().await?.iter().map(|s| s.quantity()).sum();
             let commodity = self.commodity().await.expect("must have commodity");
@@ -167,10 +177,10 @@ impl DataWithPool<model::Account> {
         .boxed()
     }
 
-    pub async fn balance(&self) -> Result<crate::Num, sqlx::Error> {
+    pub async fn balance(&self) -> Result<crate::Num, SQLError> {
         let mut net: crate::Num = self.splits().await?.iter().map(|s| s.quantity()).sum();
 
-        let Some(commodity) = self.commodity().await else { return Ok(net) };
+        let commodity = self.commodity().await?;
 
         for child in self.children().await? {
             let child_net = child.balance_into_currency(&commodity).await?;
@@ -183,7 +193,7 @@ impl DataWithPool<model::Account> {
 }
 
 impl DataWithPool<model::Split> {
-    pub async fn transaction(&self) -> Result<DataWithPool<model::Transaction>, sqlx::Error> {
+    pub async fn transaction(&self) -> Result<DataWithPool<model::Transaction>, SQLError> {
         let guid = &self.tx_guid;
 
         model::Transaction::query_by_guid(guid, self.kind)
@@ -192,9 +202,10 @@ impl DataWithPool<model::Split> {
             .map(|x| {
                 DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
             })
+            .map_err(std::convert::Into::into)
     }
 
-    pub async fn account(&self) -> Result<DataWithPool<model::Account>, sqlx::Error> {
+    pub async fn account(&self) -> Result<DataWithPool<model::Account>, SQLError> {
         let guid = &self.account_guid;
 
         model::Account::query_by_guid(guid, self.kind)
@@ -203,11 +214,12 @@ impl DataWithPool<model::Split> {
             .map(|x| {
                 DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
             })
+            .map_err(std::convert::Into::into)
     }
 }
 
 impl DataWithPool<model::Transaction> {
-    pub async fn currency(&self) -> Result<DataWithPool<model::Commodity>, sqlx::Error> {
+    pub async fn currency(&self) -> Result<DataWithPool<model::Commodity>, SQLError> {
         let guid = &self.currency_guid;
 
         model::Commodity::query_by_guid(guid, self.kind)
@@ -216,9 +228,10 @@ impl DataWithPool<model::Transaction> {
             .map(|x| {
                 DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
             })
+            .map_err(std::convert::Into::into)
     }
 
-    pub async fn splits(&self) -> Result<Vec<DataWithPool<model::Split>>, sqlx::Error> {
+    pub async fn splits(&self) -> Result<Vec<DataWithPool<model::Split>>, SQLError> {
         let guid = &self.guid;
 
         model::Split::query_by_tx_guid(guid, self.kind)
@@ -236,11 +249,12 @@ impl DataWithPool<model::Transaction> {
                     })
                     .collect()
             })
+            .map_err(std::convert::Into::into)
     }
 }
 
 impl DataWithPool<model::Price> {
-    pub async fn commodity(&self) -> Result<DataWithPool<model::Commodity>, sqlx::Error> {
+    pub async fn commodity(&self) -> Result<DataWithPool<model::Commodity>, SQLError> {
         let guid = &self.commodity_guid;
 
         model::Commodity::query_by_guid(guid, self.kind)
@@ -249,9 +263,10 @@ impl DataWithPool<model::Price> {
             .map(|x| {
                 DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
             })
+            .map_err(std::convert::Into::into)
     }
 
-    pub async fn currency(&self) -> Result<DataWithPool<model::Commodity>, sqlx::Error> {
+    pub async fn currency(&self) -> Result<DataWithPool<model::Commodity>, SQLError> {
         let guid = &self.currency_guid;
 
         model::Commodity::query_by_guid(guid, self.kind)
@@ -260,11 +275,12 @@ impl DataWithPool<model::Price> {
             .map(|x| {
                 DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
             })
+            .map_err(std::convert::Into::into)
     }
 }
 
 impl DataWithPool<model::Commodity> {
-    pub async fn accounts(&self) -> Result<Vec<DataWithPool<model::Account>>, sqlx::Error> {
+    pub async fn accounts(&self) -> Result<Vec<DataWithPool<model::Account>>, SQLError> {
         let guid = &self.guid;
 
         model::Account::query_by_commodity_guid(guid, self.kind)
@@ -282,9 +298,10 @@ impl DataWithPool<model::Commodity> {
                     })
                     .collect()
             })
+            .map_err(std::convert::Into::into)
     }
 
-    pub async fn transactions(&self) -> Result<Vec<DataWithPool<model::Transaction>>, sqlx::Error> {
+    pub async fn transactions(&self) -> Result<Vec<DataWithPool<model::Transaction>>, SQLError> {
         let guid = &self.guid;
 
         model::Transaction::query_by_currency_guid(guid, self.kind)
@@ -302,11 +319,10 @@ impl DataWithPool<model::Commodity> {
                     })
                     .collect()
             })
+            .map_err(std::convert::Into::into)
     }
 
-    pub async fn as_commodity_prices(
-        &self,
-    ) -> Result<Vec<DataWithPool<model::Price>>, sqlx::Error> {
+    pub async fn as_commodity_prices(&self) -> Result<Vec<DataWithPool<model::Price>>, SQLError> {
         let guid = &self.guid;
 
         model::Price::query_by_commodity_guid(guid, self.kind)
@@ -324,9 +340,10 @@ impl DataWithPool<model::Commodity> {
                     })
                     .collect()
             })
+            .map_err(std::convert::Into::into)
     }
 
-    pub async fn as_currency_prices(&self) -> Result<Vec<DataWithPool<model::Price>>, sqlx::Error> {
+    pub async fn as_currency_prices(&self) -> Result<Vec<DataWithPool<model::Price>>, SQLError> {
         let guid = &self.guid;
 
         model::Price::query_by_currency_guid(guid, self.kind)
@@ -344,11 +361,12 @@ impl DataWithPool<model::Commodity> {
                     })
                     .collect()
             })
+            .map_err(std::convert::Into::into)
     }
 
     pub async fn as_commodity_or_currency_prices(
         &self,
-    ) -> Result<Vec<DataWithPool<model::Price>>, sqlx::Error> {
+    ) -> Result<Vec<DataWithPool<model::Price>>, SQLError> {
         let guid = &self.guid;
 
         model::Price::query_by_commodity_or_currency_guid(guid, self.kind)
@@ -366,6 +384,7 @@ impl DataWithPool<model::Commodity> {
                     })
                     .collect()
             })
+            .map_err(std::convert::Into::into)
     }
 
     pub async fn sell(&self, currency: &DataWithPool<model::Commodity>) -> Option<crate::Num> {
@@ -385,7 +404,7 @@ impl DataWithPool<model::Commodity> {
         let graph = self
             .exchange_graph
             .as_ref()
-            .ok_or(anyhow::anyhow!("No exchange graph"))?;
+            .ok_or(anyhow!("No exchange graph"))?;
 
         Ok(graph.write().await.update().await?)
     }
@@ -424,7 +443,7 @@ mod tests {
             let account = book.account_by_name("Foo stock").await.unwrap().unwrap();
             assert_eq!("Foo stock", account.name);
             assert_eq!(1, account.splits().await.unwrap().len());
-            assert_eq!("Broker", account.parent().await.unwrap().name);
+            assert_eq!("Broker", account.parent().await.unwrap().unwrap().name);
             assert_eq!(0, account.children().await.unwrap().len());
             assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
             #[cfg(not(feature = "decimal"))]
@@ -435,7 +454,7 @@ mod tests {
             let account = book.account_by_name("Cash").await.unwrap().unwrap();
             assert_eq!("Cash", account.name);
             assert_eq!(3, account.splits().await.unwrap().len());
-            assert_eq!("Current", account.parent().await.unwrap().name);
+            assert_eq!("Current", account.parent().await.unwrap().unwrap().name);
             assert_eq!(0, account.children().await.unwrap().len());
             assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
             #[cfg(not(feature = "decimal"))]
@@ -446,7 +465,10 @@ mod tests {
             let account = book.account_by_name("Mouvements").await.unwrap().unwrap();
             assert_eq!("Mouvements", account.name);
             assert_eq!(0, account.splits().await.unwrap().len());
-            assert_eq!("Root Account", account.parent().await.unwrap().name);
+            assert_eq!(
+                "Root Account",
+                account.parent().await.unwrap().unwrap().name
+            );
             assert_eq!(2, account.children().await.unwrap().len());
             assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
             #[cfg(not(feature = "decimal"))]
@@ -465,7 +487,10 @@ mod tests {
             let account = book.account_by_name("Asset").await.unwrap().unwrap();
             assert_eq!("Asset", account.name);
             assert_eq!(0, account.splits().await.unwrap().len());
-            assert_eq!("Root Account", account.parent().await.unwrap().name);
+            assert_eq!(
+                "Root Account",
+                account.parent().await.unwrap().unwrap().name
+            );
             assert_eq!(3, account.children().await.unwrap().len());
             assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
             #[cfg(not(feature = "decimal"))]
@@ -793,7 +818,7 @@ mod tests {
             let account = book.account_by_name("Foo stock").await.unwrap().unwrap();
             assert_eq!("Foo stock", account.name);
             assert_eq!(1, account.splits().await.unwrap().len());
-            assert_eq!("Broker", account.parent().await.unwrap().name);
+            assert_eq!("Broker", account.parent().await.unwrap().unwrap().name);
             assert_eq!(0, account.children().await.unwrap().len());
             assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
             #[cfg(not(feature = "decimal"))]
@@ -804,7 +829,7 @@ mod tests {
             let account = book.account_by_name("Cash").await.unwrap().unwrap();
             assert_eq!("Cash", account.name);
             assert_eq!(3, account.splits().await.unwrap().len());
-            assert_eq!("Current", account.parent().await.unwrap().name);
+            assert_eq!("Current", account.parent().await.unwrap().unwrap().name);
             assert_eq!(0, account.children().await.unwrap().len());
             assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
             #[cfg(not(feature = "decimal"))]
@@ -815,7 +840,10 @@ mod tests {
             let account = book.account_by_name("Mouvements").await.unwrap().unwrap();
             assert_eq!("Mouvements", account.name);
             assert_eq!(0, account.splits().await.unwrap().len());
-            assert_eq!("Root Account", account.parent().await.unwrap().name);
+            assert_eq!(
+                "Root Account",
+                account.parent().await.unwrap().unwrap().name
+            );
             assert_eq!(2, account.children().await.unwrap().len());
             assert_eq!("FOO", account.commodity().await.unwrap().mnemonic);
             #[cfg(not(feature = "decimal"))]
@@ -834,7 +862,10 @@ mod tests {
             let account = book.account_by_name("Asset").await.unwrap().unwrap();
             assert_eq!("Asset", account.name);
             assert_eq!(0, account.splits().await.unwrap().len());
-            assert_eq!("Root Account", account.parent().await.unwrap().name);
+            assert_eq!(
+                "Root Account",
+                account.parent().await.unwrap().unwrap().name
+            );
             assert_eq!(3, account.children().await.unwrap().len());
             assert_eq!("EUR", account.commodity().await.unwrap().mnemonic);
             #[cfg(not(feature = "decimal"))]

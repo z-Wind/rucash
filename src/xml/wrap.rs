@@ -1,8 +1,11 @@
+use anyhow::anyhow;
+use std::ops::Deref;
+use std::sync::{Arc, RwLock};
+
 use super::Exchange;
 use super::XMLPool;
 use crate::model::{self, Commodity};
-use std::ops::Deref;
-use std::sync::{Arc, RwLock};
+use crate::XMLError;
 
 #[derive(Debug, Clone)]
 pub struct DataWithPool<T> {
@@ -253,11 +256,11 @@ impl DataWithPool<model::Commodity> {
         commodity.sell(self)
     }
 
-    pub fn update_exchange_graph(&self) -> Result<(), anyhow::Error> {
+    pub fn update_exchange_graph(&self) -> Result<(), XMLError> {
         let graph = self
             .exchange_graph
             .as_ref()
-            .ok_or(anyhow::anyhow!("No exchange graph"))?;
+            .ok_or(anyhow!("No exchange graph"))?;
         graph.write().expect("graph must could be written").update();
         Ok(())
     }
