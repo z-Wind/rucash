@@ -2,8 +2,13 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("sqlx Error: {0}")]
+    #[error("SQLx error: {0}")]
     SQL(#[from] sqlx::Error),
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
+
+    #[error("Commodity GUID does not exist")]
+    NoCommodityGuid,
+    #[error("Commodity not found for GUID: {0}")]
+    CommodityNotFound(String),
+    #[error("Exchange graph not available")]
+    NoExchangeGraph,
 }

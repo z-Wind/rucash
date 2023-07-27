@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 
@@ -260,7 +259,7 @@ impl DataWithPool<model::Commodity> {
         let graph = self
             .exchange_graph
             .as_ref()
-            .ok_or(anyhow!("No exchange graph"))?;
+            .ok_or(XMLError::NoExchangeGraph)?;
         graph.write().expect("graph must could be written").update();
         Ok(())
     }

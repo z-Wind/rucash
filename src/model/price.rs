@@ -284,6 +284,8 @@ impl<'q> Price {
     }
 
     #[cfg(not(feature = "decimal"))]
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn value(&self) -> f64 {
         self.value_num as f64 / self.value_denom as f64
     }
@@ -422,7 +424,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(1.5, result.value());
+            float_cmp::assert_approx_eq!(f64, 1.5, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(15, 1), result.value());
         }
@@ -438,7 +440,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(1.5, result.value());
+            float_cmp::assert_approx_eq!(f64, 1.5, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(15, 1), result.value());
         }
@@ -454,7 +456,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(1.5, result.value());
+            float_cmp::assert_approx_eq!(f64, 1.5, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(15, 1), result.value());
         }
@@ -523,7 +525,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(1.5, result.value());
+            float_cmp::assert_approx_eq!(f64, 1.5, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(15, 1), result.value());
         }
@@ -539,7 +541,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(1.5, result.value());
+            float_cmp::assert_approx_eq!(f64, 1.5, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(15, 1), result.value());
         }
@@ -555,7 +557,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(1.5, result.value());
+            float_cmp::assert_approx_eq!(f64, 1.5, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(15, 1), result.value());
         }
@@ -624,7 +626,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(1.5, result.value());
+            float_cmp::assert_approx_eq!(f64, 1.5, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(15, 1), result.value());
         }
@@ -640,7 +642,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(1.5, result.value());
+            float_cmp::assert_approx_eq!(f64, 1.5, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(15, 1), result.value());
         }
@@ -656,7 +658,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(1.5, result.value());
+            float_cmp::assert_approx_eq!(f64, 1.5, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(15, 1), result.value());
         }
@@ -766,7 +768,7 @@ mod tests {
             assert_eq!(price.value_num, 3);
             assert_eq!(price.value_denom, 2);
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(1.5, price.value());
+            float_cmp::assert_approx_eq!(f64, 1.5, price.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(15, 1), price.value());
         }

@@ -2,7 +2,6 @@ pub mod error;
 mod exchange;
 pub mod wrap;
 
-use anyhow::anyhow;
 use exchange::Exchange;
 use itertools::Itertools;
 use std::fs::File;
@@ -35,7 +34,7 @@ impl XMLPool {
         let mut root: Element = Element::parse(data.as_bytes())?;
         root = root
             .take_child("book")
-            .ok_or(anyhow!("No book in {}", uri))?;
+            .ok_or(XMLError::NoBook(uri.to_string()))?;
 
         Ok(Self(Arc::new(root)))
     }

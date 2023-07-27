@@ -156,6 +156,7 @@ mod tests {
         }
 
         #[tokio::test]
+        #[allow(clippy::too_many_lines)]
         async fn test_exchange() {
             let book = setup().await;
             let mut exchange = Exchange::new(book.kind, book.pool.clone()).await.unwrap();
@@ -520,7 +521,6 @@ mod tests {
     #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
-        use pretty_assertions::assert_eq;
 
         //type DB = sqlx::MySql;
 
@@ -532,6 +532,7 @@ mod tests {
         }
 
         #[tokio::test]
+        #[allow(clippy::too_many_lines)]
         async fn test_exchange() {
             let book = setup().await;
             let mut exchange = Exchange::new(book.kind, book.pool.clone()).await.unwrap();

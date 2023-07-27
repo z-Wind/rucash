@@ -141,6 +141,7 @@ mod tests {
         }
 
         #[test]
+        #[allow(clippy::too_many_lines)]
         fn test_exchange() {
             let book = setup();
             let mut exchange = Exchange::new(book.pool.clone());

@@ -274,6 +274,8 @@ impl<'q> Split {
     }
 
     #[cfg(not(feature = "decimal"))]
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn value(&self) -> f64 {
         self.value_num as f64 / self.value_denom as f64
     }
@@ -285,6 +287,8 @@ impl<'q> Split {
     }
 
     #[cfg(not(feature = "decimal"))]
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn quantity(&self) -> f64 {
         self.quantity_num as f64 / self.quantity_denom as f64
     }
@@ -434,7 +438,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(150.0, result.value());
+            float_cmp::assert_approx_eq!(f64, 150.0, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(150, 0), result.value());
         }
@@ -513,7 +517,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(150.0, result.value());
+            float_cmp::assert_approx_eq!(f64, 150.0, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(150, 0), result.value());
         }
@@ -592,7 +596,7 @@ mod tests {
                 })
                 .unwrap();
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(150.0, result.value());
+            float_cmp::assert_approx_eq!(f64, 150.0, result.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(150, 0), result.value());
         }
@@ -700,13 +704,13 @@ mod tests {
             assert_eq!(split.value_num, 15000);
             assert_eq!(split.value_denom, 100);
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(150.0, split.value());
+            float_cmp::assert_approx_eq!(f64, 150.0, split.value());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(150, 0), split.value());
             assert_eq!(split.quantity_num, 15000);
             assert_eq!(split.quantity_denom, 100);
             #[cfg(not(feature = "decimal"))]
-            assert_eq!(150.0, split.quantity());
+            float_cmp::assert_approx_eq!(f64, 150.0, split.quantity());
             #[cfg(feature = "decimal")]
             assert_eq!(Decimal::new(150, 0), split.quantity());
             assert_eq!(split.lot_guid, None);

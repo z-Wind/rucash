@@ -2,7 +2,6 @@ use super::exchange::Exchange;
 use crate::kind::SQLKind;
 use crate::model::{self, Commodity};
 use crate::SQLError;
-use anyhow::anyhow;
 use futures::future::{BoxFuture, FutureExt};
 use std::hash::Hash;
 use std::ops::Deref;
@@ -133,7 +132,7 @@ impl DataWithPool<model::Account> {
         let guid = self
             .commodity_guid
             .as_ref()
-            .ok_or(anyhow!("No commodity_guid"))?;
+            .ok_or(SQLError::NoCommodityGuid)?;
 
         model::Commodity::query_by_guid(guid, self.kind)
             .fetch_optional(&self.pool)
@@ -141,7 +140,7 @@ impl DataWithPool<model::Account> {
             .map(|x| {
                 DataWithPool::new(x, self.kind, self.pool.clone(), self.exchange_graph.clone())
             })
-            .ok_or(anyhow!("Can not find commodity by {guid}"))
+            .ok_or(SQLError::CommodityNotFound(guid.clone()))
             .map_err(std::convert::Into::into)
     }
 
@@ -400,13 +399,13 @@ impl DataWithPool<model::Commodity> {
         commodity.sell(self).await
     }
 
-    pub async fn update_exchange_graph(&self) -> Result<(), anyhow::Error> {
+    pub async fn update_exchange_graph(&self) -> Result<(), SQLError> {
         let graph = self
             .exchange_graph
             .as_ref()
-            .ok_or(anyhow!("No exchange graph"))?;
+            .ok_or(SQLError::NoExchangeGraph)?;
 
-        Ok(graph.write().await.update().await?)
+        graph.write().await.update().await
     }
 }
 
