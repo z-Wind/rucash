@@ -1,3 +1,9 @@
 {
-    "rust-analyzer.cargo.features": "all"
+    "rust-analyzer.cargo.features": [
+        "sqlite",
+        "postgresql",
+        "mysql",
+        "xml",
+        "decimal"
+    ]
 }

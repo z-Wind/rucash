@@ -1,30 +1,43 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-//const URI: &str = "sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro";
-fn uri() -> String {
+fn uri_sqlite() -> String {
     format!(
         "sqlite://{}/tests/db/sqlite/complex_sample.gnucash?mode=ro",
         env!("CARGO_MANIFEST_DIR")
     )
 }
 
+fn uri_xml() -> String {
+    format!(
+        "{}/tests/db/xml/complex_sample.gnucash",
+        env!("CARGO_MANIFEST_DIR")
+    )
+}
+
 fn benchmark_sql_query(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    //panic!("{}", uri());
+    let book = rt.block_on(async {
+        let query = rucash::SQLiteQuery::new(&uri_sqlite()).await.unwrap();
+        rucash::Book::new(query).await.unwrap()
+    });
 
     c.bench_function("sql query", |b| {
         b.to_async(&rt).iter(|| async {
-            let book = rucash::SqliteBook::new(&uri()).await.unwrap();
-            book.accounts_contains_name(black_box("aS")).await
+            book.accounts_contains_name_ignore_case(black_box("aS"))
+                .await
         });
     });
 }
 
 fn benchmark_vec_filter(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
+    let book = rt.block_on(async {
+        let query = rucash::SQLiteQuery::new(&uri_sqlite()).await.unwrap();
+        rucash::Book::new(query).await.unwrap()
+    });
+
     c.bench_function("vec filter", |b| {
         b.to_async(&rt).iter(|| async {
-            let book = rucash::SqliteBook::new(&uri()).await.unwrap();
             let vec = book.accounts().await.unwrap();
             let _: Vec<_> = vec
                 .into_iter()
@@ -35,17 +48,26 @@ fn benchmark_vec_filter(c: &mut Criterion) {
 }
 
 fn benchmark_xml_book(c: &mut Criterion) {
-    let book = rucash::XMLBook::new("tests/db/xml/complex_sample.gnucash").unwrap();
-    c.bench_function("XMLBook", |b| b.iter(|| book.accounts()));
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let book = rt.block_on(async {
+        let query = rucash::XMLQuery::new(&uri_xml()).unwrap();
+        rucash::Book::new(query).await.unwrap()
+    });
+
+    c.bench_function("XMLBook", |b| {
+        b.to_async(&rt).iter(|| async { book.accounts().await })
+    });
 }
 
 fn benchmark_sqlite_book(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
+    let book = rt.block_on(async {
+        let query = rucash::SQLiteQuery::new(&uri_sqlite()).await.unwrap();
+        rucash::Book::new(query).await.unwrap()
+    });
+
     c.bench_function("SqliteBook", |b| {
-        b.to_async(&rt).iter(|| async {
-            let book = rucash::SqliteBook::new(&uri()).await.unwrap();
-            book.accounts().await
-        })
+        b.to_async(&rt).iter(|| async { book.accounts().await })
     });
 }
 

@@ -1,874 +1,342 @@
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-use super::TestSchemas;
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
-use crate::kind::SQLKind;
+use futures::future::{BoxFuture, FutureExt};
+use std::sync::Arc;
+
+use crate::error::Error;
+use crate::model::{Commodity, Split};
+use crate::query::{AccountQ, AccountT, CommodityQ, Query, SplitQ};
+use crate::Book;
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
-#[cfg_attr(
-    any(feature = "sqlite", feature = "postgres", feature = "mysql",),
-    derive(sqlx::FromRow)
-)]
-pub struct Account {
+pub struct Account<Q>
+where
+    Q: Query,
+{
+    query: Arc<Q>,
+
     pub guid: String,
     pub name: String,
-    pub account_type: String,
-    pub commodity_guid: Option<String>,
-    pub commodity_scu: i32,
-    pub non_std_scu: i32,
-    pub parent_guid: Option<String>,
-    pub code: Option<String>,
-    pub description: Option<String>,
-    pub hidden: Option<i32>,
-    pub placeholder: Option<i32>,
+    pub r#type: String,
+    pub commodity_guid: String,
+    pub commodity_scu: i64,
+    pub non_std_scu: bool,
+    pub parent_guid: String,
+    pub code: String,
+    pub description: String,
+    pub hidden: bool,
+    pub placeholder: bool,
 }
 
-impl super::NullNone for Account {
-    fn null_none(self) -> Self {
-        let commodity_guid = self.commodity_guid.as_ref().and_then(|x| match x.as_str() {
-            "" => None,
-            x => Some(x.to_string()),
-        });
-        let parent_guid = self.parent_guid.as_ref().and_then(|x| match x.as_str() {
-            "" => None,
-            x => Some(x.to_string()),
-        });
-        let code = self.code.as_ref().and_then(|x| match x.as_str() {
-            "" => None,
-            x => Some(x.to_string()),
-        });
-        let description = self.description.as_ref().and_then(|x| match x.as_str() {
-            "" => None,
-            x => Some(x.to_string()),
-        });
-
-        let hidden = match self.hidden {
-            Some(x) => Some(x),
-            None => Some(0),
-        };
-        let placeholder = match self.placeholder {
-            Some(x) => Some(x),
-            None => Some(0),
-        };
-
+impl<Q> Account<Q>
+where
+    Q: Query,
+{
+    pub(crate) fn from_with_query<T: AccountT>(item: &T, query: Arc<Q>) -> Self {
         Self {
-            commodity_guid,
-            parent_guid,
-            code,
-            description,
-            hidden,
-            placeholder,
-            ..self
-        }
-    }
-}
+            query,
 
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-impl<'q> Account {
-    // test schemas on compile time
-    #[allow(dead_code)]
-    #[cfg(feature = "sqlite")]
-    fn test_schemas() -> TestSchemas<
-        'q,
-        sqlx::Sqlite,
-        sqlx::sqlite::SqliteRow,
-        Self,
-        sqlx::sqlite::SqliteArguments<'q>,
-    > {
-        sqlx::query_as!(
-            Self,
-            r#"
-            SELECT 
-            guid, 
-            name,
-            account_type,
-            commodity_guid,
-            commodity_scu as "commodity_scu: i32",
-            non_std_scu as "non_std_scu: i32",
-            parent_guid,
-            code,
-            description,
-            hidden as "hidden: i32",
-            placeholder as "placeholder: i32"
-            FROM accounts
-            "#,
-        )
-    }
-
-    pub(crate) fn query<DB, O>(
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-    {
-        sqlx::query_as(
-            r#"
-            SELECT 
-            guid, 
-            name,
-            account_type,
-            commodity_guid,
-            commodity_scu,
-            non_std_scu,
-            parent_guid,
-            code,
-            description,
-            hidden,
-            placeholder
-            FROM accounts
-            "#,
-        )
-    }
-
-    pub(crate) fn query_by_guid<DB, O, T>(
-        guid: T,
-        kind: SQLKind,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        match kind {
-            SQLKind::Postgres => sqlx::query_as(
-                r#"
-                SELECT 
-                guid, 
-                name,
-                account_type,
-                commodity_guid,
-                commodity_scu,
-                non_std_scu,
-                parent_guid,
-                code,
-                description,
-                hidden,
-                placeholder
-                FROM accounts
-                WHERE guid = $1
-                "#,
-            )
-            .bind(guid),
-            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
-                r#"
-                SELECT 
-                guid, 
-                name,
-                account_type,
-                commodity_guid,
-                commodity_scu,
-                non_std_scu,
-                parent_guid,
-                code,
-                description,
-                hidden,
-                placeholder
-                FROM accounts
-                WHERE guid = ?
-                "#,
-            )
-            .bind(guid),
-            SQLKind::Mssql => panic!("{kind:?} not support"),
+            guid: item.guid(),
+            name: item.name(),
+            r#type: item.account_type(),
+            commodity_guid: item.commodity_guid(),
+            commodity_scu: item.commodity_scu(),
+            non_std_scu: item.non_std_scu(),
+            parent_guid: item.parent_guid(),
+            code: item.code(),
+            description: item.description(),
+            hidden: item.hidden(),
+            placeholder: item.placeholder(),
         }
     }
 
-    pub(crate) fn query_by_commodity_guid<DB, O, T>(
-        guid: T,
-        kind: SQLKind,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        match kind {
-            SQLKind::Postgres => sqlx::query_as(
-                r#"
-                SELECT 
-                guid, 
-                name,
-                account_type,
-                commodity_guid,
-                commodity_scu,
-                non_std_scu,
-                parent_guid,
-                code,
-                description,
-                hidden,
-                placeholder
-                FROM accounts
-                WHERE commodity_guid = $1
-                "#,
-            )
-            .bind(guid),
-            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
-                r#"
-            SELECT 
-            guid, 
-            name,
-            account_type,
-            commodity_guid,
-            commodity_scu,
-            non_std_scu,
-            parent_guid,
-            code,
-            description,
-            hidden,
-            placeholder
-            FROM accounts
-            WHERE commodity_guid = ?
-            "#,
-            )
-            .bind(guid),
-            SQLKind::Mssql => panic!("{kind:?} not support"),
-        }
+    pub async fn splits(&self) -> Result<Vec<Split<Q>>, Error> {
+        let splits = SplitQ::account_guid(&*self.query, &self.guid).await?;
+        Ok(splits
+            .into_iter()
+            .map(|x| Split::from_with_query(&x, self.query.clone()))
+            .collect())
     }
 
-    pub(crate) fn query_by_parent_guid<DB, O, T>(
-        guid: T,
-        kind: SQLKind,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        match kind {
-            SQLKind::Postgres => sqlx::query_as(
-                r#"
-                SELECT 
-                guid, 
-                name,
-                account_type,
-                commodity_guid,
-                commodity_scu,
-                non_std_scu,
-                parent_guid,
-                code,
-                description,
-                hidden,
-                placeholder
-                FROM accounts
-                WHERE parent_guid = $1
-                "#,
-            )
-            .bind(guid),
-            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
-                r#"
-            SELECT 
-            guid, 
-            name,
-            account_type,
-            commodity_guid,
-            commodity_scu,
-            non_std_scu,
-            parent_guid,
-            code,
-            description,
-            hidden,
-            placeholder
-            FROM accounts
-            WHERE parent_guid = ?
-            "#,
-            )
-            .bind(guid),
-            SQLKind::Mssql => panic!("{kind:?} not support"),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn query_by_name<DB, O, T>(
-        name: T,
-        kind: SQLKind,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        match kind {
-            SQLKind::Postgres => sqlx::query_as(
-                r#"
-                SELECT 
-                guid, 
-                name,
-                account_type,
-                commodity_guid,
-                commodity_scu,
-                non_std_scu,
-                parent_guid,
-                code,
-                description,
-                hidden,
-                placeholder
-                FROM accounts
-                WHERE name = $1
-                "#,
-            )
-            .bind(name),
-            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
-                r#"
-            SELECT 
-            guid, 
-            name,
-            account_type,
-            commodity_guid,
-            commodity_scu,
-            non_std_scu,
-            parent_guid,
-            code,
-            description,
-            hidden,
-            placeholder
-            FROM accounts
-            WHERE name = ?
-            "#,
-            )
-            .bind(name),
-            SQLKind::Mssql => panic!("{kind:?} not support"),
-        }
-    }
-
-    pub(crate) fn query_like_name<DB, O, T>(
-        name: T,
-        kind: SQLKind,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        match kind {
-            SQLKind::Postgres => sqlx::query_as(
-                r#"
-                SELECT 
-                guid, 
-                name,
-                account_type,
-                commodity_guid,
-                commodity_scu,
-                non_std_scu,
-                parent_guid,
-                code,
-                description,
-                hidden,
-                placeholder
-                FROM accounts
-                WHERE LOWER(name) LIKE LOWER($1)
-                "#,
-            )
-            .bind(name),
-            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
-                r#"
-            SELECT 
-            guid, 
-            name,
-            account_type,
-            commodity_guid,
-            commodity_scu,
-            non_std_scu,
-            parent_guid,
-            code,
-            description,
-            hidden,
-            placeholder
-            FROM accounts
-            WHERE name LIKE ?
-            "#,
-            )
-            .bind(name),
-            SQLKind::Mssql => panic!("{kind:?} not support"),
-        }
-    }
-}
-
-#[cfg(feature = "xml")]
-use xmltree::Element;
-#[cfg(feature = "xml")]
-impl Account {
-    pub(crate) fn new_by_element(e: &Element) -> Self {
-        let guid = e
-            .get_child("id")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .expect("id must exist");
-        let name = e
-            .get_child("name")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .expect("name must exist");
-        let account_type = e
-            .get_child("type")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .expect("type must exist");
-        let commodity_guid = e
-            .get_child("commodity")
-            .and_then(|x| x.get_child("id"))
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let commodity_scu = e
-            .get_child("commodity-scu")
-            .and_then(xmltree::Element::get_text)
-            .map_or(0, |x| x.parse().expect("must be i32"));
-        let non_std_scu = e
-            .get_child("non-std-scu")
-            .and_then(xmltree::Element::get_text)
-            .map_or(0, |x| x.parse().expect("must be i32"));
-        let parent_guid = e
-            .get_child("parent")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let code = e
-            .get_child("code")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let description = e
-            .get_child("description")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let hidden = e
-            .get_child("hidden")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .map(|x| x.parse().unwrap_or(0));
-
-        let slots: Vec<&Element> = match e.get_child("slots") {
-            None => Vec::new(),
-            Some(x) => x
-                .children
-                .iter()
-                .filter_map(xmltree::XMLNode::as_element)
-                .collect(),
+    pub async fn parent(&self) -> Result<Option<Account<Q>>, Error> {
+        if self.parent_guid.is_empty() {
+            return Ok(None);
         };
-        let placeholder = slots
-            .iter()
-            .find(|e| {
-                e.get_child("key")
-                    .and_then(xmltree::Element::get_text)
-                    .map(std::borrow::Cow::into_owned)
-                    == Some("placeholder".to_string())
-            })
-            .and_then(|e| e.get_child("value"))
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .map(|x| i32::from(x == "true"));
 
-        Self {
-            guid,
-            name,
-            account_type,
-            commodity_guid,
-            commodity_scu,
-            non_std_scu,
-            parent_guid,
-            code,
-            description,
-            hidden,
-            placeholder,
+        let mut accounts = AccountQ::guid(&*self.query, &self.parent_guid).await?;
+
+        match accounts.pop() {
+            None => Ok(None),
+            Some(x) if accounts.is_empty() => {
+                Ok(Some(Account::from_with_query(&x, self.query.clone())))
+            }
+            _ => Err(Error::GuidMultipleFound {
+                model: "Account".to_string(),
+                guid: self.parent_guid.clone(),
+            }),
         }
+    }
+
+    pub async fn children(&self) -> Result<Vec<Account<Q>>, Error> {
+        let accounts = AccountQ::parent_guid(&*self.query, &self.guid).await?;
+        Ok(accounts
+            .into_iter()
+            .map(|x| Account::from_with_query(&x, self.query.clone()))
+            .collect())
+    }
+
+    pub async fn commodity(&self) -> Result<Commodity<Q>, Error> {
+        if self.commodity_guid.is_empty() {
+            return Err(Error::GuidNotFound {
+                model: "Commodity".to_string(),
+                guid: self.commodity_guid.clone(),
+            });
+        }
+
+        let mut commodities = CommodityQ::guid(&*self.query, &self.commodity_guid).await?;
+        match commodities.pop() {
+            None => Err(Error::GuidNotFound {
+                model: "Commodity".to_string(),
+                guid: self.commodity_guid.clone(),
+            }),
+            Some(x) if commodities.is_empty() => {
+                Ok(Commodity::from_with_query(&x, self.query.clone()))
+            }
+            _ => Err(Error::GuidMultipleFound {
+                model: "Commodity".to_string(),
+                guid: self.commodity_guid.clone(),
+            }),
+        }
+    }
+
+    fn balance_into_currency<'a>(
+        &'a self,
+        currency: &'a Commodity<Q>,
+        book: &'a Book<Q>,
+    ) -> BoxFuture<'a, Result<crate::Num, Error>> {
+        async {
+            let mut net: crate::Num = self.splits().await?.iter().map(|s| s.quantity).sum();
+            let commodity = self.commodity().await?;
+
+            for child in self.children().await? {
+                let child_net = child.balance_into_currency(&commodity, book).await?;
+                net += child_net;
+            }
+
+            let rate = commodity.sell(currency, book).await.unwrap_or_else(|| {
+                panic!(
+                    "must have rate {} to {}",
+                    commodity.mnemonic, currency.mnemonic
+                )
+            });
+            // dbg!((
+            //     &commodity.mnemonic,
+            //     &currency.mnemonic,
+            //     rate,
+            //     &self.name,
+            //     net
+            // ));
+
+            Ok(net * rate)
+        }
+        .boxed()
+    }
+
+    pub async fn balance(&self, book: &Book<Q>) -> Result<crate::Num, Error> {
+        let mut net: crate::Num = self.splits().await?.iter().map(|s| s.quantity).sum();
+
+        let commodity = self.commodity().await?;
+
+        for child in self.children().await? {
+            let child_net = child.balance_into_currency(&commodity, book).await?;
+            net += child_net;
+        }
+        // dbg!((&self.name, net));
+
+        Ok(net)
     }
 }
 
 #[cfg(test)]
-#[cfg(any(
-    feature = "sqlite",
-    feature = "postgres",
-    feature = "mysql",
-    feature = "xml"
-))]
+#[cfg(feature = "sqlite")]
 mod tests {
     use super::*;
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    use tokio::runtime::Runtime;
 
-    #[cfg(feature = "sqlite")]
-    mod sqlite {
-        use super::*;
-        use pretty_assertions::assert_eq;
+    use crate::query::sqlite::account::Account as AccountSQL;
+    use crate::SQLiteQuery;
 
-        type DB = sqlx::Sqlite;
+    #[cfg(not(feature = "decimal"))]
+    use float_cmp::assert_approx_eq;
+    use pretty_assertions::assert_eq;
+    #[cfg(feature = "decimal")]
+    use rust_decimal::Decimal;
 
-        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
-            let uri: &str = &format!(
-                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
-                env!("CARGO_MANIFEST_DIR")
-            );
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
+    async fn setup() -> SQLiteQuery {
+        let uri: &str = &format!(
+            "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+            env!("CARGO_MANIFEST_DIR")
+        );
 
-            println!("work_dir: {:?}", std::env::current_dir());
-            (
-                rt.block_on(async {
-                    sqlx::sqlite::SqlitePoolOptions::new()
-                        .max_connections(5)
-                        .connect(&format!("{uri}?mode=ro")) // read only
-                        .await
-                        .unwrap()
-                }),
-                rt,
-                uri.parse().expect("sqlite"),
-            )
-        }
-
-        #[test]
-        fn query() {
-            let (pool, rt, _) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async { Account::query().fetch_all(&pool).await })
-                .unwrap();
-            assert_eq!(21, result.len());
-        }
-
-        #[test]
-        fn query_by_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Account = rt
-                .block_on(async {
-                    Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                        .fetch_one(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!("Asset", result.name);
-        }
-
-        #[test]
-        fn query_by_commodity_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async {
-                    Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(14, result.len());
-        }
-
-        #[test]
-        fn query_by_parent_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async {
-                    Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(3, result.len());
-        }
-
-        #[test]
-        fn query_by_name() {
-            let (pool, rt, kind) = setup();
-            let result: Account = rt
-                .block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
-                .unwrap();
-            assert_eq!("fcd795021c976ba75621ec39e75f6214", result.guid);
-        }
-
-        #[test]
-        fn query_like_name() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async {
-                    Account::query_like_name("%AS%", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(3, result.len());
-        }
+        println!("work_dir: {:?}", std::env::current_dir());
+        SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
     }
 
-    #[cfg(feature = "postgres")]
-    mod postgresql {
-        use super::*;
-        use pretty_assertions::assert_eq;
+    #[tokio::test]
+    async fn test_from_with_query() {
+        let query = Arc::new(setup().await);
+        let item = AccountSQL {
+            guid: "guid".to_string(),
+            name: "name".to_string(),
+            account_type: "account_type".to_string(),
+            commodity_guid: Some("commodity_guid".to_string()),
+            commodity_scu: 100,
+            non_std_scu: 0,
+            parent_guid: Some("parent_guid".to_string()),
+            code: Some("code".to_string()),
+            description: Some("description".to_string()),
+            hidden: Some(0),
+            placeholder: Some(1),
+        };
 
-        type DB = sqlx::Postgres;
+        let result = Account::from_with_query(&item, query);
 
-        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
-            let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            (
-                rt.block_on(async {
-                    sqlx::postgres::PgPoolOptions::new()
-                        .max_connections(5)
-                        .connect(uri)
-                        .await
-                        .unwrap()
-                }),
-                rt,
-                uri.parse().expect("postgres"),
-            )
-        }
-
-        #[test]
-        fn query() {
-            let (pool, rt, _) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async { Account::query().fetch_all(&pool).await })
-                .unwrap();
-            assert_eq!(21, result.len());
-        }
-
-        #[test]
-        fn query_by_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Account = rt
-                .block_on(async {
-                    Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                        .fetch_one(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!("Asset", result.name);
-        }
-
-        #[test]
-        fn query_by_commodity_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async {
-                    Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(14, result.len());
-        }
-
-        #[test]
-        fn query_by_parent_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async {
-                    Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(3, result.len());
-        }
-
-        #[test]
-        fn query_by_name() {
-            let (pool, rt, kind) = setup();
-            let result: Account = rt
-                .block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
-                .unwrap();
-            assert_eq!("fcd795021c976ba75621ec39e75f6214", result.guid);
-        }
-
-        #[test]
-        fn query_like_name() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async {
-                    Account::query_like_name("%AS%", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(3, result.len());
-        }
+        assert_eq!(result.guid, "guid");
+        assert_eq!(result.name, "name");
+        assert_eq!(result.r#type, "account_type");
+        assert_eq!(result.commodity_guid, "commodity_guid");
+        assert_eq!(result.commodity_scu, 100);
+        assert_eq!(result.non_std_scu, false);
+        assert_eq!(result.parent_guid, "parent_guid");
+        assert_eq!(result.code, "code");
+        assert_eq!(result.description, "description");
+        assert_eq!(result.hidden, false);
+        assert_eq!(result.placeholder, true);
     }
 
-    #[cfg(feature = "mysql")]
-    mod mysql {
-        use super::*;
-        use pretty_assertions::assert_eq;
-
-        type DB = sqlx::MySql;
-
-        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
-            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            (
-                rt.block_on(async {
-                    sqlx::mysql::MySqlPoolOptions::new()
-                        .max_connections(5)
-                        .connect(uri)
-                        .await
-                        .unwrap()
-                }),
-                rt,
-                uri.parse().expect("mysql"),
-            )
-        }
-
-        #[test]
-        fn query() {
-            let (pool, rt, _) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async { Account::query().fetch_all(&pool).await })
-                .unwrap();
-            assert_eq!(21, result.len());
-        }
-
-        #[test]
-        fn query_by_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Account = rt
-                .block_on(async {
-                    Account::query_by_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                        .fetch_one(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!("Asset", result.name);
-        }
-
-        #[test]
-        fn query_by_commodity_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async {
-                    Account::query_by_commodity_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(14, result.len());
-        }
-
-        #[test]
-        fn query_by_parent_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async {
-                    Account::query_by_parent_guid("fcd795021c976ba75621ec39e75f6214", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(3, result.len());
-        }
-
-        #[test]
-        fn query_by_name() {
-            let (pool, rt, kind) = setup();
-            let result: Account = rt
-                .block_on(async { Account::query_by_name("Asset", kind).fetch_one(&pool).await })
-                .unwrap();
-            assert_eq!("fcd795021c976ba75621ec39e75f6214", result.guid);
-        }
-
-        #[test]
-        fn query_like_name() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Account> = rt
-                .block_on(async {
-                    Account::query_like_name("%AS%", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(3, result.len());
-        }
+    #[tokio::test]
+    async fn test_splits() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Cash")
+            .await
+            .unwrap()
+            .unwrap();
+        let splits = account.splits().await.unwrap();
+        assert_eq!(splits.len(), 3);
     }
 
-    #[cfg(feature = "xml")]
-    mod xml {
-        use super::*;
-        use pretty_assertions::assert_eq;
-        use std::sync::Arc;
+    #[tokio::test]
+    async fn test_parent() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Cash")
+            .await
+            .unwrap()
+            .unwrap();
+        let parent = account.parent().await.unwrap().unwrap();
+        assert_eq!(parent.name, "Current");
+    }
 
-        #[allow(dead_code)]
-        fn setup() -> Arc<Element> {
-            let uri: &str = &format!(
-                "{}/tests/db/xml/complex_sample.gnucash",
-                env!("CARGO_MANIFEST_DIR")
-            );
-            crate::XMLBook::new(uri).unwrap().pool.0
-        }
+    #[tokio::test]
+    async fn test_no_parent() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Root Account")
+            .await
+            .unwrap()
+            .unwrap();
+        let parent = account.parent().await.unwrap();
+        dbg!(&parent);
+        assert!(parent.is_none());
+    }
 
-        #[test]
-        fn new_by_element() {
-            let data = r##"
-            <?xml version="1.0" encoding="utf-8" ?>
-            <gnc-v2
-                xmlns:gnc="http://www.gnucash.org/XML/gnc"
-                xmlns:act="http://www.gnucash.org/XML/act"
-                xmlns:book="http://www.gnucash.org/XML/book"
-                xmlns:cd="http://www.gnucash.org/XML/cd"
-                xmlns:cmdty="http://www.gnucash.org/XML/cmdty"
-                xmlns:price="http://www.gnucash.org/XML/price"
-                xmlns:slot="http://www.gnucash.org/XML/slot"
-                xmlns:split="http://www.gnucash.org/XML/split"
-                xmlns:sx="http://www.gnucash.org/XML/sx"
-                xmlns:trn="http://www.gnucash.org/XML/trn"
-                xmlns:ts="http://www.gnucash.org/XML/ts"
-                xmlns:fs="http://www.gnucash.org/XML/fs"
-                xmlns:bgt="http://www.gnucash.org/XML/bgt"
-                xmlns:recurrence="http://www.gnucash.org/XML/recurrence"
-                xmlns:lot="http://www.gnucash.org/XML/lot"
-                xmlns:addr="http://www.gnucash.org/XML/addr"
-                xmlns:billterm="http://www.gnucash.org/XML/billterm"
-                xmlns:bt-days="http://www.gnucash.org/XML/bt-days"
-                xmlns:bt-prox="http://www.gnucash.org/XML/bt-prox"
-                xmlns:cust="http://www.gnucash.org/XML/cust"
-                xmlns:employee="http://www.gnucash.org/XML/employee"
-                xmlns:entry="http://www.gnucash.org/XML/entry"
-                xmlns:invoice="http://www.gnucash.org/XML/invoice"
-                xmlns:job="http://www.gnucash.org/XML/job"
-                xmlns:order="http://www.gnucash.org/XML/order"
-                xmlns:owner="http://www.gnucash.org/XML/owner"
-                xmlns:taxtable="http://www.gnucash.org/XML/taxtable"
-                xmlns:tte="http://www.gnucash.org/XML/tte"
-                xmlns:vendor="http://www.gnucash.org/XML/vendor">
-            <gnc:account version="2.0.0">
-                <act:name>Asset</act:name>
-                <act:id type="guid">fcd795021c976ba75621ec39e75f6214</act:id>
-                <act:type>ASSET</act:type>
-                <act:commodity>
-                    <cmdty:space>CURRENCY</cmdty:space>
-                    <cmdty:id>EUR</cmdty:id>
-                </act:commodity>
-                <act:commodity-scu>100</act:commodity-scu>
-                <act:slots>
-                    <slot>
-                    <slot:key>placeholder</slot:key>
-                    <slot:value type="string">true</slot:value>
-                    </slot>
-                </act:slots>
-                <act:parent type="guid">00622dda21937b29e494179de5013f82</act:parent>
-            </gnc:account>
-            </gnc-v2>
-            "##;
+    #[tokio::test]
+    async fn test_children() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Current")
+            .await
+            .unwrap()
+            .unwrap();
+        let children = account.children().await.unwrap();
+        assert_eq!(children.len(), 3);
+    }
 
-            let e = Element::parse(data.as_bytes())
-                .unwrap()
-                .take_child("account")
-                .unwrap();
+    #[tokio::test]
+    async fn test_children2() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Asset")
+            .await
+            .unwrap()
+            .unwrap();
+        let children = account.children().await.unwrap();
 
-            let account = Account::new_by_element(&e);
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[0].name, "Current");
+        assert_eq!(children[1].name, "Fixed");
+        assert_eq!(children[2].name, "Broker");
+    }
 
-            assert_eq!(account.guid, "fcd795021c976ba75621ec39e75f6214");
-            assert_eq!(account.name, "Asset");
-            assert_eq!(account.account_type, "ASSET");
-            assert_eq!(account.commodity_guid.as_ref().unwrap(), "EUR");
-            assert_eq!(account.commodity_scu, 100);
-            assert_eq!(account.non_std_scu, 0);
-            assert_eq!(
-                account.parent_guid.as_ref().unwrap(),
-                "00622dda21937b29e494179de5013f82"
-            );
-            assert_eq!(account.code, None);
-            assert_eq!(account.description, None);
-            assert_eq!(account.hidden, None);
-            assert_eq!(account.placeholder.unwrap(), 1);
-        }
+    #[tokio::test]
+    async fn test_commodity() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Cash")
+            .await
+            .unwrap()
+            .unwrap();
+        let commodity = account.commodity().await.unwrap();
+        assert_eq!(commodity.mnemonic, "EUR");
+    }
+
+    #[tokio::test]
+    async fn test_balance_into_currency() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Asset")
+            .await
+            .unwrap()
+            .unwrap();
+        let commodity = account.commodity().await.unwrap();
+
+        #[cfg(not(feature = "decimal"))]
+        assert_approx_eq!(
+            f64,
+            account
+                .balance_into_currency(&commodity, &book)
+                .await
+                .unwrap(),
+            24695.3
+        );
+        #[cfg(feature = "decimal")]
+        assert_eq!(
+            account
+                .balance_into_currency(&commodity, &book)
+                .await
+                .unwrap(),
+            Decimal::new(246_953, 1)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_balance() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Current")
+            .await
+            .unwrap()
+            .unwrap();
+
+        #[cfg(not(feature = "decimal"))]
+        assert_approx_eq!(f64, account.balance(&book).await.unwrap(), 4590.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(account.balance(&book).await.unwrap(), Decimal::new(4590, 0));
     }
 }

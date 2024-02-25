@@ -1,30 +1,37 @@
-use super::wrap::DataWithPool;
-use crate::kind::SQLKind;
-use crate::model;
-use crate::SQLError;
 use chrono::NaiveDateTime;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
+
+use crate::error::Error;
+use crate::model::{Commodity, Price};
+use crate::query::{PriceQ, Query};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Exchange {
-    kind: SQLKind,
-    pool: sqlx::AnyPool,
     graph: HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>>,
 }
 
 impl Exchange {
-    async fn new_graph(
-        kind: SQLKind,
-        pool: sqlx::AnyPool,
-    ) -> Result<HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>>, SQLError> {
-        let prices: Vec<DataWithPool<model::Price>> =
-            model::Price::query().fetch_all(&pool).await.map(|v| {
-                v.into_iter()
-                    .map(|x| DataWithPool::new(x, kind, pool.clone(), None))
-                    .collect()
-            })?;
+    pub(crate) async fn new<Q>(query: Arc<Q>) -> Result<Self, Error>
+    where
+        Q: Query,
+    {
+        Ok(Self {
+            graph: Self::new_graph(query.clone()).await?,
+        })
+    }
+
+    async fn new_graph<Q>(
+        query: Arc<Q>,
+    ) -> Result<HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>>, Error>
+    where
+        Q: Query,
+    {
+        let prices: Vec<Price<Q>> = PriceQ::all(&*query)
+            .await?
+            .into_iter()
+            .map(|x| Price::from_with_query(&x, query.clone()))
+            .collect();
 
         let mut graph: HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>> =
             HashMap::new();
@@ -37,39 +44,35 @@ impl Exchange {
                 .or_default()
                 .entry(currency.clone())
                 .and_modify(|e| {
-                    if e.1 < p.date {
-                        *e = (p.value(), p.date);
+                    if e.1 < p.datetime {
+                        *e = (p.value, p.datetime);
                     }
                 })
-                .or_insert((p.value(), p.date));
+                .or_insert((p.value, p.datetime));
 
             graph
                 .entry(currency.clone())
                 .or_default()
                 .entry(commodity.clone())
                 .and_modify(|e| {
-                    if e.1 < p.date {
-                        *e = (num_traits::one::<crate::Num>() / p.value(), p.date);
+                    if e.1 < p.datetime {
+                        *e = (num_traits::one::<crate::Num>() / p.value, p.datetime);
                     }
                 })
-                .or_insert((num_traits::one::<crate::Num>() / p.value(), p.date));
+                .or_insert((num_traits::one::<crate::Num>() / p.value, p.datetime));
         }
 
         Ok(graph)
     }
-    pub(crate) async fn new(kind: SQLKind, pool: sqlx::AnyPool) -> Result<Self, SQLError> {
-        Ok(Self {
-            graph: Self::new_graph(kind, pool.clone()).await?,
-            kind,
-            pool,
-        })
-    }
 
-    pub(crate) fn cal(
+    pub(crate) fn cal<Q>(
         &self,
-        commodity: &DataWithPool<model::Commodity>,
-        currency: &DataWithPool<model::Commodity>,
-    ) -> Option<crate::Num> {
+        commodity: &Commodity<Q>,
+        currency: &Commodity<Q>,
+    ) -> Option<crate::Num>
+    where
+        Q: Query,
+    {
         let commodity = &commodity.mnemonic;
         let currency = &currency.mnemonic;
         if commodity == currency {
@@ -90,7 +93,7 @@ impl Exchange {
             for _ in 0..n {
                 let (c, r, date) = queue.pop_front().unwrap();
                 if let Some(map) = self.graph.get(c) {
-                    for (k, v) in map.iter() {
+                    for (k, v) in map {
                         if visited.contains(&(c, k)) {
                             continue;
                         }
@@ -123,8 +126,11 @@ impl Exchange {
         None
     }
 
-    pub(crate) async fn update(&mut self) -> Result<(), SQLError> {
-        self.graph = Self::new_graph(self.kind, self.pool.clone()).await?;
+    pub(crate) async fn update<Q>(&mut self, query: Arc<Q>) -> Result<(), Error>
+    where
+        Q: Query,
+    {
+        self.graph = Self::new_graph(query).await?;
         Ok(())
     }
 }
@@ -132,6 +138,8 @@ impl Exchange {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Book;
+
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
     #[cfg(feature = "decimal")]
@@ -140,27 +148,30 @@ mod tests {
     #[cfg(feature = "sqlite")]
     mod sqlite {
         use super::*;
+
+        use crate::SQLiteQuery;
+
         #[cfg(feature = "decimal")]
         use pretty_assertions::assert_eq;
 
-        //type DB = sqlx::Sqlite;
-
-        async fn setup() -> crate::SqliteBook {
+        async fn setup() -> SQLiteQuery {
             let uri: &str = &format!(
                 "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
-            crate::SqliteBook::new(uri)
-                .await
-                .unwrap_or_else(|e| panic!("{e} uri:{uri:?}"))
+
+            println!("work_dir: {:?}", std::env::current_dir());
+            SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
         }
 
         #[tokio::test]
         #[allow(clippy::too_many_lines)]
         async fn test_exchange() {
-            let book = setup().await;
-            let mut exchange = Exchange::new(book.kind, book.pool.clone()).await.unwrap();
-            exchange.update().await.expect("ok");
+            let query = setup().await;
+            let book = Book::new(query.clone()).await.unwrap();
+            let query = Arc::new(query);
+            let mut exchange = Exchange::new(query.clone()).await.unwrap();
+            exchange.update(query).await.expect("ok");
 
             let from = book
                 .commodities()
@@ -333,22 +344,27 @@ mod tests {
     #[cfg(feature = "postgresql")]
     mod postgresql {
         use super::*;
+
+        use crate::PostgreSQLQuery;
+
+        #[cfg(feature = "decimal")]
         use pretty_assertions::assert_eq;
 
-        const URI: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
-        //type DB = sqlx::Postgres;
-
-        async fn setup(uri: &str) -> crate::PostgreSQLBook {
-            crate::PostgreSQLBook::new(&uri)
+        async fn setup() -> PostgreSQLQuery {
+            let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+            PostgreSQLQuery::new(uri)
                 .await
                 .unwrap_or_else(|e| panic!("{e} uri:{uri:?}"))
         }
 
         #[tokio::test]
+        #[allow(clippy::too_many_lines)]
         async fn test_exchange() {
-            let book = setup().await;
-            let mut exchange = Exchange::new(book.kind, book.pool.clone()).await.unwrap();
-            exchange.update().await.expect("ok");
+            let query = setup().await;
+            let book = Book::new(query.clone()).await.unwrap();
+            let query = Arc::new(query);
+            let mut exchange = Exchange::new(query.clone()).await.unwrap();
+            exchange.update(query).await.expect("ok");
 
             let from = book
                 .commodities()
@@ -521,12 +537,14 @@ mod tests {
     #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
+        use crate::MySQLQuery;
 
-        //type DB = sqlx::MySql;
+        #[cfg(feature = "decimal")]
+        use pretty_assertions::assert_eq;
 
-        async fn setup() -> crate::MySQLBook {
+        async fn setup() -> MySQLQuery {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
-            crate::MySQLBook::new(uri)
+            MySQLQuery::new(uri)
                 .await
                 .unwrap_or_else(|e| panic!("{e} uri:{uri:?}"))
         }
@@ -534,9 +552,11 @@ mod tests {
         #[tokio::test]
         #[allow(clippy::too_many_lines)]
         async fn test_exchange() {
-            let book = setup().await;
-            let mut exchange = Exchange::new(book.kind, book.pool.clone()).await.unwrap();
-            exchange.update().await.expect("ok");
+            let query = setup().await;
+            let book = Book::new(query.clone()).await.unwrap();
+            let query = Arc::new(query);
+            let mut exchange = Exchange::new(query.clone()).await.unwrap();
+            exchange.update(query).await.expect("ok");
 
             let from = book
                 .commodities()

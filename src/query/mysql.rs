@@ -1,20 +1,20 @@
-use std::ops::Deref;
+pub(crate) mod account;
+pub(crate) mod commodity;
+pub(crate) mod price;
+pub(crate) mod split;
+pub(crate) mod transaction;
 
-use super::SQLBook;
-use crate::SQLError;
+use super::Query;
+use crate::error::Error;
 
-#[derive(Debug)]
-pub struct Book(SQLBook);
+const MAX_CONNECTIONS: u32 = 10;
 
-impl Deref for Book {
-    type Target = SQLBook;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+#[derive(Debug, Clone)]
+pub struct MySQLQuery {
+    pool: sqlx::MySqlPool,
 }
 
-impl Book {
+impl MySQLQuery {
     /// Options and flags which can be used to configure a `MySQL` connection.
     /// Described by [`MySQL`](https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html).
     ///
@@ -36,12 +36,27 @@ impl Book {
     /// ```text
     /// mysql://root:password@localhost/db
     /// ```
-    pub async fn new(uri: &str) -> Result<Self, SQLError> {
-        let pool = sqlx::any::AnyPoolOptions::new()
-            .max_connections(super::MAX_CONNECTIONS)
+    pub async fn new(uri: &str) -> Result<Self, Error> {
+        let pool = sqlx::mysql::MySqlPoolOptions::new()
+            .max_connections(MAX_CONNECTIONS)
             .connect(uri)
-            .await;
+            .await?;
 
-        Ok(Self(SQLBook::new(uri.parse()?, pool?).await))
+        Ok(Self { pool })
+    }
+}
+
+impl Query for MySQLQuery {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_new() {
+        let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+
+        println!("work_dir: {:?}", std::env::current_dir());
+        MySQLQuery::new(&format!("{uri}?mode=ro")).await.unwrap();
     }
 }

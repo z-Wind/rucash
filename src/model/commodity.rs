@@ -1,543 +1,315 @@
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-use super::TestSchemas;
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
-use crate::kind::SQLKind;
+use std::sync::Arc;
+
+use crate::book::Book;
+use crate::error::Error;
+use crate::model::{Account, Price, Transaction};
+use crate::query::{AccountQ, CommodityT, PriceQ, Query, TransactionQ};
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
-#[cfg_attr(
-    any(feature = "sqlite", feature = "postgres", feature = "mysql",),
-    derive(sqlx::FromRow)
-)]
-pub struct Commodity {
+pub struct Commodity<Q>
+where
+    Q: Query,
+{
+    query: Arc<Q>,
+
     pub guid: String,
     pub namespace: String,
     pub mnemonic: String,
-    pub fullname: Option<String>,
-    pub cusip: Option<String>,
-    pub fraction: i32,
-    pub quote_flag: i32,
-    pub quote_source: Option<String>,
-    pub quote_tz: Option<String>,
+    pub fullname: String,
+    pub cusip: String,
+    pub fraction: i64,
+    pub quote_flag: bool,
+    pub quote_source: String,
+    pub quote_tz: String,
 }
 
-impl super::NullNone for Commodity {
-    fn null_none(self) -> Self {
-        let fullname = self.fullname.as_ref().and_then(|x| match x.as_str() {
-            "" => None,
-            x => Some(x.to_string()),
-        });
-        let cusip = self.cusip.as_ref().and_then(|x| match x.as_str() {
-            "" => None,
-            x => Some(x.to_string()),
-        });
-        let quote_source = self.quote_source.as_ref().and_then(|x| match x.as_str() {
-            "" => None,
-            x => Some(x.to_string()),
-        });
-        let quote_tz = self.quote_tz.as_ref().and_then(|x| match x.as_str() {
-            "" => None,
-            x => Some(x.to_string()),
-        });
-
+impl<Q> Commodity<Q>
+where
+    Q: Query,
+{
+    pub(crate) fn from_with_query<T: CommodityT>(item: &T, query: Arc<Q>) -> Self {
         Self {
-            fullname,
-            cusip,
-            quote_source,
-            quote_tz,
-            ..self
-        }
-    }
-}
+            query,
 
-impl<'q> Commodity {
-    // test schemas on compile time
-    #[allow(dead_code)]
-    #[cfg(feature = "sqlite")]
-    fn test_schemas() -> TestSchemas<
-        'q,
-        sqlx::Sqlite,
-        sqlx::sqlite::SqliteRow,
-        Self,
-        sqlx::sqlite::SqliteArguments<'q>,
-    > {
-        sqlx::query_as!(
-            Self,
-            r#"
-            SELECT
-            guid,
-            namespace,
-            mnemonic,
-            fullname,
-            cusip,
-            fraction as "fraction: i32",
-            quote_flag as "quote_flag: i32",
-            quote_source,
-            quote_tz
-            FROM commodities
-            "#,
-        )
-    }
-
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    pub(crate) fn query<DB, O>(
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-    {
-        sqlx::query_as(
-            r#"
-            SELECT
-            guid,
-            namespace,
-            mnemonic,
-            fullname,
-            cusip,
-            fraction,
-            quote_flag,
-            quote_source,
-            quote_tz
-            FROM commodities
-            "#,
-        )
-    }
-
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    pub(crate) fn query_by_guid<DB, O, T>(
-        guid: T,
-        kind: SQLKind,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        match kind {
-            SQLKind::Postgres => sqlx::query_as(
-                r#"
-                SELECT
-                guid,
-                namespace,
-                mnemonic,
-                fullname,
-                cusip,
-                fraction,
-                quote_flag,
-                quote_source,
-                quote_tz
-                FROM commodities
-                WHERE guid = $1
-                "#,
-            )
-            .bind(guid),
-            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
-                r#"
-            SELECT
-            guid,
-            namespace,
-            mnemonic,
-            fullname,
-            cusip,
-            fraction,
-            quote_flag,
-            quote_source,
-            quote_tz
-            FROM commodities
-            WHERE guid = ?
-            "#,
-            )
-            .bind(guid),
-            SQLKind::Mssql => panic!("{kind:?} not support"),
+            guid: item.guid(),
+            namespace: item.namespace(),
+            mnemonic: item.mnemonic(),
+            fullname: item.fullname(),
+            cusip: item.cusip(),
+            fraction: item.fraction(),
+            quote_flag: item.quote_flag(),
+            quote_source: item.quote_source(),
+            quote_tz: item.quote_tz(),
         }
     }
 
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    pub(crate) fn query_by_namespace<DB, O, T>(
-        namespace: T,
-        kind: SQLKind,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        match kind {
-            SQLKind::Postgres => sqlx::query_as(
-                r#"
-                SELECT
-                guid,
-                namespace,
-                mnemonic,
-                fullname,
-                cusip,
-                fraction,
-                quote_flag,
-                quote_source,
-                quote_tz
-                FROM commodities
-                WHERE namespace = $1
-                "#,
-            )
-            .bind(namespace),
-            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
-                r#"
-            SELECT
-            guid,
-            namespace,
-            mnemonic,
-            fullname,
-            cusip,
-            fraction,
-            quote_flag,
-            quote_source,
-            quote_tz
-            FROM commodities
-            WHERE namespace = ?
-            "#,
-            )
-            .bind(namespace),
-            SQLKind::Mssql => panic!("{kind:?} not support"),
-        }
+    pub async fn accounts(&self) -> Result<Vec<Account<Q>>, Error> {
+        let accounts = AccountQ::commodity_guid(&*self.query, &self.guid).await?;
+        Ok(accounts
+            .into_iter()
+            .map(|x| Account::from_with_query(&x, self.query.clone()))
+            .collect())
     }
-}
 
-#[cfg(feature = "xml")]
-use xmltree::Element;
-#[cfg(feature = "xml")]
+    pub async fn transactions(&self) -> Result<Vec<Transaction<Q>>, Error> {
+        let transactions = TransactionQ::currency_guid(&*self.query, &self.guid).await?;
+        Ok(transactions
+            .into_iter()
+            .map(|x| Transaction::from_with_query(&x, self.query.clone()))
+            .collect())
+    }
 
-impl Commodity {
-    pub(crate) fn new_by_element(e: &Element) -> Self {
-        let guid = e
-            .get_child("id")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .expect("id must exist");
-        let namespace = e
-            .get_child("space")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .expect("space must exist");
-        let mnemonic = guid.clone();
-        let fullname = e
-            .get_child("fullname")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let cusip = e
-            .get_child("cusip")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let fraction = e
-            .get_child("fraction")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .map_or(100, |x| x.parse().expect("must be i32"));
-        let quote_flag = match e.get_child("get_quotes") {
-            Some(_) => 1,
-            None => 0,
-        };
-        let quote_source = e
-            .get_child("quote_source")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let quote_tz = e
-            .get_child("quote_tz")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
+    pub async fn as_commodity_prices(&self) -> Result<Vec<Price<Q>>, Error> {
+        let prices = PriceQ::commodity_guid(&*self.query, &self.guid).await?;
+        Ok(prices
+            .into_iter()
+            .map(|x| Price::from_with_query(&x, self.query.clone()))
+            .collect())
+    }
 
-        Self {
-            guid,
-            namespace,
-            mnemonic,
-            fullname,
-            cusip,
-            fraction,
-            quote_flag,
-            quote_source,
-            quote_tz,
-        }
+    pub async fn as_currency_prices(&self) -> Result<Vec<Price<Q>>, Error> {
+        let prices = PriceQ::currency_guid(&*self.query, &self.guid).await?;
+        Ok(prices
+            .into_iter()
+            .map(|x| Price::from_with_query(&x, self.query.clone()))
+            .collect())
+    }
+
+    pub async fn as_commodity_or_currency_prices(&self) -> Result<Vec<Price<Q>>, Error> {
+        let prices = PriceQ::commodity_or_currency_guid(&*self.query, &self.guid).await?;
+        Ok(prices
+            .into_iter()
+            .map(|x| Price::from_with_query(&x, self.query.clone()))
+            .collect())
+    }
+
+    pub async fn sell(&self, currency: &Self, book: &Book<Q>) -> Option<crate::Num> {
+        // println!("{} to {}", self.mnemonic, currency.mnemonic);
+        book.exchange(self, currency).await
+    }
+
+    pub async fn buy(&self, commodity: &Self, book: &Book<Q>) -> Option<crate::Num> {
+        commodity.sell(self, book).await
     }
 }
 
 #[cfg(test)]
-#[cfg(any(
-    feature = "sqlite",
-    feature = "postgres",
-    feature = "mysql",
-    feature = "xml"
-))]
+#[cfg(feature = "sqlite")]
 mod tests {
     use super::*;
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    use tokio::runtime::Runtime;
 
-    #[cfg(feature = "sqlite")]
-    mod sqlite {
-        use super::*;
-        use pretty_assertions::assert_eq;
+    use crate::query::sqlite::commodity::Commodity as CommoditySQL;
+    use crate::SQLiteQuery;
 
-        type DB = sqlx::Sqlite;
+    #[cfg(not(feature = "decimal"))]
+    use float_cmp::assert_approx_eq;
+    use pretty_assertions::assert_eq;
+    #[cfg(feature = "decimal")]
+    use rust_decimal::Decimal;
 
-        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
-            let uri: &str = &format!(
-                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
-                env!("CARGO_MANIFEST_DIR")
-            );
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
+    async fn setup() -> SQLiteQuery {
+        let uri: &str = &format!(
+            "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+            env!("CARGO_MANIFEST_DIR")
+        );
 
-            (
-                rt.block_on(async {
-                    sqlx::sqlite::SqlitePoolOptions::new()
-                        .max_connections(5)
-                        .connect(&format!("{uri}?mode=ro")) // read only
-                        .await
-                        .unwrap()
-                }),
-                rt,
-                uri.parse().expect("sqlite"),
-            )
-        }
-
-        #[test]
-        fn query() {
-            let (pool, rt, _) = setup();
-            let result: Vec<Commodity> = rt
-                .block_on(async { Commodity::query().fetch_all(&pool).await })
-                .unwrap();
-            assert_eq!(5, result.len());
-        }
-
-        #[test]
-        fn query_by_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Commodity = rt
-                .block_on(async {
-                    Commodity::query_by_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                        .fetch_one(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!("Euro", result.fullname.unwrap());
-        }
-
-        #[test]
-        fn query_by_namespace() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Commodity> = rt
-                .block_on(async {
-                    Commodity::query_by_namespace("CURRENCY", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(4, result.len());
-        }
+        println!("work_dir: {:?}", std::env::current_dir());
+        SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
     }
 
-    #[cfg(feature = "postgres")]
-    mod postgresql {
-        use super::*;
-        use pretty_assertions::assert_eq;
+    #[tokio::test]
+    async fn test_from_with_query() {
+        let query = Arc::new(setup().await);
+        let item = CommoditySQL {
+            guid: "guid".to_string(),
+            namespace: "namespace".to_string(),
+            mnemonic: "mnemonic".to_string(),
+            fullname: Some("fullname".to_string()),
+            cusip: Some("cusip".to_string()),
+            fraction: 100,
+            quote_flag: 1,
+            quote_source: Some("quote_source".to_string()),
+            quote_tz: Some("quote_tz".to_string()),
+        };
 
-        type DB = sqlx::Postgres;
+        let result = Commodity::from_with_query(&item, query);
 
-        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
-            let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            (
-                rt.block_on(async {
-                    sqlx::postgres::PgPoolOptions::new()
-                        .max_connections(5)
-                        .connect(uri)
-                        .await
-                        .unwrap()
-                }),
-                rt,
-                uri.parse().expect("postgres"),
-            )
-        }
-
-        #[test]
-        fn query() {
-            let (pool, rt, _) = setup();
-            let result: Vec<Commodity> = rt
-                .block_on(async { Commodity::query().fetch_all(&pool).await })
-                .unwrap();
-            assert_eq!(5, result.len());
-        }
-
-        #[test]
-        fn query_by_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Commodity = rt
-                .block_on(async {
-                    Commodity::query_by_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                        .fetch_one(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!("Euro", result.fullname.unwrap());
-        }
-
-        #[test]
-        fn query_by_namespace() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Commodity> = rt
-                .block_on(async {
-                    Commodity::query_by_namespace("CURRENCY", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(4, result.len());
-        }
+        assert_eq!(result.guid, "guid");
+        assert_eq!(result.namespace, "namespace");
+        assert_eq!(result.mnemonic, "mnemonic");
+        assert_eq!(result.fullname, "fullname");
+        assert_eq!(result.cusip, "cusip");
+        assert_eq!(result.fraction, 100);
+        assert_eq!(result.quote_flag, true);
+        assert_eq!(result.quote_source, "quote_source");
+        assert_eq!(result.quote_tz, "quote_tz");
     }
 
-    #[cfg(feature = "mysql")]
-    mod mysql {
-        use super::*;
-        use pretty_assertions::assert_eq;
-
-        type DB = sqlx::MySql;
-
-        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
-            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            (
-                rt.block_on(async {
-                    sqlx::mysql::MySqlPoolOptions::new()
-                        .max_connections(5)
-                        .connect(uri)
-                        .await
-                        .unwrap()
-                }),
-                rt,
-                uri.parse().expect("mysql"),
-            )
-        }
-
-        #[test]
-        fn query() {
-            let (pool, rt, _) = setup();
-            let result: Vec<Commodity> = rt
-                .block_on(async { Commodity::query().fetch_all(&pool).await })
-                .unwrap();
-            assert_eq!(5, result.len());
-        }
-
-        #[test]
-        fn query_by_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Commodity = rt
-                .block_on(async {
-                    Commodity::query_by_guid("346629655191dcf59a7e2c2a85b70f69", kind)
-                        .fetch_one(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!("Euro", result.fullname.unwrap());
-        }
-
-        #[test]
-        fn query_by_namespace() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Commodity> = rt
-                .block_on(async {
-                    Commodity::query_by_namespace("CURRENCY", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(4, result.len());
-        }
+    #[tokio::test]
+    async fn test_accounts() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let commodity = book
+            .commodities()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+            .unwrap();
+        let accounts = commodity.accounts().await.unwrap();
+        assert_eq!(accounts.len(), 14);
     }
 
-    #[cfg(feature = "xml")]
-    mod xml {
-        use super::*;
-        use pretty_assertions::assert_eq;
-        use std::sync::Arc;
+    #[tokio::test]
+    async fn test_transactions() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let commodity = book
+            .commodities()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+            .unwrap();
+        let transactions = commodity.transactions().await.unwrap();
+        assert_eq!(transactions.len(), 11);
+    }
 
-        #[allow(dead_code)]
-        fn setup() -> Arc<Element> {
-            let uri: &str = &format!(
-                "{}/tests/db/xml/complex_sample.gnucash",
-                env!("CARGO_MANIFEST_DIR")
-            );
+    #[tokio::test]
+    async fn test_as_commodity_prices() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let commodity = book
+            .commodities()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+            .unwrap();
+        let prices = commodity.as_commodity_prices().await.unwrap();
+        assert_eq!(prices.len(), 1);
+    }
 
-            crate::XMLBook::new(uri).unwrap().pool.0
-        }
+    #[tokio::test]
+    async fn test_as_currency_prices() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let commodity = book
+            .commodities()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+            .unwrap();
+        let prices = commodity.as_currency_prices().await.unwrap();
+        assert_eq!(prices.len(), 2);
+    }
 
-        #[test]
-        fn new_by_element() {
-            let data = r##"
-            <?xml version="1.0" encoding="utf-8" ?>
-            <gnc-v2
-                xmlns:gnc="http://www.gnucash.org/XML/gnc"
-                xmlns:act="http://www.gnucash.org/XML/act"
-                xmlns:book="http://www.gnucash.org/XML/book"
-                xmlns:cd="http://www.gnucash.org/XML/cd"
-                xmlns:cmdty="http://www.gnucash.org/XML/cmdty"
-                xmlns:price="http://www.gnucash.org/XML/price"
-                xmlns:slot="http://www.gnucash.org/XML/slot"
-                xmlns:split="http://www.gnucash.org/XML/split"
-                xmlns:sx="http://www.gnucash.org/XML/sx"
-                xmlns:trn="http://www.gnucash.org/XML/trn"
-                xmlns:ts="http://www.gnucash.org/XML/ts"
-                xmlns:fs="http://www.gnucash.org/XML/fs"
-                xmlns:bgt="http://www.gnucash.org/XML/bgt"
-                xmlns:recurrence="http://www.gnucash.org/XML/recurrence"
-                xmlns:lot="http://www.gnucash.org/XML/lot"
-                xmlns:addr="http://www.gnucash.org/XML/addr"
-                xmlns:billterm="http://www.gnucash.org/XML/billterm"
-                xmlns:bt-days="http://www.gnucash.org/XML/bt-days"
-                xmlns:bt-prox="http://www.gnucash.org/XML/bt-prox"
-                xmlns:cust="http://www.gnucash.org/XML/cust"
-                xmlns:employee="http://www.gnucash.org/XML/employee"
-                xmlns:entry="http://www.gnucash.org/XML/entry"
-                xmlns:invoice="http://www.gnucash.org/XML/invoice"
-                xmlns:job="http://www.gnucash.org/XML/job"
-                xmlns:order="http://www.gnucash.org/XML/order"
-                xmlns:owner="http://www.gnucash.org/XML/owner"
-                xmlns:taxtable="http://www.gnucash.org/XML/taxtable"
-                xmlns:tte="http://www.gnucash.org/XML/tte"
-                xmlns:vendor="http://www.gnucash.org/XML/vendor">
-            <gnc:commodity version="2.0.0">
-                <cmdty:space>CURRENCY</cmdty:space>
-                <cmdty:id>EUR</cmdty:id>
-                <cmdty:get_quotes/>
-                <cmdty:quote_source>currency</cmdty:quote_source>
-                <cmdty:quote_tz/>
-            </gnc:commodity>
-            </gnc-v2>
-            "##;
+    #[tokio::test]
+    async fn test_as_commodity_or_currency_prices() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let commodity = book
+            .commodities()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+            .unwrap();
+        let prices = commodity.as_commodity_or_currency_prices().await.unwrap();
+        assert_eq!(prices.len(), 3);
+    }
 
-            let e = Element::parse(data.as_bytes())
-                .unwrap()
-                .take_child("commodity")
-                .unwrap();
+    #[tokio::test]
+    async fn test_rate_direct() {
+        // ADF => AED
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let commodity = book
+            .commodities()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
+            .unwrap();
+        let currency = book
+            .commodities()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+            .unwrap();
 
-            let commodity = Commodity::new_by_element(&e);
+        let rate = commodity.sell(&currency, &book).await.unwrap();
+        #[cfg(not(feature = "decimal"))]
+        assert_approx_eq!(f64, rate, 1.5);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(15, 1));
 
-            assert_eq!(commodity.guid, "EUR");
-            assert_eq!(commodity.namespace, "CURRENCY");
-            assert_eq!(commodity.mnemonic, "EUR");
-            assert_eq!(commodity.fullname, None);
-            assert_eq!(commodity.cusip, None);
-            assert_eq!(commodity.fraction, 100);
-            assert_eq!(commodity.quote_flag, 1);
-            assert_eq!(commodity.quote_source.as_ref().unwrap(), "currency");
-            assert_eq!(commodity.quote_tz, None);
-        }
+        let rate = currency.buy(&commodity, &book).await.unwrap();
+        #[cfg(not(feature = "decimal"))]
+        assert_approx_eq!(f64, rate, 1.5);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(15, 1));
+
+        // AED => EUR
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let commodity = book
+            .commodities()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+            .unwrap();
+        let currency = book
+            .commodities()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+            .unwrap();
+
+        let rate = commodity.sell(&currency, &book).await.unwrap();
+        #[cfg(not(feature = "decimal"))]
+        assert_approx_eq!(f64, rate, 9.0 / 10.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+
+        let rate = currency.buy(&commodity, &book).await.unwrap();
+        #[cfg(not(feature = "decimal"))]
+        assert_approx_eq!(f64, rate, 9.0 / 10.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+    }
+
+    #[tokio::test]
+    async fn test_rate_indirect() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        // USD => AED
+        let commodity = book
+            .commodities()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "1e5d65e2726a5d4595741cb204992991")
+            .unwrap();
+        let currency = book
+            .commodities()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+            .unwrap();
+
+        let rate = commodity.sell(&currency, &book).await.unwrap();
+        #[cfg(not(feature = "decimal"))]
+        assert_approx_eq!(f64, rate, 7.0 / 5.0 * 10.0 / 9.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(
+            rate,
+            (Decimal::new(7, 0) / Decimal::new(5, 0)) * (Decimal::new(10, 0) / Decimal::new(9, 0)),
+        );
     }
 }

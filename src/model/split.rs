@@ -1,719 +1,197 @@
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-use super::TestSchemas;
-#[cfg(feature = "decimal")]
-use rust_decimal::Decimal;
+use chrono::NaiveDateTime;
+use std::sync::Arc;
 
-#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
-use crate::kind::SQLKind;
+use crate::error::Error;
+use crate::model::{Account, Transaction};
+use crate::query::{AccountQ, Query, SplitT, TransactionQ};
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
-#[cfg_attr(
-    any(feature = "sqlite", feature = "postgres", feature = "mysql",),
-    derive(sqlx::FromRow)
-)]
-pub struct Split {
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct Split<Q>
+where
+    Q: Query,
+{
+    query: Arc<Q>,
+
     pub guid: String,
     pub tx_guid: String,
     pub account_guid: String,
     pub memo: String,
     pub action: String,
-    pub reconcile_state: String,
-    pub reconcile_date: Option<chrono::NaiveDateTime>,
-    pub value_num: i64,
-    pub value_denom: i64,
-    pub quantity_num: i64,
-    pub quantity_denom: i64,
-    pub lot_guid: Option<String>,
+    pub reconcile_state: bool,
+    pub reconcile_datetime: Option<NaiveDateTime>,
+    pub value: crate::Num,
+    pub quantity: crate::Num,
+    pub lot_guid: String,
 }
 
-impl super::NullNone for Split {
-    fn null_none(self) -> Self {
-        let lot_guid = self.lot_guid.as_ref().and_then(|x| match x.as_str() {
-            "" => None,
-            x => Some(x.to_string()),
-        });
-
-        let reconcile_date = self.reconcile_date.and_then(|x| {
-            match x.format("%Y-%m-%d %H:%M:%S").to_string().as_str() {
-                "1970-01-01 00:00:00" => None,
-                _ => self.reconcile_date,
-            }
-        });
-
+impl<Q> Split<Q>
+where
+    Q: Query,
+{
+    pub(crate) fn from_with_query<T: SplitT>(item: &T, query: Arc<Q>) -> Self {
         Self {
-            reconcile_date,
-            lot_guid,
-            ..self
-        }
-    }
-}
+            query,
 
-impl<'q> Split {
-    // test schemas on compile time
-    #[allow(dead_code)]
-    #[cfg(feature = "sqlite")]
-    fn test_schemas() -> TestSchemas<
-        'q,
-        sqlx::Sqlite,
-        sqlx::sqlite::SqliteRow,
-        Self,
-        sqlx::sqlite::SqliteArguments<'q>,
-    > {
-        sqlx::query_as!(
-            Self,
-            r#"
-            SELECT 	
-            guid,
-            tx_guid,
-            account_guid,
-            memo,
-            action,
-            reconcile_state,
-            reconcile_date as "reconcile_date: chrono::NaiveDateTime",
-            value_num,
-            value_denom,
-            quantity_num,
-            quantity_denom,
-            lot_guid
-            FROM splits
-            "#,
-        )
-    }
-
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    pub(crate) fn query<DB, O>(
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-    {
-        sqlx::query_as(
-            r#"
-            SELECT 	
-            guid,
-            tx_guid,
-            account_guid,
-            memo,
-            action,
-            reconcile_state,
-            reconcile_date,
-            value_num,
-            value_denom,
-            quantity_num,
-            quantity_denom,
-            lot_guid
-            FROM splits
-            "#,
-        )
-    }
-
-    #[allow(dead_code)]
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    pub(crate) fn query_by_guid<DB, O, T>(
-        guid: T,
-        kind: SQLKind,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        match kind {
-            SQLKind::Postgres => sqlx::query_as(
-                r#"
-                SELECT 	
-                guid,
-                tx_guid,
-                account_guid,
-                memo,
-                action,
-                reconcile_state,
-                reconcile_date,
-                value_num,
-                value_denom,
-                quantity_num,
-                quantity_denom,
-                lot_guid
-                FROM splits
-                WHERE guid = $1
-                "#,
-            )
-            .bind(guid),
-            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
-                r#"
-            SELECT 	
-            guid,
-            tx_guid,
-            account_guid,
-            memo,
-            action,
-            reconcile_state,
-            reconcile_date,
-            value_num,
-            value_denom,
-            quantity_num,
-            quantity_denom,
-            lot_guid
-            FROM splits
-            WHERE guid = ?
-            "#,
-            )
-            .bind(guid),
-            SQLKind::Mssql => panic!("{kind:?} not support"),
+            guid: item.guid(),
+            tx_guid: item.tx_guid(),
+            account_guid: item.account_guid(),
+            memo: item.memo(),
+            action: item.action(),
+            reconcile_state: item.reconcile_state(),
+            reconcile_datetime: item.reconcile_datetime(),
+            lot_guid: item.lot_guid(),
+            value: item.value(),
+            quantity: item.quantity(),
         }
     }
 
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    pub(crate) fn query_by_account_guid<DB, O, T>(
-        guid: T,
-        kind: SQLKind,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        match kind {
-            SQLKind::Postgres => sqlx::query_as(
-                r#"
-                SELECT 	
-                guid,
-                tx_guid,
-                account_guid,
-                memo,
-                action,
-                reconcile_state,
-                reconcile_date,
-                value_num,
-                value_denom,
-                quantity_num,
-                quantity_denom,
-                lot_guid
-                FROM splits
-                WHERE account_guid = $1
-                "#,
-            )
-            .bind(guid),
-            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
-                r#"
-            SELECT 	
-            guid,
-            tx_guid,
-            account_guid,
-            memo,
-            action,
-            reconcile_state,
-            reconcile_date,
-            value_num,
-            value_denom,
-            quantity_num,
-            quantity_denom,
-            lot_guid
-            FROM splits
-            WHERE account_guid = ?
-            "#,
-            )
-            .bind(guid),
-            SQLKind::Mssql => panic!("{kind:?} not support"),
-        }
-    }
-
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    pub(crate) fn query_by_tx_guid<DB, O, T>(
-        guid: T,
-        kind: SQLKind,
-    ) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::database::HasArguments<'q>>::Arguments>
-    where
-        DB: sqlx::Database,
-        O: Send + Unpin + for<'r> sqlx::FromRow<'r, DB::Row>,
-        T: 'q + Send + sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-    {
-        match kind {
-            SQLKind::Postgres => sqlx::query_as(
-                r#"
-                SELECT 	
-                guid,
-                tx_guid,
-                account_guid,
-                memo,
-                action,
-                reconcile_state,
-                reconcile_date,
-                value_num,
-                value_denom,
-                quantity_num,
-                quantity_denom,
-                lot_guid
-                FROM splits
-                WHERE tx_guid = $1
-                "#,
-            )
-            .bind(guid),
-            SQLKind::MySql | SQLKind::Sqlite => sqlx::query_as(
-                r#"
-            SELECT 	
-            guid,
-            tx_guid,
-            account_guid,
-            memo,
-            action,
-            reconcile_state,
-            reconcile_date,
-            value_num,
-            value_denom,
-            quantity_num,
-            quantity_denom,
-            lot_guid
-            FROM splits
-            WHERE tx_guid = ?
-            "#,
-            )
-            .bind(guid),
-            SQLKind::Mssql => panic!("{kind:?} not support"),
-        }
-    }
-
-    #[cfg(not(feature = "decimal"))]
-    #[must_use]
-    #[allow(clippy::cast_precision_loss)]
-    pub fn value(&self) -> f64 {
-        self.value_num as f64 / self.value_denom as f64
-    }
-
-    #[cfg(feature = "decimal")]
-    #[must_use]
-    pub fn value(&self) -> Decimal {
-        Decimal::new(self.value_num, 0) / Decimal::new(self.value_denom, 0)
-    }
-
-    #[cfg(not(feature = "decimal"))]
-    #[must_use]
-    #[allow(clippy::cast_precision_loss)]
-    pub fn quantity(&self) -> f64 {
-        self.quantity_num as f64 / self.quantity_denom as f64
-    }
-
-    #[cfg(feature = "decimal")]
-    #[must_use]
-    pub fn quantity(&self) -> Decimal {
-        Decimal::new(self.quantity_num, 0) / Decimal::new(self.quantity_denom, 0)
-    }
-}
-
-#[cfg(feature = "xml")]
-use xmltree::Element;
-#[cfg(feature = "xml")]
-impl Split {
-    pub(crate) fn new_by_element(tx_guid: String, e: &Element) -> Self {
-        let guid = e
-            .get_child("id")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .expect("id must exist");
-        let tx_guid = tx_guid;
-        let account_guid = e
-            .get_child("account")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .expect("account must exist");
-        let memo = e
-            .get_child("memo")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .unwrap_or_default();
-        let action = e
-            .get_child("action")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .unwrap_or_default();
-        let reconcile_state = e
-            .get_child("reconciled-state")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .unwrap_or_default();
-        let reconcile_date = e
-            .get_child("reconciled-date")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .map(|x| {
-                chrono::NaiveDateTime::parse_from_str(&x, "%Y-%m-%d %H:%M:%S")
-                    .expect("%Y-%m-%d %H:%M:%S")
+    pub async fn transaction(&self) -> Result<Transaction<Q>, Error> {
+        if self.tx_guid.is_empty() {
+            return Err(Error::GuidNotFound {
+                model: "Transaction".to_string(),
+                guid: self.tx_guid.clone(),
             });
+        };
 
-        let splits = e
-            .get_child("value")
-            .expect("value must exist")
-            .get_text()
-            .unwrap();
-        let mut splits = splits.split('/');
-        let value_num = splits.next().unwrap().parse().unwrap();
-        let value_denom = splits.next().unwrap().parse().unwrap();
+        let mut transactions = TransactionQ::guid(&*self.query, &self.tx_guid).await?;
 
-        let splits = e
-            .get_child("quantity")
-            .expect("quantity must exist")
-            .get_text()
-            .unwrap();
-        let mut splits = splits.split('/');
-        let quantity_num = splits.next().unwrap().parse().unwrap();
-        let quantity_denom = splits.next().unwrap().parse().unwrap();
-        let lot_guid = None;
+        match transactions.pop() {
+            None => Err(Error::GuidNotFound {
+                model: "Transaction".to_string(),
+                guid: self.tx_guid.clone(),
+            }),
+            Some(x) if transactions.is_empty() => {
+                Ok(Transaction::from_with_query(&x, self.query.clone()))
+            }
+            _ => Err(Error::GuidMultipleFound {
+                model: "Transaction".to_string(),
+                guid: self.tx_guid.clone(),
+            }),
+        }
+    }
 
-        Self {
-            guid,
-            tx_guid,
-            account_guid,
-            memo,
-            action,
-            reconcile_state,
-            reconcile_date,
-            value_num,
-            value_denom,
-            quantity_num,
-            quantity_denom,
-            lot_guid,
+    pub async fn account(&self) -> Result<Account<Q>, Error> {
+        if self.account_guid.is_empty() {
+            return Err(Error::GuidNotFound {
+                model: "Account".to_string(),
+                guid: self.account_guid.clone(),
+            });
+        };
+
+        let mut accounts = AccountQ::guid(&*self.query, &self.account_guid).await?;
+
+        match accounts.pop() {
+            None => Err(Error::GuidNotFound {
+                model: "Account".to_string(),
+                guid: self.account_guid.clone(),
+            }),
+            Some(x) if accounts.is_empty() => Ok(Account::from_with_query(&x, self.query.clone())),
+            _ => Err(Error::GuidMultipleFound {
+                model: "Account".to_string(),
+                guid: self.account_guid.clone(),
+            }),
         }
     }
 }
 
 #[cfg(test)]
-#[cfg(any(
-    feature = "sqlite",
-    feature = "postgres",
-    feature = "mysql",
-    feature = "xml"
-))]
+#[cfg(feature = "sqlite")]
 mod tests {
     use super::*;
-    #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql",))]
-    use tokio::runtime::Runtime;
 
-    #[cfg(feature = "sqlite")]
-    mod sqlite {
-        use super::*;
-        use pretty_assertions::assert_eq;
+    use crate::query::sqlite::split::Split as SplitSQL;
+    use crate::Book;
+    use crate::SQLiteQuery;
 
-        type DB = sqlx::Sqlite;
+    #[cfg(not(feature = "decimal"))]
+    use float_cmp::assert_approx_eq;
+    use pretty_assertions::assert_eq;
+    #[cfg(feature = "decimal")]
+    use rust_decimal::Decimal;
 
-        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
-            let uri: &str = &format!(
-                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
-                env!("CARGO_MANIFEST_DIR")
-            );
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
+    async fn setup() -> SQLiteQuery {
+        let uri: &str = &format!(
+            "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+            env!("CARGO_MANIFEST_DIR")
+        );
 
-            (
-                rt.block_on(async {
-                    sqlx::sqlite::SqlitePoolOptions::new()
-                        .max_connections(5)
-                        .connect(&format!("{uri}?mode=ro")) // read only
-                        .await
-                        .unwrap()
-                }),
-                rt,
-                uri.parse().expect("sqlite"),
-            )
-        }
-
-        #[test]
-        fn query() {
-            let (pool, rt, _) = setup();
-            let result: Vec<Split> = rt
-                .block_on(async { Split::query().fetch_all(&pool).await })
-                .unwrap();
-            assert_eq!(25, result.len());
-        }
-
-        #[test]
-        fn query_by_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Split = rt
-                .block_on(async {
-                    Split::query_by_guid("de832fe97e37811a7fff7e28b3a43425", kind)
-                        .fetch_one(&pool)
-                        .await
-                })
-                .unwrap();
-            #[cfg(not(feature = "decimal"))]
-            float_cmp::assert_approx_eq!(f64, 150.0, result.value());
-            #[cfg(feature = "decimal")]
-            assert_eq!(Decimal::new(150, 0), result.value());
-        }
-
-        #[test]
-        fn query_by_account_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Split> = rt
-                .block_on(async {
-                    Split::query_by_account_guid("93fc043c3062aaa1297b30e543d2cd0d", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(3, result.len());
-        }
-
-        #[test]
-        fn query_by_tx_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Split> = rt
-                .block_on(async {
-                    Split::query_by_tx_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(2, result.len());
-        }
+        println!("work_dir: {:?}", std::env::current_dir());
+        SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
     }
 
-    #[cfg(feature = "postgres")]
-    mod postgresql {
-        use super::*;
-        use pretty_assertions::assert_eq;
-
-        type DB = sqlx::Postgres;
-
-        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
-            let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            (
-                rt.block_on(async {
-                    sqlx::postgres::PgPoolOptions::new()
-                        .max_connections(5)
-                        .connect(uri)
-                        .await
-                        .unwrap()
-                }),
-                rt,
-                uri.parse().expect("postgres"),
+    #[tokio::test]
+    async fn test_from_with_query() {
+        let query = Arc::new(setup().await);
+        let item = SplitSQL {
+            guid: "guid".to_string(),
+            tx_guid: "commodity_guid".to_string(),
+            account_guid: "currency_guid".to_string(),
+            memo: "currency_guid".to_string(),
+            action: "currency_guid".to_string(),
+            reconcile_state: "currency_guid".to_string(),
+            reconcile_date: NaiveDateTime::parse_from_str(
+                "2014-12-24 10:59:00",
+                "%Y-%m-%d %H:%M:%S",
             )
-        }
+            .ok(),
+            lot_guid: Some("source".to_string()),
 
-        #[test]
-        fn query() {
-            let (pool, rt, _) = setup();
-            let result: Vec<Split> = rt
-                .block_on(async { Split::query().fetch_all(&pool).await })
-                .unwrap();
-            assert_eq!(25, result.len());
-        }
+            value_num: 1000,
+            value_denom: 10,
+            quantity_num: 1100,
+            quantity_denom: 10,
+        };
 
-        #[test]
-        fn query_by_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Split = rt
-                .block_on(async {
-                    Split::query_by_guid("de832fe97e37811a7fff7e28b3a43425", kind)
-                        .fetch_one(&pool)
-                        .await
-                })
-                .unwrap();
-            #[cfg(not(feature = "decimal"))]
-            float_cmp::assert_approx_eq!(f64, 150.0, result.value());
-            #[cfg(feature = "decimal")]
-            assert_eq!(Decimal::new(150, 0), result.value());
-        }
+        let result = Split::from_with_query(&item, query);
 
-        #[test]
-        fn query_by_account_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Split> = rt
-                .block_on(async {
-                    Split::query_by_account_guid("93fc043c3062aaa1297b30e543d2cd0d", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(3, result.len());
-        }
-
-        #[test]
-        fn query_by_tx_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Split> = rt
-                .block_on(async {
-                    Split::query_by_tx_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(2, result.len());
-        }
+        assert_eq!(result.guid, "guid");
+        assert_eq!(result.tx_guid, "commodity_guid");
+        assert_eq!(result.account_guid, "currency_guid");
+        assert_eq!(result.memo, "currency_guid");
+        assert_eq!(result.action, "currency_guid");
+        assert_eq!(result.reconcile_state, false);
+        assert_eq!(
+            result.reconcile_datetime,
+            NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").ok()
+        );
+        assert_eq!(result.lot_guid, "source");
+        #[cfg(not(feature = "decimal"))]
+        assert_approx_eq!(f64, result.value, 100.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(result.value, Decimal::new(100, 0));
+        #[cfg(not(feature = "decimal"))]
+        assert_approx_eq!(f64, result.quantity, 110.0);
+        #[cfg(feature = "decimal")]
+        assert_eq!(result.quantity, Decimal::new(110, 0));
     }
 
-    #[cfg(feature = "mysql")]
-    mod mysql {
-        use super::*;
-        use pretty_assertions::assert_eq;
-
-        type DB = sqlx::MySql;
-
-        fn setup() -> (sqlx::Pool<DB>, Runtime, SQLKind) {
-            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            (
-                rt.block_on(async {
-                    sqlx::mysql::MySqlPoolOptions::new()
-                        .max_connections(5)
-                        .connect(uri)
-                        .await
-                        .unwrap()
-                }),
-                rt,
-                uri.parse().expect("mysql"),
-            )
-        }
-
-        #[test]
-        fn query() {
-            let (pool, rt, _) = setup();
-            let result: Vec<Split> = rt
-                .block_on(async { Split::query().fetch_all(&pool).await })
-                .unwrap();
-            assert_eq!(25, result.len());
-        }
-
-        #[test]
-        fn query_by_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Split = rt
-                .block_on(async {
-                    Split::query_by_guid("de832fe97e37811a7fff7e28b3a43425", kind)
-                        .fetch_one(&pool)
-                        .await
-                })
-                .unwrap();
-            #[cfg(not(feature = "decimal"))]
-            float_cmp::assert_approx_eq!(f64, 150.0, result.value());
-            #[cfg(feature = "decimal")]
-            assert_eq!(Decimal::new(150, 0), result.value());
-        }
-
-        #[test]
-        fn query_by_account_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Split> = rt
-                .block_on(async {
-                    Split::query_by_account_guid("93fc043c3062aaa1297b30e543d2cd0d", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(3, result.len());
-        }
-
-        #[test]
-        fn query_by_tx_guid() {
-            let (pool, rt, kind) = setup();
-            let result: Vec<Split> = rt
-                .block_on(async {
-                    Split::query_by_tx_guid("6c8876003c4a6026e38e3afb67d6f2b1", kind)
-                        .fetch_all(&pool)
-                        .await
-                })
-                .unwrap();
-            assert_eq!(2, result.len());
-        }
+    #[tokio::test]
+    async fn transaction() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let split = book
+            .splits()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
+            .unwrap();
+        let transaction = split.transaction().await.unwrap();
+        assert_eq!(transaction.description, "income 1");
     }
 
-    #[cfg(feature = "xml")]
-    mod xml {
-        use super::*;
-        use pretty_assertions::assert_eq;
-        use std::sync::Arc;
-
-        #[allow(dead_code)]
-        fn setup() -> Arc<Element> {
-            let uri: &str = &format!(
-                "{}/tests/db/xml/complex_sample.gnucash",
-                env!("CARGO_MANIFEST_DIR")
-            );
-            crate::XMLBook::new(uri).unwrap().pool.0
-        }
-
-        #[test]
-        fn new_by_element() {
-            let data = r##"
-                <?xml version="1.0" encoding="utf-8" ?>
-                <gnc-v2
-                    xmlns:gnc="http://www.gnucash.org/XML/gnc"
-                    xmlns:act="http://www.gnucash.org/XML/act"
-                    xmlns:book="http://www.gnucash.org/XML/book"
-                    xmlns:cd="http://www.gnucash.org/XML/cd"
-                    xmlns:cmdty="http://www.gnucash.org/XML/cmdty"
-                    xmlns:price="http://www.gnucash.org/XML/price"
-                    xmlns:slot="http://www.gnucash.org/XML/slot"
-                    xmlns:split="http://www.gnucash.org/XML/split"
-                    xmlns:sx="http://www.gnucash.org/XML/sx"
-                    xmlns:trn="http://www.gnucash.org/XML/trn"
-                    xmlns:ts="http://www.gnucash.org/XML/ts"
-                    xmlns:fs="http://www.gnucash.org/XML/fs"
-                    xmlns:bgt="http://www.gnucash.org/XML/bgt"
-                    xmlns:recurrence="http://www.gnucash.org/XML/recurrence"
-                    xmlns:lot="http://www.gnucash.org/XML/lot"
-                    xmlns:addr="http://www.gnucash.org/XML/addr"
-                    xmlns:billterm="http://www.gnucash.org/XML/billterm"
-                    xmlns:bt-days="http://www.gnucash.org/XML/bt-days"
-                    xmlns:bt-prox="http://www.gnucash.org/XML/bt-prox"
-                    xmlns:cust="http://www.gnucash.org/XML/cust"
-                    xmlns:employee="http://www.gnucash.org/XML/employee"
-                    xmlns:entry="http://www.gnucash.org/XML/entry"
-                    xmlns:invoice="http://www.gnucash.org/XML/invoice"
-                    xmlns:job="http://www.gnucash.org/XML/job"
-                    xmlns:order="http://www.gnucash.org/XML/order"
-                    xmlns:owner="http://www.gnucash.org/XML/owner"
-                    xmlns:taxtable="http://www.gnucash.org/XML/taxtable"
-                    xmlns:tte="http://www.gnucash.org/XML/tte"
-                    xmlns:vendor="http://www.gnucash.org/XML/vendor">
-                    <trn:split>
-                        <split:id type="guid">de832fe97e37811a7fff7e28b3a43425</split:id>
-                        <split:reconciled-state>n</split:reconciled-state>
-                        <split:value>15000/100</split:value>
-                        <split:quantity>15000/100</split:quantity>
-                        <split:account type="guid">93fc043c3062aaa1297b30e543d2cd0d</split:account>
-                    </trn:split>
-                </gnc-v2>
-                "##;
-
-            let e = Element::parse(data.as_bytes())
-                .unwrap()
-                .take_child("split")
-                .unwrap();
-
-            let split = Split::new_by_element(String::from("6c8876003c4a6026e38e3afb67d6f2b1"), &e);
-
-            assert_eq!(split.guid, "de832fe97e37811a7fff7e28b3a43425");
-            assert_eq!(split.tx_guid, "6c8876003c4a6026e38e3afb67d6f2b1");
-            assert_eq!(split.account_guid, "93fc043c3062aaa1297b30e543d2cd0d");
-            assert_eq!(split.memo, "");
-            assert_eq!(split.action, "");
-            assert_eq!(split.reconcile_state, "n");
-            assert_eq!(split.reconcile_date, None);
-            assert_eq!(split.value_num, 15000);
-            assert_eq!(split.value_denom, 100);
-            #[cfg(not(feature = "decimal"))]
-            float_cmp::assert_approx_eq!(f64, 150.0, split.value());
-            #[cfg(feature = "decimal")]
-            assert_eq!(Decimal::new(150, 0), split.value());
-            assert_eq!(split.quantity_num, 15000);
-            assert_eq!(split.quantity_denom, 100);
-            #[cfg(not(feature = "decimal"))]
-            float_cmp::assert_approx_eq!(f64, 150.0, split.quantity());
-            #[cfg(feature = "decimal")]
-            assert_eq!(Decimal::new(150, 0), split.quantity());
-            assert_eq!(split.lot_guid, None);
-        }
+    #[tokio::test]
+    async fn account() {
+        let query = setup().await;
+        let book = Book::new(query).await.unwrap();
+        let split = book
+            .splits()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
+            .unwrap();
+        let account = split.account().await.unwrap();
+        assert_eq!(account.name, "Cash");
     }
 }

@@ -1,185 +1,244 @@
-use rucash::XMLBook;
+use chrono::NaiveDateTime;
+#[cfg(not(feature = "decimal"))]
+use float_cmp::assert_approx_eq;
+use rucash::{Book, XMLQuery};
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
 
-pub const URI: &str = "tests/db/xml/complex_sample.gnucash";
+pub fn uri() -> String {
+    format!(
+        "{}/tests/db/xml/complex_sample.gnucash",
+        env!("CARGO_MANIFEST_DIR")
+    )
+}
 
 mod book {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    #[test]
-    fn new() {
-        XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn new() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        Book::new(query).await.unwrap();
     }
 
-    #[test]
+    #[tokio::test]
     #[should_panic]
-    fn new_fail() {
-        XMLBook::new("./tests/db/xml/aa").unwrap();
+    async fn new_fail() {
+        let query = XMLQuery::new("./tests/db/xml/aa").unwrap();
+        Book::new(query).await.unwrap();
     }
 
-    #[test]
-    fn accounts() {
-        let book = XMLBook::new(URI).unwrap();
-        let accounts = book.accounts();
+    #[tokio::test]
+    async fn accounts() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let accounts = book.accounts().await.unwrap();
         // 21 - 1 template
         assert_eq!(accounts.len(), 20);
     }
 
-    #[test]
-    fn accounts_filter() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn accounts_filter() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let accounts = book
             .accounts()
+            .await
+            .unwrap()
             .into_iter()
             .filter(|x| x.name.to_lowercase().contains(&"aS".to_lowercase()));
         assert_eq!(accounts.count(), 3);
     }
 
-    #[test]
-    fn accounts_by_name() {
-        let book = XMLBook::new(URI).unwrap();
-        let accounts = book.accounts_contains_name("aS");
+    #[tokio::test]
+    async fn accounts_by_name() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let accounts = book.accounts_contains_name_ignore_case("aS").await.unwrap();
         assert_eq!(accounts.len(), 3);
     }
 
-    #[test]
-    fn account_by_name() {
-        let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("aS").expect("must have one");
+    #[tokio::test]
+    async fn account_contains_name_ignore_case() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("NaS")
+            .await
+            .unwrap()
+            .expect("must have one");
         assert_eq!(account.name, "NASDAQ");
     }
 
-    #[test]
-    fn splits() {
-        let book = XMLBook::new(URI).unwrap();
-        let splits = book.splits();
+    #[tokio::test]
+    async fn splits() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let splits = book.splits().await.unwrap();
         assert_eq!(splits.len(), 25);
     }
 
-    #[test]
-    fn transactions() {
-        let book = XMLBook::new(URI).unwrap();
-        let transactions = book.transactions();
+    #[tokio::test]
+    async fn transactions() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let transactions = book.transactions().await.unwrap();
         assert_eq!(transactions.len(), 11);
     }
 
-    #[test]
-    fn prices() {
-        let book = XMLBook::new(URI).unwrap();
-        let prices = book.prices();
+    #[tokio::test]
+    async fn prices() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let prices = book.prices().await.unwrap();
         assert_eq!(prices.len(), 5);
     }
 
-    #[test]
-    fn commodities() {
-        let book = XMLBook::new(URI).unwrap();
-        let commodities = book.commodities();
+    #[tokio::test]
+    async fn commodities() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let commodities = book.commodities().await.unwrap();
         //  6 = 5 + 1 template
         assert_eq!(commodities.len(), 6);
     }
 
-    #[test]
-    fn currencies() {
-        let book = XMLBook::new(URI).unwrap();
-        let currencies = book.currencies();
+    #[tokio::test]
+    async fn currencies() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let currencies = book.currencies().await.unwrap();
         assert_eq!(currencies.len(), 4);
     }
 }
 mod account {
     use super::*;
     use pretty_assertions::assert_eq;
-    #[test]
-    fn property() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn property() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let account = book
             .accounts()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "fcd795021c976ba75621ec39e75f6214")
             .unwrap();
 
         assert_eq!(account.guid, "fcd795021c976ba75621ec39e75f6214");
         assert_eq!(account.name, "Asset");
-        assert_eq!(account.account_type, "ASSET");
-        assert_eq!(account.commodity_guid.as_ref().unwrap(), "EUR");
+        assert_eq!(account.r#type, "ASSET");
+        assert_eq!(account.commodity_guid, "EUR");
         assert_eq!(account.commodity_scu, 100);
-        assert_eq!(account.non_std_scu, 0);
-        assert_eq!(
-            account.parent_guid.as_ref().unwrap(),
-            "00622dda21937b29e494179de5013f82"
-        );
-        assert_eq!(account.code, None);
-        assert_eq!(account.description, None);
-        assert_eq!(account.hidden, Some(0));
-        assert_eq!(account.placeholder.unwrap(), 1);
+        assert_eq!(account.non_std_scu, false);
+        assert_eq!(account.parent_guid, "00622dda21937b29e494179de5013f82");
+        assert_eq!(account.code, "");
+        assert_eq!(account.description, "");
+        assert_eq!(account.hidden, false);
+        assert_eq!(account.placeholder, true);
     }
 
-    #[test]
-    fn balance() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn balance() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let account = book
             .accounts()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.name == "Current")
             .unwrap();
 
         #[cfg(not(feature = "decimal"))]
-        assert_eq!(account.balance(), 4590.0);
+        assert_approx_eq!(f64, account.balance(&book).await.unwrap(), 4590.0);
         #[cfg(feature = "decimal")]
-        assert_eq!(account.balance(), Decimal::new(4590, 0));
+        assert_eq!(account.balance(&book).await.unwrap(), Decimal::new(4590, 0));
     }
-    #[test]
-    fn balance_diff_currency() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn balance_diff_currency() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let account = book
             .accounts()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.name == "Asset")
             .unwrap();
 
         #[cfg(not(feature = "decimal"))]
-        assert_eq!(account.balance(), 24695.3);
+        assert_approx_eq!(f64, account.balance(&book).await.unwrap(), 24695.3);
         #[cfg(feature = "decimal")]
-        assert_eq!(account.balance(), Decimal::new(246953, 1));
+        assert_eq!(
+            account.balance(&book).await.unwrap(),
+            Decimal::new(246953, 1)
+        );
     }
-    #[test]
-    fn splits() {
-        let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("Cash").expect("must have one");
-        let splits = account.splits();
+    #[tokio::test]
+    async fn splits() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Cash")
+            .await
+            .unwrap()
+            .expect("must have one");
+        let splits = account.splits().await.unwrap();
         assert_eq!(splits.len(), 3);
     }
 
-    #[test]
-    fn parent() {
-        let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("Cash").expect("must have one");
-        let parent = account.parent().unwrap();
+    #[tokio::test]
+    async fn parent() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Cash")
+            .await
+            .unwrap()
+            .expect("must have one");
+        let parent = account.parent().await.unwrap().unwrap();
         assert_eq!(parent.name, "Current");
     }
 
-    #[test]
-    fn no_parent() {
-        let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("Root Account").expect("must have one");
-        let parent = account.parent();
+    #[tokio::test]
+    async fn no_parent() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Root Account")
+            .await
+            .unwrap()
+            .expect("must have one");
+        let parent = account.parent().await.unwrap();
         assert!(parent.is_none());
     }
 
-    #[test]
-    fn children() {
-        let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("Current").expect("must have one");
-        let children = account.children();
+    #[tokio::test]
+    async fn children() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Current")
+            .await
+            .unwrap()
+            .expect("must have one");
+        let children = account.children().await.unwrap();
         assert_eq!(children.len(), 3);
     }
 
-    #[test]
-    fn commodity() {
-        let book = XMLBook::new(URI).unwrap();
-        let account = book.account_by_name("Cash").expect("must have one");
-        let commodity = account.commodity().unwrap();
+    #[tokio::test]
+    async fn commodity() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
+        let account = book
+            .account_contains_name_ignore_case("Cash")
+            .await
+            .unwrap()
+            .expect("must have one");
+        let commodity = account.commodity().await.unwrap();
         assert_eq!(commodity.mnemonic, "EUR");
     }
 }
@@ -187,11 +246,14 @@ mod account {
 mod split {
     use super::*;
     use pretty_assertions::assert_eq;
-    #[test]
-    fn property() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn property() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let split = book
             .splits()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .unwrap();
@@ -201,59 +263,65 @@ mod split {
         assert_eq!(split.account_guid, "93fc043c3062aaa1297b30e543d2cd0d");
         assert_eq!(split.memo, "");
         assert_eq!(split.action, "");
-        assert_eq!(split.reconcile_state, "n");
-        assert_eq!(split.reconcile_date, None);
-        assert_eq!(split.value_num, 15000);
-        assert_eq!(split.value_denom, 100);
+        assert_eq!(split.reconcile_state, false);
+        assert_eq!(split.reconcile_datetime, None);
 
         #[cfg(not(feature = "decimal"))]
-        assert_eq!(split.value(), 150.0);
+        assert_approx_eq!(f64, split.value, 150.0);
         #[cfg(feature = "decimal")]
-        assert_eq!(split.value(), Decimal::new(150, 0));
-
-        assert_eq!(split.quantity_num, 15000);
-        assert_eq!(split.quantity_denom, 100);
+        assert_eq!(split.value, Decimal::new(150, 0));
 
         #[cfg(not(feature = "decimal"))]
-        assert_eq!(split.quantity(), 150.0);
+        assert_approx_eq!(f64, split.quantity, 150.0);
         #[cfg(feature = "decimal")]
-        assert_eq!(split.quantity(), Decimal::new(150, 0));
+        assert_eq!(split.quantity, Decimal::new(150, 0));
 
-        assert_eq!(split.lot_guid, None);
+        assert_eq!(split.lot_guid, "");
     }
-    #[test]
-    fn transaction() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn transaction() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let split = book
             .splits()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .unwrap();
-        let transaction = split.transaction();
-        assert_eq!(transaction.description.as_ref().unwrap(), "income 1");
+        let transaction = split.transaction().await.unwrap();
+        assert_eq!(transaction.description, "income 1");
     }
 
-    #[test]
-    fn account() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn account() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let split = book
             .splits()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
             .unwrap();
-        let account = split.account();
+        let account = split.account().await.unwrap();
         assert_eq!(account.name, "Cash");
     }
 }
 
 mod transaction {
     use super::*;
+
     use pretty_assertions::assert_eq;
-    #[test]
-    fn property() {
-        let book = XMLBook::new(URI).unwrap();
+
+    #[tokio::test]
+    async fn property() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let transaction = book
             .transactions()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .unwrap();
@@ -262,47 +330,43 @@ mod transaction {
         assert_eq!(transaction.currency_guid, "EUR");
         assert_eq!(transaction.num, "");
         assert_eq!(
-            transaction
-                .post_date
-                .as_ref()
-                .unwrap()
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string(),
-            "2014-12-24 10:59:00"
+            transaction.post_datetime,
+            NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
         );
         assert_eq!(
-            transaction
-                .enter_date
-                .as_ref()
-                .unwrap()
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string(),
-            "2014-12-25 10:08:15"
+            transaction.enter_datetime,
+            NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S").unwrap()
         );
-        assert_eq!(transaction.description.as_ref().unwrap(), "income 1");
+        assert_eq!(transaction.description, "income 1");
     }
 
-    #[test]
-    fn currency() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn currency() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let transaction = book
             .transactions()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .unwrap();
-        let currency = transaction.currency();
+        let currency = transaction.currency().await.unwrap();
         assert_eq!(currency.mnemonic, "EUR");
     }
 
-    #[test]
-    fn splits() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn splits() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let transaction = book
             .transactions()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
             .unwrap();
-        let splits = transaction.splits();
+        let splits = transaction.splits().await.unwrap();
         assert_eq!(splits.len(), 2);
     }
 }
@@ -310,11 +374,14 @@ mod transaction {
 mod price {
     use super::*;
     use pretty_assertions::assert_eq;
-    #[test]
-    fn property() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn property() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let price = book
             .prices()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .unwrap();
@@ -323,56 +390,62 @@ mod price {
         assert_eq!(price.commodity_guid, "ADF");
         assert_eq!(price.currency_guid, "AED");
         assert_eq!(
-            price.date.format("%Y-%m-%d %H:%M:%S").to_string(),
-            "2018-02-20 23:00:00"
+            price.datetime,
+            NaiveDateTime::parse_from_str("2018-02-20 23:00:00", "%Y-%m-%d %H:%M:%S").unwrap()
         );
-        assert_eq!(price.source.as_ref().unwrap(), "user:price-editor");
-        assert_eq!(price.r#type.as_ref().unwrap(), "unknown");
-        assert_eq!(price.value_num, 3);
-        assert_eq!(price.value_denom, 2);
+        assert_eq!(price.source, "user:price-editor");
+        assert_eq!(price.r#type, "unknown");
 
         #[cfg(not(feature = "decimal"))]
-        assert_eq!(price.value(), 1.5);
+        assert_approx_eq!(f64, price.value, 1.5);
         #[cfg(feature = "decimal")]
-        assert_eq!(price.value(), Decimal::new(15, 1));
+        assert_eq!(price.value, Decimal::new(15, 1));
     }
 
-    #[test]
-    fn commodity() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn commodity() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let price = book
             .prices()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .unwrap();
-        let commodity = price.commodity();
+        let commodity = price.commodity().await.unwrap();
         assert_eq!(commodity.mnemonic, "ADF");
     }
 
-    #[test]
-    fn currency() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn currency() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let price = book
             .prices()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
             .unwrap();
-        let currency = price.currency();
+        let currency = price.currency().await.unwrap();
         assert_eq!(currency.mnemonic, "AED");
     }
 }
 
 mod commodity {
     use super::*;
-    #[cfg(not(feature = "decimal"))]
-    use float_cmp::assert_approx_eq;
+
     use pretty_assertions::assert_eq;
 
-    #[test]
-    fn property() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn property() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "EUR")
             .unwrap();
@@ -380,142 +453,172 @@ mod commodity {
         assert_eq!(commodity.guid, "EUR");
         assert_eq!(commodity.namespace, "CURRENCY");
         assert_eq!(commodity.mnemonic, "EUR");
-        assert_eq!(commodity.fullname, None);
-        assert_eq!(commodity.cusip, None);
+        assert_eq!(commodity.fullname, "");
+        assert_eq!(commodity.cusip, "");
         assert_eq!(commodity.fraction, 100);
-        assert_eq!(commodity.quote_flag, 1);
-        assert_eq!(commodity.quote_source.as_ref().unwrap(), "currency");
-        assert_eq!(commodity.quote_tz, None);
+        assert_eq!(commodity.quote_flag, true);
+        assert_eq!(commodity.quote_source, "currency");
+        assert_eq!(commodity.quote_tz, "");
     }
 
-    #[test]
-    fn accounts() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn accounts() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "EUR")
             .unwrap();
-        let accounts = commodity.accounts();
+        let accounts = commodity.accounts().await.unwrap();
         assert_eq!(accounts.len(), 14);
     }
 
-    #[test]
-    fn transactions() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn transactions() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "EUR")
             .unwrap();
-        let transactions = commodity.transactions();
+        let transactions = commodity.transactions().await.unwrap();
         assert_eq!(transactions.len(), 11);
     }
 
-    #[test]
-    fn as_commodity_prices() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn as_commodity_prices() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "EUR")
             .unwrap();
-        let prices = commodity.as_commodity_prices();
+        let prices = commodity.as_commodity_prices().await.unwrap();
         assert_eq!(prices.len(), 1);
     }
 
-    #[test]
-    fn as_currency_prices() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn as_currency_prices() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "EUR")
             .unwrap();
-        let prices = commodity.as_currency_prices();
+        let prices = commodity.as_currency_prices().await.unwrap();
         assert_eq!(prices.len(), 2);
     }
 
-    #[test]
-    fn as_commodity_or_currency_prices() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn as_commodity_or_currency_prices() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "EUR")
             .unwrap();
-        let prices = commodity.as_commodity_or_currency_prices();
+        let prices = commodity.as_commodity_or_currency_prices().await.unwrap();
         assert_eq!(prices.len(), 3);
     }
 
-    #[test]
-    fn rate_direct() {
+    #[tokio::test]
+    async fn rate_direct() {
         // ADF => AED
-        let book = XMLBook::new(URI).unwrap();
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "ADF")
             .unwrap();
         let currency = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "AED")
             .unwrap();
 
-        let rate = commodity.sell(&currency).unwrap();
+        let rate = commodity.sell(&currency, &book).await.unwrap();
         #[cfg(not(feature = "decimal"))]
-        assert_eq!(rate, 1.5);
+        assert_approx_eq!(f64, rate, 1.5);
         #[cfg(feature = "decimal")]
         assert_eq!(rate, Decimal::new(15, 1));
 
-        let rate = currency.buy(&commodity).unwrap();
+        let rate = currency.buy(&commodity, &book).await.unwrap();
         #[cfg(not(feature = "decimal"))]
-        assert_eq!(rate, 1.5);
+        assert_approx_eq!(f64, rate, 1.5);
         #[cfg(feature = "decimal")]
         assert_eq!(rate, Decimal::new(15, 1));
 
         // AED => EUR
-        let book = XMLBook::new(URI).unwrap();
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "AED")
             .unwrap();
         let currency = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "EUR")
             .unwrap();
 
-        let rate = commodity.sell(&currency).unwrap();
+        let rate = commodity.sell(&currency, &book).await.unwrap();
         #[cfg(not(feature = "decimal"))]
         assert_approx_eq!(f64, rate, 9.0 / 10.0);
         #[cfg(feature = "decimal")]
         assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
 
-        let rate = currency.buy(&commodity).unwrap();
+        let rate = currency.buy(&commodity, &book).await.unwrap();
         #[cfg(not(feature = "decimal"))]
         assert_approx_eq!(f64, rate, 9.0 / 10.0);
         #[cfg(feature = "decimal")]
         assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
     }
 
-    #[test]
-    fn rate_indirect() {
-        let book = XMLBook::new(URI).unwrap();
+    #[tokio::test]
+    async fn rate_indirect() {
+        let query = XMLQuery::new(&uri()).unwrap();
+        let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "USD")
             .unwrap();
         let currency = book
             .commodities()
+            .await
+            .unwrap()
             .into_iter()
             .find(|x| x.guid == "AED")
             .unwrap();
 
-        let rate = commodity.sell(&currency).unwrap();
+        let rate = commodity.sell(&currency, &book).await.unwrap();
         #[cfg(not(feature = "decimal"))]
         assert_approx_eq!(f64, rate, 7.0 / 5.0 * 10.0 / 9.0);
         #[cfg(feature = "decimal")]
