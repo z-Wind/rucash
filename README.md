@@ -44,7 +44,7 @@ async fn main() {
 ```toml
 # Cargo.toml
 [dependencies]
-rucash = { version = "0.3", features = [ "sqlite", "decimal" ] }
+rucash = { version = "0.4", features = [ "sqlite", "decimal" ] }
 ```
 
 #### Cargo Feature Flags
