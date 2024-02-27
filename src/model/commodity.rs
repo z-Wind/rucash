@@ -94,222 +94,869 @@ where
 }
 
 #[cfg(test)]
-#[cfg(feature = "sqlite")]
 mod tests {
     use super::*;
 
-    use crate::query::sqlite::commodity::Commodity as CommoditySQL;
-    use crate::SQLiteQuery;
-
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
-    use pretty_assertions::assert_eq;
     #[cfg(feature = "decimal")]
     use rust_decimal::Decimal;
 
-    async fn setup() -> SQLiteQuery {
-        let uri: &str = &format!(
-            "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
-            env!("CARGO_MANIFEST_DIR")
-        );
+    #[cfg(feature = "sqlite")]
+    mod sqlite {
+        use super::*;
 
-        println!("work_dir: {:?}", std::env::current_dir());
-        SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
+        use pretty_assertions::assert_eq;
+
+        use crate::query::sqlite::commodity::Commodity as CommodityBase;
+        use crate::SQLiteQuery;
+
+        async fn setup() -> SQLiteQuery {
+            let uri: &str = &format!(
+                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+
+            println!("work_dir: {:?}", std::env::current_dir());
+            SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = CommodityBase {
+                guid: "guid".to_string(),
+                namespace: "namespace".to_string(),
+                mnemonic: "mnemonic".to_string(),
+                fullname: Some("fullname".to_string()),
+                cusip: Some("cusip".to_string()),
+                fraction: 100,
+                quote_flag: 1,
+                quote_source: Some("quote_source".to_string()),
+                quote_tz: Some("quote_tz".to_string()),
+            };
+
+            let result = Commodity::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.namespace, "namespace");
+            assert_eq!(result.mnemonic, "mnemonic");
+            assert_eq!(result.fullname, "fullname");
+            assert_eq!(result.cusip, "cusip");
+            assert_eq!(result.fraction, 100);
+            assert_eq!(result.quote_flag, true);
+            assert_eq!(result.quote_source, "quote_source");
+            assert_eq!(result.quote_tz, "quote_tz");
+        }
+
+        #[tokio::test]
+        async fn test_accounts() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let accounts = commodity.accounts().await.unwrap();
+            assert_eq!(accounts.len(), 14);
+        }
+
+        #[tokio::test]
+        async fn test_transactions() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let transactions = commodity.transactions().await.unwrap();
+            assert_eq!(transactions.len(), 11);
+        }
+
+        #[tokio::test]
+        async fn test_as_commodity_prices() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let prices = commodity.as_commodity_prices().await.unwrap();
+            assert_eq!(prices.len(), 1);
+        }
+
+        #[tokio::test]
+        async fn test_as_currency_prices() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let prices = commodity.as_currency_prices().await.unwrap();
+            assert_eq!(prices.len(), 2);
+        }
+
+        #[tokio::test]
+        async fn test_as_commodity_or_currency_prices() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let prices = commodity.as_commodity_or_currency_prices().await.unwrap();
+            assert_eq!(prices.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_rate_direct() {
+            // ADF => AED
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+
+            let rate = currency.buy(&commodity, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+
+            // AED => EUR
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 9.0 / 10.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+
+            let rate = currency.buy(&commodity, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 9.0 / 10.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+        }
+
+        #[tokio::test]
+        async fn test_rate_indirect() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            // USD => AED
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "1e5d65e2726a5d4595741cb204992991")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 7.0 / 5.0 * 10.0 / 9.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                rate,
+                (Decimal::new(7, 0) / Decimal::new(5, 0))
+                    * (Decimal::new(10, 0) / Decimal::new(9, 0)),
+            );
+        }
     }
 
-    #[tokio::test]
-    async fn test_from_with_query() {
-        let query = Arc::new(setup().await);
-        let item = CommoditySQL {
-            guid: "guid".to_string(),
-            namespace: "namespace".to_string(),
-            mnemonic: "mnemonic".to_string(),
-            fullname: Some("fullname".to_string()),
-            cusip: Some("cusip".to_string()),
-            fraction: 100,
-            quote_flag: 1,
-            quote_source: Some("quote_source".to_string()),
-            quote_tz: Some("quote_tz".to_string()),
-        };
+    #[cfg(feature = "mysql")]
+    mod mysql {
+        use super::*;
 
-        let result = Commodity::from_with_query(&item, query);
+        use pretty_assertions::assert_eq;
 
-        assert_eq!(result.guid, "guid");
-        assert_eq!(result.namespace, "namespace");
-        assert_eq!(result.mnemonic, "mnemonic");
-        assert_eq!(result.fullname, "fullname");
-        assert_eq!(result.cusip, "cusip");
-        assert_eq!(result.fraction, 100);
-        assert_eq!(result.quote_flag, true);
-        assert_eq!(result.quote_source, "quote_source");
-        assert_eq!(result.quote_tz, "quote_tz");
+        use crate::query::mysql::commodity::Commodity as CommodityBase;
+        use crate::MySQLQuery;
+
+        async fn setup() -> MySQLQuery {
+            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+            MySQLQuery::new(uri).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = CommodityBase {
+                guid: "guid".to_string(),
+                namespace: "namespace".to_string(),
+                mnemonic: "mnemonic".to_string(),
+                fullname: Some("fullname".to_string()),
+                cusip: Some("cusip".to_string()),
+                fraction: 100,
+                quote_flag: 1,
+                quote_source: Some("quote_source".to_string()),
+                quote_tz: Some("quote_tz".to_string()),
+            };
+
+            let result = Commodity::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.namespace, "namespace");
+            assert_eq!(result.mnemonic, "mnemonic");
+            assert_eq!(result.fullname, "fullname");
+            assert_eq!(result.cusip, "cusip");
+            assert_eq!(result.fraction, 100);
+            assert_eq!(result.quote_flag, true);
+            assert_eq!(result.quote_source, "quote_source");
+            assert_eq!(result.quote_tz, "quote_tz");
+        }
+
+        #[tokio::test]
+        async fn test_accounts() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let accounts = commodity.accounts().await.unwrap();
+            assert_eq!(accounts.len(), 14);
+        }
+
+        #[tokio::test]
+        async fn test_transactions() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let transactions = commodity.transactions().await.unwrap();
+            assert_eq!(transactions.len(), 11);
+        }
+
+        #[tokio::test]
+        async fn test_as_commodity_prices() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let prices = commodity.as_commodity_prices().await.unwrap();
+            assert_eq!(prices.len(), 1);
+        }
+
+        #[tokio::test]
+        async fn test_as_currency_prices() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let prices = commodity.as_currency_prices().await.unwrap();
+            assert_eq!(prices.len(), 2);
+        }
+
+        #[tokio::test]
+        async fn test_as_commodity_or_currency_prices() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let prices = commodity.as_commodity_or_currency_prices().await.unwrap();
+            assert_eq!(prices.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_rate_direct() {
+            // ADF => AED
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+
+            let rate = currency.buy(&commodity, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+
+            // AED => EUR
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 9.0 / 10.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+
+            let rate = currency.buy(&commodity, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 9.0 / 10.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+        }
+
+        #[tokio::test]
+        async fn test_rate_indirect() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            // USD => AED
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "1e5d65e2726a5d4595741cb204992991")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 7.0 / 5.0 * 10.0 / 9.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                rate,
+                (Decimal::new(7, 0) / Decimal::new(5, 0))
+                    * (Decimal::new(10, 0) / Decimal::new(9, 0)),
+            );
+        }
     }
 
-    #[tokio::test]
-    async fn test_accounts() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let commodity = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .unwrap();
-        let accounts = commodity.accounts().await.unwrap();
-        assert_eq!(accounts.len(), 14);
+    #[cfg(feature = "postgresql")]
+    mod postgresql {
+        use super::*;
+
+        use pretty_assertions::assert_eq;
+
+        use crate::query::postgresql::commodity::Commodity as CommodityBase;
+        use crate::PostgreSQLQuery;
+
+        async fn setup() -> PostgreSQLQuery {
+            let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+            PostgreSQLQuery::new(uri).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = CommodityBase {
+                guid: "guid".to_string(),
+                namespace: "namespace".to_string(),
+                mnemonic: "mnemonic".to_string(),
+                fullname: Some("fullname".to_string()),
+                cusip: Some("cusip".to_string()),
+                fraction: 100,
+                quote_flag: 1,
+                quote_source: Some("quote_source".to_string()),
+                quote_tz: Some("quote_tz".to_string()),
+            };
+
+            let result = Commodity::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.namespace, "namespace");
+            assert_eq!(result.mnemonic, "mnemonic");
+            assert_eq!(result.fullname, "fullname");
+            assert_eq!(result.cusip, "cusip");
+            assert_eq!(result.fraction, 100);
+            assert_eq!(result.quote_flag, true);
+            assert_eq!(result.quote_source, "quote_source");
+            assert_eq!(result.quote_tz, "quote_tz");
+        }
+
+        #[tokio::test]
+        async fn test_accounts() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let accounts = commodity.accounts().await.unwrap();
+            assert_eq!(accounts.len(), 14);
+        }
+
+        #[tokio::test]
+        async fn test_transactions() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let transactions = commodity.transactions().await.unwrap();
+            assert_eq!(transactions.len(), 11);
+        }
+
+        #[tokio::test]
+        async fn test_as_commodity_prices() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let prices = commodity.as_commodity_prices().await.unwrap();
+            assert_eq!(prices.len(), 1);
+        }
+
+        #[tokio::test]
+        async fn test_as_currency_prices() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let prices = commodity.as_currency_prices().await.unwrap();
+            assert_eq!(prices.len(), 2);
+        }
+
+        #[tokio::test]
+        async fn test_as_commodity_or_currency_prices() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+            let prices = commodity.as_commodity_or_currency_prices().await.unwrap();
+            assert_eq!(prices.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_rate_direct() {
+            // ADF => AED
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+
+            let rate = currency.buy(&commodity, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+
+            // AED => EUR
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 9.0 / 10.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+
+            let rate = currency.buy(&commodity, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 9.0 / 10.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+        }
+
+        #[tokio::test]
+        async fn test_rate_indirect() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            // USD => AED
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "1e5d65e2726a5d4595741cb204992991")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 7.0 / 5.0 * 10.0 / 9.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                rate,
+                (Decimal::new(7, 0) / Decimal::new(5, 0))
+                    * (Decimal::new(10, 0) / Decimal::new(9, 0)),
+            );
+        }
     }
 
-    #[tokio::test]
-    async fn test_transactions() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let commodity = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .unwrap();
-        let transactions = commodity.transactions().await.unwrap();
-        assert_eq!(transactions.len(), 11);
-    }
+    #[cfg(feature = "xml")]
+    mod xml {
+        use super::*;
 
-    #[tokio::test]
-    async fn test_as_commodity_prices() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let commodity = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .unwrap();
-        let prices = commodity.as_commodity_prices().await.unwrap();
-        assert_eq!(prices.len(), 1);
-    }
+        use pretty_assertions::assert_eq;
 
-    #[tokio::test]
-    async fn test_as_currency_prices() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let commodity = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .unwrap();
-        let prices = commodity.as_currency_prices().await.unwrap();
-        assert_eq!(prices.len(), 2);
-    }
+        use crate::query::xml::commodity::Commodity as CommodityBase;
+        use crate::XMLQuery;
 
-    #[tokio::test]
-    async fn test_as_commodity_or_currency_prices() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let commodity = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .unwrap();
-        let prices = commodity.as_commodity_or_currency_prices().await.unwrap();
-        assert_eq!(prices.len(), 3);
-    }
+        fn setup() -> XMLQuery {
+            let path: &str = &format!(
+                "{}/tests/db/xml/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
 
-    #[tokio::test]
-    async fn test_rate_direct() {
-        // ADF => AED
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let commodity = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
-            .unwrap();
-        let currency = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
-            .unwrap();
+            println!("work_dir: {:?}", std::env::current_dir());
+            XMLQuery::new(path).unwrap()
+        }
 
-        let rate = commodity.sell(&currency, &book).await.unwrap();
-        #[cfg(not(feature = "decimal"))]
-        assert_approx_eq!(f64, rate, 1.5);
-        #[cfg(feature = "decimal")]
-        assert_eq!(rate, Decimal::new(15, 1));
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup());
+            let item = CommodityBase {
+                guid: "guid".to_string(),
+                namespace: "namespace".to_string(),
+                mnemonic: "mnemonic".to_string(),
+                fullname: Some("fullname".to_string()),
+                cusip: Some("cusip".to_string()),
+                fraction: 100,
+                quote_flag: true,
+                quote_source: Some("quote_source".to_string()),
+                quote_tz: Some("quote_tz".to_string()),
+            };
 
-        let rate = currency.buy(&commodity, &book).await.unwrap();
-        #[cfg(not(feature = "decimal"))]
-        assert_approx_eq!(f64, rate, 1.5);
-        #[cfg(feature = "decimal")]
-        assert_eq!(rate, Decimal::new(15, 1));
+            let result = Commodity::from_with_query(&item, query);
 
-        // AED => EUR
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let commodity = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
-            .unwrap();
-        let currency = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "346629655191dcf59a7e2c2a85b70f69")
-            .unwrap();
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.namespace, "namespace");
+            assert_eq!(result.mnemonic, "mnemonic");
+            assert_eq!(result.fullname, "fullname");
+            assert_eq!(result.cusip, "cusip");
+            assert_eq!(result.fraction, 100);
+            assert_eq!(result.quote_flag, true);
+            assert_eq!(result.quote_source, "quote_source");
+            assert_eq!(result.quote_tz, "quote_tz");
+        }
 
-        let rate = commodity.sell(&currency, &book).await.unwrap();
-        #[cfg(not(feature = "decimal"))]
-        assert_approx_eq!(f64, rate, 9.0 / 10.0);
-        #[cfg(feature = "decimal")]
-        assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+        #[tokio::test]
+        async fn test_accounts() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "EUR")
+                .unwrap();
+            let accounts = commodity.accounts().await.unwrap();
+            assert_eq!(accounts.len(), 14);
+        }
 
-        let rate = currency.buy(&commodity, &book).await.unwrap();
-        #[cfg(not(feature = "decimal"))]
-        assert_approx_eq!(f64, rate, 9.0 / 10.0);
-        #[cfg(feature = "decimal")]
-        assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
-    }
+        #[tokio::test]
+        async fn test_transactions() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "EUR")
+                .unwrap();
+            let transactions = commodity.transactions().await.unwrap();
+            assert_eq!(transactions.len(), 11);
+        }
 
-    #[tokio::test]
-    async fn test_rate_indirect() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        // USD => AED
-        let commodity = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "1e5d65e2726a5d4595741cb204992991")
-            .unwrap();
-        let currency = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
-            .unwrap();
+        #[tokio::test]
+        async fn test_as_commodity_prices() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "EUR")
+                .unwrap();
+            let prices = commodity.as_commodity_prices().await.unwrap();
+            assert_eq!(prices.len(), 1);
+        }
 
-        let rate = commodity.sell(&currency, &book).await.unwrap();
-        #[cfg(not(feature = "decimal"))]
-        assert_approx_eq!(f64, rate, 7.0 / 5.0 * 10.0 / 9.0);
-        #[cfg(feature = "decimal")]
-        assert_eq!(
-            rate,
-            (Decimal::new(7, 0) / Decimal::new(5, 0)) * (Decimal::new(10, 0) / Decimal::new(9, 0)),
-        );
+        #[tokio::test]
+        async fn test_as_currency_prices() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "EUR")
+                .unwrap();
+            let prices = commodity.as_currency_prices().await.unwrap();
+            assert_eq!(prices.len(), 2);
+        }
+
+        #[tokio::test]
+        async fn test_as_commodity_or_currency_prices() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "EUR")
+                .unwrap();
+            let prices = commodity.as_commodity_or_currency_prices().await.unwrap();
+            assert_eq!(prices.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_rate_direct() {
+            // ADF => AED
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "ADF")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "AED")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+
+            let rate = currency.buy(&commodity, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+
+            // AED => EUR
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "AED")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "EUR")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 9.0 / 10.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+
+            let rate = currency.buy(&commodity, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 9.0 / 10.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
+        }
+
+        #[tokio::test]
+        async fn test_rate_indirect() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            // USD => AED
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "USD")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "AED")
+                .unwrap();
+
+            let rate = commodity.sell(&currency, &book).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 7.0 / 5.0 * 10.0 / 9.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                rate,
+                (Decimal::new(7, 0) / Decimal::new(5, 0))
+                    * (Decimal::new(10, 0) / Decimal::new(9, 0)),
+            );
+        }
     }
 }

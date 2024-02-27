@@ -151,7 +151,6 @@ mod tests {
 
         use crate::SQLiteQuery;
 
-        #[cfg(feature = "decimal")]
         use pretty_assertions::assert_eq;
 
         async fn setup() -> SQLiteQuery {
@@ -187,6 +186,201 @@ mod tests {
                 .into_iter()
                 .find(|c| c.mnemonic == "AED")
                 .unwrap();
+			assert_eq!(from.mnemonic, "ADF");
+			assert_eq!(to.mnemonic, "AED");
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 1.5, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(15, 1), exchange.cal(&from, &to).unwrap());
+
+            let from = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "FOO")
+                .unwrap();
+            let to = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "FOO")
+                .unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 1.0, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(10, 1), exchange.cal(&from, &to).unwrap());
+
+            let from = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "FOO")
+                .unwrap();
+            let to = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "AED")
+                .unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 0.9, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(9, 1), exchange.cal(&from, &to).unwrap());
+
+            let from = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "EUR")
+                .unwrap();
+            let to = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "USD")
+                .unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 1.0 / 1.4, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(10, 1) / Decimal::new(14, 1),
+                exchange.cal(&from, &to).unwrap()
+            );
+
+            let from = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "AED")
+                .unwrap();
+            let to = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "EUR")
+                .unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 0.9, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(9, 1), exchange.cal(&from, &to).unwrap());
+
+            let from = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "USD")
+                .unwrap();
+            let to = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "AED")
+                .unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(
+                f64,
+                7.0 / 5.0 * 10.0 / 9.0,
+                exchange.cal(&from, &to).unwrap()
+            );
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                (Decimal::new(7, 0) / Decimal::new(5, 0))
+                    * (Decimal::new(10, 0) / Decimal::new(9, 0)),
+                exchange.cal(&from, &to).unwrap()
+            );
+
+            let from = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "FOO")
+                .unwrap();
+            let to = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "EUR")
+                .unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 0.81, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(Decimal::new(81, 2), exchange.cal(&from, &to).unwrap());
+
+            let from = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "EUR")
+                .unwrap();
+            let to = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "FOO")
+                .unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, 1.0 / 0.81, exchange.cal(&from, &to).unwrap());
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                Decimal::new(10, 1) / Decimal::new(81, 2),
+                exchange.cal(&from, &to).unwrap()
+            );
+        }
+    }
+
+    #[cfg(feature = "mysql")]
+    mod mysql {
+        use super::*;
+        use crate::MySQLQuery;
+
+        use pretty_assertions::assert_eq;
+
+        async fn setup() -> MySQLQuery {
+            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+            MySQLQuery::new(uri)
+                .await
+                .unwrap_or_else(|e| panic!("{e} uri:{uri:?}"))
+        }
+
+        #[tokio::test]
+        #[allow(clippy::too_many_lines)]
+        async fn test_exchange() {
+            let query = setup().await;
+            let book = Book::new(query.clone()).await.unwrap();
+            let query = Arc::new(query);
+            let mut exchange = Exchange::new(query.clone()).await.unwrap();
+            exchange.update(query).await.expect("ok");
+
+            let from = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "ADF")
+                .unwrap();
+            let to = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|c| c.mnemonic == "AED")
+                .unwrap();
+			assert_eq!(from.mnemonic, "ADF");
+			assert_eq!(to.mnemonic, "AED");
             #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.5, exchange.cal(&from, &to).unwrap());
             #[cfg(feature = "decimal")]
@@ -347,7 +541,6 @@ mod tests {
 
         use crate::PostgreSQLQuery;
 
-        #[cfg(feature = "decimal")]
         use pretty_assertions::assert_eq;
 
         async fn setup() -> PostgreSQLQuery {
@@ -380,6 +573,8 @@ mod tests {
                 .into_iter()
                 .find(|c| c.mnemonic == "AED")
                 .unwrap();
+			assert_eq!(from.mnemonic, "ADF");
+			assert_eq!(to.mnemonic, "AED");
             #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.5, exchange.cal(&from, &to).unwrap());
             #[cfg(feature = "decimal")]
@@ -534,25 +729,27 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "mysql")]
-    mod mysql {
+    #[cfg(feature = "xml")]
+    mod xml {
         use super::*;
-        use crate::MySQLQuery;
+        use crate::XMLQuery;
 
-        #[cfg(feature = "decimal")]
         use pretty_assertions::assert_eq;
 
-        async fn setup() -> MySQLQuery {
-            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
-            MySQLQuery::new(uri)
-                .await
-                .unwrap_or_else(|e| panic!("{e} uri:{uri:?}"))
+        fn setup() -> XMLQuery {
+            let path: &str = &format!(
+                "{}/tests/db/xml/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+
+            println!("work_dir: {:?}", std::env::current_dir());
+            XMLQuery::new(path).unwrap()
         }
 
         #[tokio::test]
         #[allow(clippy::too_many_lines)]
         async fn test_exchange() {
-            let query = setup().await;
+            let query = setup();
             let book = Book::new(query.clone()).await.unwrap();
             let query = Arc::new(query);
             let mut exchange = Exchange::new(query.clone()).await.unwrap();
@@ -572,6 +769,8 @@ mod tests {
                 .into_iter()
                 .find(|c| c.mnemonic == "AED")
                 .unwrap();
+			assert_eq!(from.mnemonic, "ADF");
+			assert_eq!(to.mnemonic, "AED");
             #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.5, exchange.cal(&from, &to).unwrap());
             #[cfg(feature = "decimal")]

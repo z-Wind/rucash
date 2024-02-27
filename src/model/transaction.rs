@@ -72,83 +72,342 @@ where
 }
 
 #[cfg(test)]
-#[cfg(feature = "sqlite")]
 mod tests {
     use super::*;
 
-    use crate::query::sqlite::transaction::Transaction as TransactionSQL;
     use crate::Book;
-    use crate::SQLiteQuery;
 
-    use pretty_assertions::assert_eq;
+    #[cfg(feature = "sqlite")]
+    mod sqlite {
+        use super::*;
 
-    async fn setup() -> SQLiteQuery {
-        let uri: &str = &format!(
-            "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
-            env!("CARGO_MANIFEST_DIR")
-        );
+        use pretty_assertions::assert_eq;
 
-        println!("work_dir: {:?}", std::env::current_dir());
-        SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
-    }
+        use crate::query::sqlite::transaction::Transaction as TransactionBase;
+        use crate::SQLiteQuery;
 
-    #[tokio::test]
-    async fn test_from_with_query() {
-        let query = Arc::new(setup().await);
-        let item = TransactionSQL {
-            guid: "guid".to_string(),
-            currency_guid: "commodity_guid".to_string(),
-            num: "currency_guid".to_string(),
-            post_date: NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
+        async fn setup() -> SQLiteQuery {
+            let uri: &str = &format!(
+                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+
+            println!("work_dir: {:?}", std::env::current_dir());
+            SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = TransactionBase {
+                guid: "guid".to_string(),
+                currency_guid: "currency_guid".to_string(),
+                num: "currency_guid".to_string(),
+                post_date: NaiveDateTime::parse_from_str(
+                    "2014-12-24 10:59:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
                 .ok(),
-            enter_date: NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
+                enter_date: NaiveDateTime::parse_from_str(
+                    "2014-12-24 10:59:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
                 .ok(),
-            description: Some("source".to_string()),
-        };
+                description: Some("source".to_string()),
+            };
 
-        let result = Transaction::from_with_query(&item, query);
+            let result = Transaction::from_with_query(&item, query);
 
-        assert_eq!(result.guid, "guid");
-        assert_eq!(result.currency_guid, "commodity_guid");
-        assert_eq!(result.num, "currency_guid");
-        assert_eq!(
-            result.post_datetime,
-            NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
-        );
-        assert_eq!(
-            result.enter_datetime,
-            NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
-        );
-        assert_eq!(result.description, "source");
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.currency_guid, "currency_guid");
+            assert_eq!(result.num, "currency_guid");
+            assert_eq!(
+                result.post_datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(
+                result.enter_datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(result.description, "source");
+        }
+
+        #[tokio::test]
+        async fn currency() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let transaction = book
+                .transactions()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
+                .unwrap();
+            let currency = transaction.currency().await.unwrap();
+            assert_eq!(currency.fullname, "Euro");
+        }
+
+        #[tokio::test]
+        async fn splits() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let transaction = book
+                .transactions()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
+                .unwrap();
+            let splits = transaction.splits().await.unwrap();
+            assert_eq!(splits.len(), 2);
+        }
     }
 
-    #[tokio::test]
-    async fn currency() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let transaction = book
-            .transactions()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
-            .unwrap();
-        let currency = transaction.currency().await.unwrap();
-        assert_eq!(currency.fullname, "Euro");
+    #[cfg(feature = "mysql")]
+    mod mysql {
+        use super::*;
+
+        use pretty_assertions::assert_eq;
+
+        use crate::query::mysql::transaction::Transaction as TransactionBase;
+        use crate::MySQLQuery;
+
+        async fn setup() -> MySQLQuery {
+            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+            MySQLQuery::new(uri).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = TransactionBase {
+                guid: "guid".to_string(),
+                currency_guid: "currency_guid".to_string(),
+                num: "currency_guid".to_string(),
+                post_date: NaiveDateTime::parse_from_str(
+                    "2014-12-24 10:59:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .ok(),
+                enter_date: NaiveDateTime::parse_from_str(
+                    "2014-12-24 10:59:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .ok(),
+                description: Some("source".to_string()),
+            };
+
+            let result = Transaction::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.currency_guid, "currency_guid");
+            assert_eq!(result.num, "currency_guid");
+            assert_eq!(
+                result.post_datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(
+                result.enter_datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(result.description, "source");
+        }
+
+        #[tokio::test]
+        async fn currency() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let transaction = book
+                .transactions()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
+                .unwrap();
+            let currency = transaction.currency().await.unwrap();
+            assert_eq!(currency.fullname, "Euro");
+        }
+
+        #[tokio::test]
+        async fn splits() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let transaction = book
+                .transactions()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
+                .unwrap();
+            let splits = transaction.splits().await.unwrap();
+            assert_eq!(splits.len(), 2);
+        }
     }
 
-    #[tokio::test]
-    async fn splits() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let transaction = book
-            .transactions()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
-            .unwrap();
-        let splits = transaction.splits().await.unwrap();
-        assert_eq!(splits.len(), 2);
+    #[cfg(feature = "postgresql")]
+    mod postgresql {
+        use super::*;
+
+        use pretty_assertions::assert_eq;
+
+        use crate::query::postgresql::transaction::Transaction as TransactionBase;
+        use crate::PostgreSQLQuery;
+
+        async fn setup() -> PostgreSQLQuery {
+            let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+            PostgreSQLQuery::new(uri).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = TransactionBase {
+                guid: "guid".to_string(),
+                currency_guid: "currency_guid".to_string(),
+                num: "currency_guid".to_string(),
+                post_date: NaiveDateTime::parse_from_str(
+                    "2014-12-24 10:59:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .ok(),
+                enter_date: NaiveDateTime::parse_from_str(
+                    "2014-12-24 10:59:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .ok(),
+                description: Some("source".to_string()),
+            };
+
+            let result = Transaction::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.currency_guid, "currency_guid");
+            assert_eq!(result.num, "currency_guid");
+            assert_eq!(
+                result.post_datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(
+                result.enter_datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(result.description, "source");
+        }
+
+        #[tokio::test]
+        async fn currency() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let transaction = book
+                .transactions()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
+                .unwrap();
+            let currency = transaction.currency().await.unwrap();
+            assert_eq!(currency.fullname, "Euro");
+        }
+
+        #[tokio::test]
+        async fn splits() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let transaction = book
+                .transactions()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
+                .unwrap();
+            let splits = transaction.splits().await.unwrap();
+            assert_eq!(splits.len(), 2);
+        }
+    }
+
+    #[cfg(feature = "xml")]
+    mod xml {
+        use super::*;
+
+        use pretty_assertions::assert_eq;
+
+        use crate::query::xml::transaction::Transaction as TransactionBase;
+        use crate::XMLQuery;
+
+        fn setup() -> XMLQuery {
+            let path: &str = &format!(
+                "{}/tests/db/xml/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+
+            println!("work_dir: {:?}", std::env::current_dir());
+            XMLQuery::new(path).unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup());
+            let item = TransactionBase {
+                guid: "guid".to_string(),
+                currency_guid: "currency_guid".to_string(),
+                num: "currency_guid".to_string(),
+                post_date: NaiveDateTime::parse_from_str(
+                    "2014-12-24 10:59:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .ok(),
+                enter_date: NaiveDateTime::parse_from_str(
+                    "2014-12-24 10:59:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .ok(),
+                description: Some("source".to_string()),
+            };
+
+            let result = Transaction::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.currency_guid, "currency_guid");
+            assert_eq!(result.num, "currency_guid");
+            assert_eq!(
+                result.post_datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(
+                result.enter_datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(result.description, "source");
+        }
+
+        #[tokio::test]
+        async fn currency() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let transaction = book
+                .transactions()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
+                .unwrap();
+            let currency = transaction.currency().await.unwrap();
+            assert_eq!(currency.fullname, "");
+        }
+
+        #[tokio::test]
+        async fn splits() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let transaction = book
+                .transactions()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "6c8876003c4a6026e38e3afb67d6f2b1")
+                .unwrap();
+            let splits = transaction.splits().await.unwrap();
+            assert_eq!(splits.len(), 2);
+        }
     }
 }

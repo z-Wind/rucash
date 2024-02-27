@@ -244,7 +244,7 @@ mod tests {
     #[tokio::test]
     async fn test_contains_name_ignore_case() {
         let query = setup().await;
-        let result = query.contains_name_ignore_case("%AS%").await.unwrap();
+        let result = query.contains_name_ignore_case("AS").await.unwrap();
         assert_eq!(result.len(), 3);
     }
 }

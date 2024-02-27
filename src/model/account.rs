@@ -156,187 +156,725 @@ where
 }
 
 #[cfg(test)]
-#[cfg(feature = "sqlite")]
 mod tests {
     use super::*;
 
-    use crate::query::sqlite::account::Account as AccountSQL;
-    use crate::SQLiteQuery;
-
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
-    use pretty_assertions::assert_eq;
     #[cfg(feature = "decimal")]
     use rust_decimal::Decimal;
 
-    async fn setup() -> SQLiteQuery {
-        let uri: &str = &format!(
-            "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
-            env!("CARGO_MANIFEST_DIR")
-        );
+    #[cfg(feature = "sqlite")]
+    mod sqlite {
+        use super::*;
 
-        println!("work_dir: {:?}", std::env::current_dir());
-        SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
-    }
+        use pretty_assertions::assert_eq;
 
-    #[tokio::test]
-    async fn test_from_with_query() {
-        let query = Arc::new(setup().await);
-        let item = AccountSQL {
-            guid: "guid".to_string(),
-            name: "name".to_string(),
-            account_type: "account_type".to_string(),
-            commodity_guid: Some("commodity_guid".to_string()),
-            commodity_scu: 100,
-            non_std_scu: 0,
-            parent_guid: Some("parent_guid".to_string()),
-            code: Some("code".to_string()),
-            description: Some("description".to_string()),
-            hidden: Some(0),
-            placeholder: Some(1),
-        };
+        use crate::query::sqlite::account::Account as AccountBase;
+        use crate::SQLiteQuery;
 
-        let result = Account::from_with_query(&item, query);
+        async fn setup() -> SQLiteQuery {
+            let uri: &str = &format!(
+                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
 
-        assert_eq!(result.guid, "guid");
-        assert_eq!(result.name, "name");
-        assert_eq!(result.r#type, "account_type");
-        assert_eq!(result.commodity_guid, "commodity_guid");
-        assert_eq!(result.commodity_scu, 100);
-        assert_eq!(result.non_std_scu, false);
-        assert_eq!(result.parent_guid, "parent_guid");
-        assert_eq!(result.code, "code");
-        assert_eq!(result.description, "description");
-        assert_eq!(result.hidden, false);
-        assert_eq!(result.placeholder, true);
-    }
+            println!("work_dir: {:?}", std::env::current_dir());
+            SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
+        }
 
-    #[tokio::test]
-    async fn test_splits() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let account = book
-            .account_contains_name_ignore_case("Cash")
-            .await
-            .unwrap()
-            .unwrap();
-        let splits = account.splits().await.unwrap();
-        assert_eq!(splits.len(), 3);
-    }
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = AccountBase {
+                guid: "guid".to_string(),
+                name: "name".to_string(),
+                account_type: "account_type".to_string(),
+                commodity_guid: Some("commodity_guid".to_string()),
+                commodity_scu: 100,
+                non_std_scu: 0,
+                parent_guid: Some("parent_guid".to_string()),
+                code: Some("code".to_string()),
+                description: Some("description".to_string()),
+                hidden: Some(0),
+                placeholder: Some(1),
+            };
 
-    #[tokio::test]
-    async fn test_parent() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let account = book
-            .account_contains_name_ignore_case("Cash")
-            .await
-            .unwrap()
-            .unwrap();
-        let parent = account.parent().await.unwrap().unwrap();
-        assert_eq!(parent.name, "Current");
-    }
+            let result = Account::from_with_query(&item, query);
 
-    #[tokio::test]
-    async fn test_no_parent() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let account = book
-            .account_contains_name_ignore_case("Root Account")
-            .await
-            .unwrap()
-            .unwrap();
-        let parent = account.parent().await.unwrap();
-        dbg!(&parent);
-        assert!(parent.is_none());
-    }
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.name, "name");
+            assert_eq!(result.r#type, "account_type");
+            assert_eq!(result.commodity_guid, "commodity_guid");
+            assert_eq!(result.commodity_scu, 100);
+            assert_eq!(result.non_std_scu, false);
+            assert_eq!(result.parent_guid, "parent_guid");
+            assert_eq!(result.code, "code");
+            assert_eq!(result.description, "description");
+            assert_eq!(result.hidden, false);
+            assert_eq!(result.placeholder, true);
+        }
 
-    #[tokio::test]
-    async fn test_children() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let account = book
-            .account_contains_name_ignore_case("Current")
-            .await
-            .unwrap()
-            .unwrap();
-        let children = account.children().await.unwrap();
-        assert_eq!(children.len(), 3);
-    }
-
-    #[tokio::test]
-    async fn test_children2() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let account = book
-            .account_contains_name_ignore_case("Asset")
-            .await
-            .unwrap()
-            .unwrap();
-        let children = account.children().await.unwrap();
-
-        assert_eq!(children.len(), 3);
-        assert_eq!(children[0].name, "Current");
-        assert_eq!(children[1].name, "Fixed");
-        assert_eq!(children[2].name, "Broker");
-    }
-
-    #[tokio::test]
-    async fn test_commodity() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let account = book
-            .account_contains_name_ignore_case("Cash")
-            .await
-            .unwrap()
-            .unwrap();
-        let commodity = account.commodity().await.unwrap();
-        assert_eq!(commodity.mnemonic, "EUR");
-    }
-
-    #[tokio::test]
-    async fn test_balance_into_currency() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let account = book
-            .account_contains_name_ignore_case("Asset")
-            .await
-            .unwrap()
-            .unwrap();
-        let commodity = account.commodity().await.unwrap();
-
-        #[cfg(not(feature = "decimal"))]
-        assert_approx_eq!(
-            f64,
-            account
-                .balance_into_currency(&commodity, &book)
+        #[tokio::test]
+        async fn test_splits() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
                 .await
-                .unwrap(),
-            24695.3
-        );
-        #[cfg(feature = "decimal")]
-        assert_eq!(
-            account
-                .balance_into_currency(&commodity, &book)
+                .unwrap()
+                .unwrap();
+            let splits = account.splits().await.unwrap();
+            assert_eq!(splits.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_parent() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
                 .await
-                .unwrap(),
-            Decimal::new(246_953, 1)
-        );
+                .unwrap()
+                .unwrap();
+            let parent = account.parent().await.unwrap().unwrap();
+            assert_eq!(parent.name, "Current");
+        }
+
+        #[tokio::test]
+        async fn test_no_parent() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Root Account")
+                .await
+                .unwrap()
+                .unwrap();
+            let parent = account.parent().await.unwrap();
+            dbg!(&parent);
+            assert!(parent.is_none());
+        }
+
+        #[tokio::test]
+        async fn test_children() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Current")
+                .await
+                .unwrap()
+                .unwrap();
+            let children = account.children().await.unwrap();
+            assert_eq!(children.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_children2() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Asset")
+                .await
+                .unwrap()
+                .unwrap();
+            let children = account.children().await.unwrap();
+
+            assert_eq!(children.len(), 3);
+            assert_eq!(children[0].name, "Current");
+            assert_eq!(children[1].name, "Fixed");
+            assert_eq!(children[2].name, "Broker");
+        }
+
+        #[tokio::test]
+        async fn test_commodity() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
+                .await
+                .unwrap()
+                .unwrap();
+            let commodity = account.commodity().await.unwrap();
+            assert_eq!(commodity.mnemonic, "EUR");
+        }
+
+        #[tokio::test]
+        async fn test_balance_into_currency() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Asset")
+                .await
+                .unwrap()
+                .unwrap();
+            let commodity = account.commodity().await.unwrap();
+
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(
+                f64,
+                account
+                    .balance_into_currency(&commodity, &book)
+                    .await
+                    .unwrap(),
+                24695.3
+            );
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                account
+                    .balance_into_currency(&commodity, &book)
+                    .await
+                    .unwrap(),
+                Decimal::new(246_953, 1)
+            );
+        }
+
+        #[tokio::test]
+        async fn test_balance() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Current")
+                .await
+                .unwrap()
+                .unwrap();
+
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, account.balance(&book).await.unwrap(), 4590.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(account.balance(&book).await.unwrap(), Decimal::new(4590, 0));
+        }
     }
 
-    #[tokio::test]
-    async fn test_balance() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let account = book
-            .account_contains_name_ignore_case("Current")
-            .await
-            .unwrap()
-            .unwrap();
+    #[cfg(feature = "mysql")]
+    mod mysql {
+        use super::*;
 
-        #[cfg(not(feature = "decimal"))]
-        assert_approx_eq!(f64, account.balance(&book).await.unwrap(), 4590.0);
-        #[cfg(feature = "decimal")]
-        assert_eq!(account.balance(&book).await.unwrap(), Decimal::new(4590, 0));
+        use pretty_assertions::assert_eq;
+
+        use crate::query::mysql::account::Account as AccountBase;
+        use crate::MySQLQuery;
+
+        async fn setup() -> MySQLQuery {
+            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+            MySQLQuery::new(uri).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = AccountBase {
+                guid: "guid".to_string(),
+                name: "name".to_string(),
+                account_type: "account_type".to_string(),
+                commodity_guid: Some("commodity_guid".to_string()),
+                commodity_scu: 100,
+                non_std_scu: 0,
+                parent_guid: Some("parent_guid".to_string()),
+                code: Some("code".to_string()),
+                description: Some("description".to_string()),
+                hidden: Some(0),
+                placeholder: Some(1),
+            };
+
+            let result = Account::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.name, "name");
+            assert_eq!(result.r#type, "account_type");
+            assert_eq!(result.commodity_guid, "commodity_guid");
+            assert_eq!(result.commodity_scu, 100);
+            assert_eq!(result.non_std_scu, false);
+            assert_eq!(result.parent_guid, "parent_guid");
+            assert_eq!(result.code, "code");
+            assert_eq!(result.description, "description");
+            assert_eq!(result.hidden, false);
+            assert_eq!(result.placeholder, true);
+        }
+
+        #[tokio::test]
+        async fn test_splits() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
+                .await
+                .unwrap()
+                .unwrap();
+            let splits = account.splits().await.unwrap();
+            assert_eq!(splits.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_parent() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
+                .await
+                .unwrap()
+                .unwrap();
+            let parent = account.parent().await.unwrap().unwrap();
+            assert_eq!(parent.name, "Current");
+        }
+
+        #[tokio::test]
+        async fn test_no_parent() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Root Account")
+                .await
+                .unwrap()
+                .unwrap();
+            let parent = account.parent().await.unwrap();
+            dbg!(&parent);
+            assert!(parent.is_none());
+        }
+
+        #[tokio::test]
+        async fn test_children() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Current")
+                .await
+                .unwrap()
+                .unwrap();
+            let children = account.children().await.unwrap();
+            assert_eq!(children.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_children2() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Asset")
+                .await
+                .unwrap()
+                .unwrap();
+            let children = account.children().await.unwrap();
+
+            assert_eq!(children.len(), 3);
+            assert_eq!(children[0].name, "Current");
+            assert_eq!(children[1].name, "Fixed");
+            assert_eq!(children[2].name, "Broker");
+        }
+
+        #[tokio::test]
+        async fn test_commodity() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
+                .await
+                .unwrap()
+                .unwrap();
+            let commodity = account.commodity().await.unwrap();
+            assert_eq!(commodity.mnemonic, "EUR");
+        }
+
+        #[tokio::test]
+        async fn test_balance_into_currency() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Asset")
+                .await
+                .unwrap()
+                .unwrap();
+            let commodity = account.commodity().await.unwrap();
+
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(
+                f64,
+                account
+                    .balance_into_currency(&commodity, &book)
+                    .await
+                    .unwrap(),
+                24695.3
+            );
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                account
+                    .balance_into_currency(&commodity, &book)
+                    .await
+                    .unwrap(),
+                Decimal::new(246_953, 1)
+            );
+        }
+
+        #[tokio::test]
+        async fn test_balance() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Current")
+                .await
+                .unwrap()
+                .unwrap();
+
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, account.balance(&book).await.unwrap(), 4590.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(account.balance(&book).await.unwrap(), Decimal::new(4590, 0));
+        }
+    }
+
+    #[cfg(feature = "postgresql")]
+    mod postgresql {
+        use super::*;
+
+        use pretty_assertions::assert_eq;
+
+        use crate::query::postgresql::account::Account as AccountBase;
+        use crate::PostgreSQLQuery;
+
+        async fn setup() -> PostgreSQLQuery {
+            let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+            PostgreSQLQuery::new(uri).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = AccountBase {
+                guid: "guid".to_string(),
+                name: "name".to_string(),
+                account_type: "account_type".to_string(),
+                commodity_guid: Some("commodity_guid".to_string()),
+                commodity_scu: 100,
+                non_std_scu: 0,
+                parent_guid: Some("parent_guid".to_string()),
+                code: Some("code".to_string()),
+                description: Some("description".to_string()),
+                hidden: Some(0),
+                placeholder: Some(1),
+            };
+
+            let result = Account::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.name, "name");
+            assert_eq!(result.r#type, "account_type");
+            assert_eq!(result.commodity_guid, "commodity_guid");
+            assert_eq!(result.commodity_scu, 100);
+            assert_eq!(result.non_std_scu, false);
+            assert_eq!(result.parent_guid, "parent_guid");
+            assert_eq!(result.code, "code");
+            assert_eq!(result.description, "description");
+            assert_eq!(result.hidden, false);
+            assert_eq!(result.placeholder, true);
+        }
+
+        #[tokio::test]
+        async fn test_splits() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
+                .await
+                .unwrap()
+                .unwrap();
+            let splits = account.splits().await.unwrap();
+            assert_eq!(splits.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_parent() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
+                .await
+                .unwrap()
+                .unwrap();
+            let parent = account.parent().await.unwrap().unwrap();
+            assert_eq!(parent.name, "Current");
+        }
+
+        #[tokio::test]
+        async fn test_no_parent() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Root Account")
+                .await
+                .unwrap()
+                .unwrap();
+            let parent = account.parent().await.unwrap();
+            dbg!(&parent);
+            assert!(parent.is_none());
+        }
+
+        #[tokio::test]
+        async fn test_children() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Current")
+                .await
+                .unwrap()
+                .unwrap();
+            let children = account.children().await.unwrap();
+            assert_eq!(children.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_children2() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Asset")
+                .await
+                .unwrap()
+                .unwrap();
+            let children = account.children().await.unwrap();
+
+            assert_eq!(children.len(), 3);
+            assert_eq!(children[0].name, "Current");
+            assert_eq!(children[1].name, "Fixed");
+            assert_eq!(children[2].name, "Broker");
+        }
+
+        #[tokio::test]
+        async fn test_commodity() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
+                .await
+                .unwrap()
+                .unwrap();
+            let commodity = account.commodity().await.unwrap();
+            assert_eq!(commodity.mnemonic, "EUR");
+        }
+
+        #[tokio::test]
+        async fn test_balance_into_currency() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Asset")
+                .await
+                .unwrap()
+                .unwrap();
+            let commodity = account.commodity().await.unwrap();
+
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(
+                f64,
+                account
+                    .balance_into_currency(&commodity, &book)
+                    .await
+                    .unwrap(),
+                24695.3
+            );
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                account
+                    .balance_into_currency(&commodity, &book)
+                    .await
+                    .unwrap(),
+                Decimal::new(246_953, 1)
+            );
+        }
+
+        #[tokio::test]
+        async fn test_balance() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Current")
+                .await
+                .unwrap()
+                .unwrap();
+
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, account.balance(&book).await.unwrap(), 4590.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(account.balance(&book).await.unwrap(), Decimal::new(4590, 0));
+        }
+    }
+
+    #[cfg(feature = "xml")]
+    mod xml {
+        use super::*;
+
+        use pretty_assertions::assert_eq;
+
+        use crate::query::xml::account::Account as AccountBase;
+        use crate::XMLQuery;
+
+        fn setup() -> XMLQuery {
+            let path: &str = &format!(
+                "{}/tests/db/xml/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+
+            println!("work_dir: {:?}", std::env::current_dir());
+            XMLQuery::new(path).unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup());
+            let item = AccountBase {
+                guid: "guid".to_string(),
+                name: "name".to_string(),
+                account_type: "account_type".to_string(),
+                commodity_guid: Some("commodity_guid".to_string()),
+                commodity_scu: 100,
+                non_std_scu: 0,
+                parent_guid: Some("parent_guid".to_string()),
+                code: Some("code".to_string()),
+                description: Some("description".to_string()),
+                hidden: false,
+                placeholder: true,
+            };
+
+            let result = Account::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.name, "name");
+            assert_eq!(result.r#type, "account_type");
+            assert_eq!(result.commodity_guid, "commodity_guid");
+            assert_eq!(result.commodity_scu, 100);
+            assert_eq!(result.non_std_scu, false);
+            assert_eq!(result.parent_guid, "parent_guid");
+            assert_eq!(result.code, "code");
+            assert_eq!(result.description, "description");
+            assert_eq!(result.hidden, false);
+            assert_eq!(result.placeholder, true);
+        }
+
+        #[tokio::test]
+        async fn test_splits() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
+                .await
+                .unwrap()
+                .unwrap();
+            let splits = account.splits().await.unwrap();
+            assert_eq!(splits.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_parent() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
+                .await
+                .unwrap()
+                .unwrap();
+            let parent = account.parent().await.unwrap().unwrap();
+            assert_eq!(parent.name, "Current");
+        }
+
+        #[tokio::test]
+        async fn test_no_parent() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Root Account")
+                .await
+                .unwrap()
+                .unwrap();
+            let parent = account.parent().await.unwrap();
+            dbg!(&parent);
+            assert!(parent.is_none());
+        }
+
+        #[tokio::test]
+        async fn test_children() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Current")
+                .await
+                .unwrap()
+                .unwrap();
+            let children = account.children().await.unwrap();
+            assert_eq!(children.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_children2() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Asset")
+                .await
+                .unwrap()
+                .unwrap();
+            let children = account.children().await.unwrap();
+
+            assert_eq!(children.len(), 3);
+            assert_eq!(children[0].name, "Current");
+            assert_eq!(children[1].name, "Fixed");
+            assert_eq!(children[2].name, "Broker");
+        }
+
+        #[tokio::test]
+        async fn test_commodity() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Cash")
+                .await
+                .unwrap()
+                .unwrap();
+            let commodity = account.commodity().await.unwrap();
+            assert_eq!(commodity.mnemonic, "EUR");
+        }
+
+        #[tokio::test]
+        async fn test_balance_into_currency() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Asset")
+                .await
+                .unwrap()
+                .unwrap();
+            let commodity = account.commodity().await.unwrap();
+
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(
+                f64,
+                account
+                    .balance_into_currency(&commodity, &book)
+                    .await
+                    .unwrap(),
+                24695.3
+            );
+            #[cfg(feature = "decimal")]
+            assert_eq!(
+                account
+                    .balance_into_currency(&commodity, &book)
+                    .await
+                    .unwrap(),
+                Decimal::new(246_953, 1)
+            );
+        }
+
+        #[tokio::test]
+        async fn test_balance() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let account = book
+                .account_contains_name_ignore_case("Current")
+                .await
+                .unwrap()
+                .unwrap();
+
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, account.balance(&book).await.unwrap(), 4590.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(account.balance(&book).await.unwrap(), Decimal::new(4590, 0));
+        }
     }
 }

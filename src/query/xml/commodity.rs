@@ -1,5 +1,4 @@
-// ref: https://piecash.readthedocs.io/en/master/object_model.html
-// ref: https://wiki.gnucash.org/wiki/SQL
+// ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use itertools::Itertools;
 use xmltree::Element;
@@ -40,7 +39,7 @@ impl TryFrom<&Element> for Commodity {
             })?;
         let mnemonic = guid.clone();
         let fullname = e
-            .get_child("fullname")
+            .get_child("name")
             .and_then(xmltree::Element::get_text)
             .map(std::borrow::Cow::into_owned);
         let cusip = e

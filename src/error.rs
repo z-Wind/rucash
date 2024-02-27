@@ -1,6 +1,3 @@
-#[cfg(feature = "xml")]
-use std::num::ParseIntError;
-
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("No book found: {0}")]
@@ -32,7 +29,7 @@ pub enum Error {
     XMLFromElement { model: String },
     #[cfg(feature = "xml")]
     #[error("XML parseInt error: {0}")]
-    XMLParseInt(#[from] ParseIntError),
+    XMLParseInt(#[from] std::num::ParseIntError),
     #[cfg(feature = "xml")]
     #[error("XML parseNaiveDatetime error: {0}")]
     XMLParseNaiveDatetime(#[from] chrono::ParseError),

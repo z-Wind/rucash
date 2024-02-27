@@ -29,7 +29,7 @@ mod consistency {
         Book::new(query).await.unwrap()
     }
 
-    fn vec_match<T, Q>(a: &Vec<T>, b: &Vec<Q>, cmp: fn(&T, &Q) -> bool) -> bool {
+    fn vec_match<T, Q>(a: &[T], b: &[Q], cmp: fn(&T, &Q) -> bool) -> bool {
         assert_eq!(a.len(), b.len());
         let matching = a.iter().zip(b.iter()).filter(|&(a, b)| cmp(a, b)).count();
         assert_eq!(matching, a.len());
@@ -79,7 +79,7 @@ mod consistency {
             &v_sqlite
                 .into_iter()
                 .filter(|x| x.name != "Template Root")
-                .collect(),
+                .collect::<Vec<_>>(),
             &v_xml,
             cmp
         ));
@@ -244,7 +244,7 @@ mod consistency {
         println!("vec_match(&v_sqlite, &v_xml)");
         assert!(vec_match(
             &v_sqlite,
-            &v_xml.into_iter().filter(|x| x.guid != "template").collect(),
+            &v_xml.into_iter().filter(|x| x.guid != "template").collect::<Vec<_>>(),
             cmp
         ),);
     }

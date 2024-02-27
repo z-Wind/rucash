@@ -6,6 +6,7 @@ use crate::model::Commodity;
 use crate::query::{CommodityQ, PriceT, Query};
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "decimal", derive(Eq, Hash))]
 pub struct Price<Q>
 where
     Q: Query,
@@ -90,89 +91,332 @@ where
 }
 
 #[cfg(test)]
-#[cfg(feature = "sqlite")]
+
 mod tests {
     use super::*;
 
-    use crate::query::sqlite::price::Price as PriceSQL;
     use crate::Book;
-    use crate::SQLiteQuery;
 
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
-    use pretty_assertions::assert_eq;
     #[cfg(feature = "decimal")]
     use rust_decimal::Decimal;
 
-    async fn setup() -> SQLiteQuery {
-        let uri: &str = &format!(
-            "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
-            env!("CARGO_MANIFEST_DIR")
-        );
+    #[cfg(feature = "sqlite")]
+    mod sqlite {
+        use super::*;
 
-        println!("work_dir: {:?}", std::env::current_dir());
-        SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
+        use pretty_assertions::assert_eq;
+
+        use crate::query::sqlite::price::Price as PriceBase;
+        use crate::SQLiteQuery;
+
+        async fn setup() -> SQLiteQuery {
+            let uri: &str = &format!(
+                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+
+            println!("work_dir: {:?}", std::env::current_dir());
+            SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = PriceBase {
+                guid: "guid".to_string(),
+                commodity_guid: "commodity_guid".to_string(),
+                currency_guid: "currency_guid".to_string(),
+                date: NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
+                    .unwrap(),
+                source: Some("source".to_string()),
+                r#type: Some("type".to_string()),
+                value_num: 1000,
+                value_denom: 10,
+            };
+
+            let result = Price::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.commodity_guid, "commodity_guid");
+            assert_eq!(result.currency_guid, "currency_guid");
+            assert_eq!(
+                result.datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(result.source, "source");
+            assert_eq!(result.r#type, "type");
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, result.value, 100.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(result.value, Decimal::new(100, 0));
+        }
+
+        #[tokio::test]
+        async fn commodity() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let price = book
+                .prices()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
+                .unwrap();
+            let commodity = price.commodity().await.unwrap();
+            assert_eq!(commodity.fullname, "Andorran Franc");
+        }
+
+        #[tokio::test]
+        async fn currency() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let price = book
+                .prices()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
+                .unwrap();
+            let currency = price.currency().await.unwrap();
+            assert_eq!(currency.fullname, "UAE Dirham");
+        }
     }
 
-    #[tokio::test]
-    async fn test_from_with_query() {
-        let query = Arc::new(setup().await);
-        let item = PriceSQL {
-            guid: "guid".to_string(),
-            commodity_guid: "commodity_guid".to_string(),
-            currency_guid: "currency_guid".to_string(),
-            date: NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
-                .unwrap(),
-            source: Some("source".to_string()),
-            r#type: Some("type".to_string()),
-            value_num: 1000,
-            value_denom: 10,
-        };
+    #[cfg(feature = "mysql")]
+    mod mysql {
+        use super::*;
 
-        let result = Price::from_with_query(&item, query);
+        use pretty_assertions::assert_eq;
 
-        assert_eq!(result.guid, "guid");
-        assert_eq!(result.commodity_guid, "commodity_guid");
-        assert_eq!(result.currency_guid, "currency_guid");
-        assert_eq!(
-            result.datetime,
-            NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
-        );
-        assert_eq!(result.source, "source");
-        assert_eq!(result.r#type, "type");
-        #[cfg(not(feature = "decimal"))]
-        assert_approx_eq!(f64, result.value, 100.0);
-        #[cfg(feature = "decimal")]
-        assert_eq!(result.value, Decimal::new(100, 0));
+        use crate::query::mysql::price::Price as PriceBase;
+        use crate::MySQLQuery;
+
+        async fn setup() -> MySQLQuery {
+            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+            MySQLQuery::new(uri).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = PriceBase {
+                guid: "guid".to_string(),
+                commodity_guid: "commodity_guid".to_string(),
+                currency_guid: "currency_guid".to_string(),
+                date: NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
+                    .unwrap(),
+                source: Some("source".to_string()),
+                r#type: Some("type".to_string()),
+                value_num: 1000,
+                value_denom: 10,
+            };
+
+            let result = Price::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.commodity_guid, "commodity_guid");
+            assert_eq!(result.currency_guid, "currency_guid");
+            assert_eq!(
+                result.datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(result.source, "source");
+            assert_eq!(result.r#type, "type");
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, result.value, 100.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(result.value, Decimal::new(100, 0));
+        }
+
+        #[tokio::test]
+        async fn commodity() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let price = book
+                .prices()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
+                .unwrap();
+            let commodity = price.commodity().await.unwrap();
+            assert_eq!(commodity.fullname, "Andorran Franc");
+        }
+
+        #[tokio::test]
+        async fn currency() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let price = book
+                .prices()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
+                .unwrap();
+            let currency = price.currency().await.unwrap();
+            assert_eq!(currency.fullname, "UAE Dirham");
+        }
     }
 
-    #[tokio::test]
-    async fn commodity() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let price = book
-            .prices()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
-            .unwrap();
-        let commodity = price.commodity().await.unwrap();
-        assert_eq!(commodity.fullname, "Andorran Franc");
+    #[cfg(feature = "postgresql")]
+    mod postgresql {
+        use super::*;
+
+        use pretty_assertions::assert_eq;
+
+        use crate::query::postgresql::price::Price as PriceBase;
+        use crate::PostgreSQLQuery;
+
+        async fn setup() -> PostgreSQLQuery {
+            let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+            PostgreSQLQuery::new(uri).await.unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = PriceBase {
+                guid: "guid".to_string(),
+                commodity_guid: "commodity_guid".to_string(),
+                currency_guid: "currency_guid".to_string(),
+                date: NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
+                    .unwrap(),
+                source: Some("source".to_string()),
+                r#type: Some("type".to_string()),
+                value_num: 1000,
+                value_denom: 10,
+            };
+
+            let result = Price::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.commodity_guid, "commodity_guid");
+            assert_eq!(result.currency_guid, "currency_guid");
+            assert_eq!(
+                result.datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(result.source, "source");
+            assert_eq!(result.r#type, "type");
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, result.value, 100.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(result.value, Decimal::new(100, 0));
+        }
+
+        #[tokio::test]
+        async fn commodity() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let price = book
+                .prices()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
+                .unwrap();
+            let commodity = price.commodity().await.unwrap();
+            assert_eq!(commodity.fullname, "Andorran Franc");
+        }
+
+        #[tokio::test]
+        async fn currency() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let price = book
+                .prices()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
+                .unwrap();
+            let currency = price.currency().await.unwrap();
+            assert_eq!(currency.fullname, "UAE Dirham");
+        }
     }
 
-    #[tokio::test]
-    async fn currency() {
-        let query = setup().await;
-        let book = Book::new(query).await.unwrap();
-        let price = book
-            .prices()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
-            .unwrap();
-        let currency = price.currency().await.unwrap();
-        assert_eq!(currency.fullname, "UAE Dirham");
+    #[cfg(feature = "xml")]
+    mod xml {
+        use super::*;
+
+        use pretty_assertions::assert_eq;
+
+        use crate::query::xml::price::Price as PriceBase;
+        use crate::XMLQuery;
+
+        fn setup() -> XMLQuery {
+            let path: &str = &format!(
+                "{}/tests/db/xml/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+
+            println!("work_dir: {:?}", std::env::current_dir());
+            XMLQuery::new(path).unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup());
+            let item = PriceBase {
+                guid: "guid".to_string(),
+                commodity_guid: "commodity_guid".to_string(),
+                currency_guid: "currency_guid".to_string(),
+                date: NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
+                    .unwrap(),
+                source: Some("source".to_string()),
+                r#type: Some("type".to_string()),
+                value_num: 1000,
+                value_denom: 10,
+            };
+
+            let result = Price::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.commodity_guid, "commodity_guid");
+            assert_eq!(result.currency_guid, "currency_guid");
+            assert_eq!(
+                result.datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(result.source, "source");
+            assert_eq!(result.r#type, "type");
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, result.value, 100.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(result.value, Decimal::new(100, 0));
+        }
+
+        #[tokio::test]
+        async fn commodity() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let price = book
+                .prices()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
+                .unwrap();
+            let commodity = price.commodity().await.unwrap();
+            assert_eq!(commodity.fullname, "");
+        }
+
+        #[tokio::test]
+        async fn currency() {
+            let query = setup();
+            let book = Book::new(query).await.unwrap();
+            let price = book
+                .prices()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
+                .unwrap();
+            let currency = price.currency().await.unwrap();
+            assert_eq!(currency.fullname, "");
+        }
     }
 }

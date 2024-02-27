@@ -1,5 +1,4 @@
-// ref: https://piecash.readthedocs.io/en/master/object_model.html
-// ref: https://wiki.gnucash.org/wiki/SQL
+// ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use chrono::NaiveDateTime;
 use xmltree::Element;

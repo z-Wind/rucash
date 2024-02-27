@@ -129,134 +129,510 @@ where
 }
 
 #[cfg(test)]
-#[cfg(feature = "sqlite")]
 mod tests {
     use super::*;
 
-    use crate::SQLiteQuery;
-
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
-    use pretty_assertions::assert_eq;
     #[cfg(feature = "decimal")]
     use rust_decimal::Decimal;
     use tokio::sync::OnceCell;
 
-    static Q: OnceCell<Book<SQLiteQuery>> = OnceCell::const_new();
-    async fn setup() -> &'static Book<SQLiteQuery> {
-        Q.get_or_init(|| async {
+    #[cfg(feature = "sqlite")]
+    mod sqlite {
+        use super::*;
+
+        use pretty_assertions::assert_eq;
+
+        use crate::SQLiteQuery;
+
+        static Q: OnceCell<Book<SQLiteQuery>> = OnceCell::const_new();
+        async fn setup() -> &'static Book<SQLiteQuery> {
+            Q.get_or_init(|| async {
+                let uri: &str = &format!(
+                    "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                    env!("CARGO_MANIFEST_DIR")
+                );
+
+                println!("work_dir: {:?}", std::env::current_dir());
+                let query = SQLiteQuery::new(uri).await.unwrap();
+                Book::new(query).await.unwrap()
+            })
+            .await
+        }
+
+        #[tokio::test]
+        async fn test_new() {
             let uri: &str = &format!(
                 "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
-
-            println!("work_dir: {:?}", std::env::current_dir());
             let query = SQLiteQuery::new(uri).await.unwrap();
-            Book::new(query).await.unwrap()
-        })
-        .await
+            Book::new(query).await.unwrap();
+        }
+
+        #[tokio::test]
+        async fn test_new_fail() {
+            assert!(matches!(
+                SQLiteQuery::new("sqlite://tests/sample/no.gnucash").await,
+                Err(crate::Error::Sql(_))
+            ));
+        }
+
+        #[tokio::test]
+        async fn test_accounts() {
+            let book = setup().await;
+            let accounts = book.accounts().await.unwrap();
+            assert_eq!(accounts.len(), 21);
+        }
+
+        #[tokio::test]
+        async fn test_accounts_contains_name() {
+            let book = setup().await;
+            let accounts = book.accounts_contains_name_ignore_case("aS").await.unwrap();
+            assert_eq!(accounts.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_account_contains_name() {
+            let book = setup().await;
+            let account = book
+                .account_contains_name_ignore_case("NAS")
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(account.name, "NASDAQ");
+        }
+
+        #[tokio::test]
+        async fn test_splits() {
+            let book = setup().await;
+            let splits = book.splits().await.unwrap();
+            assert_eq!(splits.len(), 25);
+        }
+
+        #[tokio::test]
+        async fn test_transactions() {
+            let book = setup().await;
+            let transactions = book.transactions().await.unwrap();
+            assert_eq!(transactions.len(), 11);
+        }
+
+        #[tokio::test]
+        async fn test_prices() {
+            let book = setup().await;
+            let prices = book.prices().await.unwrap();
+            assert_eq!(prices.len(), 5);
+        }
+
+        #[tokio::test]
+        async fn test_commodities() {
+            let book = setup().await;
+            let commodities = book.commodities().await.unwrap();
+            assert_eq!(commodities.len(), 5);
+        }
+
+        #[tokio::test]
+        async fn test_currencies() {
+            let book = setup().await;
+            let currencies = book.currencies().await.unwrap();
+            assert_eq!(currencies.len(), 4);
+        }
+
+        #[tokio::test]
+        async fn test_exchange() {
+            let book = setup().await;
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+
+            let rate = book.exchange(&commodity, &currency).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+        }
     }
 
-    #[tokio::test]
-    async fn test_new() {
-        let uri: &str = &format!(
-            "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
-            env!("CARGO_MANIFEST_DIR")
-        );
-        let query = SQLiteQuery::new(uri).await.unwrap();
-        Book::new(query).await.unwrap();
-    }
+    #[cfg(feature = "mysql")]
+    mod mysql {
+        use super::*;
 
-    #[tokio::test]
-    async fn test_new_fail() {
-        assert!(matches!(
-            SQLiteQuery::new("sqlite://tests/sample/no.gnucash").await,
-            Err(crate::Error::Sql(_))
-        ));
-    }
+        use pretty_assertions::assert_eq;
 
-    #[tokio::test]
-    async fn test_accounts() {
-        let book = setup().await;
-        let accounts = book.accounts().await.unwrap();
-        assert_eq!(accounts.len(), 21);
-    }
+        use crate::MySQLQuery;
 
-    #[tokio::test]
-    async fn test_accounts_contains_name() {
-        let book = setup().await;
-        let accounts = book.accounts_contains_name_ignore_case("aS").await.unwrap();
-        assert_eq!(accounts.len(), 3);
-    }
-
-    #[tokio::test]
-    async fn test_account_contains_name() {
-        let book = setup().await;
-        let account = book
-            .account_contains_name_ignore_case("NAS")
+        static Q: OnceCell<Book<MySQLQuery>> = OnceCell::const_new();
+        async fn setup() -> &'static Book<MySQLQuery> {
+            Q.get_or_init(|| async {
+                let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+                let query = MySQLQuery::new(uri)
+                    .await
+                    .unwrap_or_else(|e| panic!("{e} uri:{uri:?}"));
+                Book::new(query).await.unwrap()
+            })
             .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(account.name, "NASDAQ");
+        }
+
+        #[tokio::test]
+        async fn test_new() {
+            let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
+            let query = MySQLQuery::new(uri).await.unwrap();
+            Book::new(query).await.unwrap();
+        }
+
+        #[tokio::test]
+        async fn test_new_fail() {
+            assert!(matches!(
+                MySQLQuery::new("mysql://tests/sample/no.gnucash").await,
+                Err(crate::Error::Sql(_))
+            ));
+        }
+
+        #[tokio::test]
+        async fn test_accounts() {
+            let book = setup().await;
+            let accounts = book.accounts().await.unwrap();
+            assert_eq!(accounts.len(), 21);
+        }
+
+        #[tokio::test]
+        async fn test_accounts_contains_name() {
+            let book = setup().await;
+            let accounts = book.accounts_contains_name_ignore_case("aS").await.unwrap();
+            assert_eq!(accounts.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_account_contains_name() {
+            let book = setup().await;
+            let account = book
+                .account_contains_name_ignore_case("NAS")
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(account.name, "NASDAQ");
+        }
+
+        #[tokio::test]
+        async fn test_splits() {
+            let book = setup().await;
+            let splits = book.splits().await.unwrap();
+            assert_eq!(splits.len(), 25);
+        }
+
+        #[tokio::test]
+        async fn test_transactions() {
+            let book = setup().await;
+            let transactions = book.transactions().await.unwrap();
+            assert_eq!(transactions.len(), 11);
+        }
+
+        #[tokio::test]
+        async fn test_prices() {
+            let book = setup().await;
+            let prices = book.prices().await.unwrap();
+            assert_eq!(prices.len(), 5);
+        }
+
+        #[tokio::test]
+        async fn test_commodities() {
+            let book = setup().await;
+            let commodities = book.commodities().await.unwrap();
+            assert_eq!(commodities.len(), 5);
+        }
+
+        #[tokio::test]
+        async fn test_currencies() {
+            let book = setup().await;
+            let currencies = book.currencies().await.unwrap();
+            assert_eq!(currencies.len(), 4);
+        }
+
+        #[tokio::test]
+        async fn test_exchange() {
+            let book = setup().await;
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+
+            let rate = book.exchange(&commodity, &currency).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+        }
     }
 
-    #[tokio::test]
-    async fn test_splits() {
-        let book = setup().await;
-        let splits = book.splits().await.unwrap();
-        assert_eq!(splits.len(), 25);
-    }
+    #[cfg(feature = "postgresql")]
+    mod postgresql {
+        use super::*;
 
-    #[tokio::test]
-    async fn test_transactions() {
-        let book = setup().await;
-        let transactions = book.transactions().await.unwrap();
-        assert_eq!(transactions.len(), 11);
-    }
+        use pretty_assertions::assert_eq;
 
-    #[tokio::test]
-    async fn test_prices() {
-        let book = setup().await;
-        let prices = book.prices().await.unwrap();
-        assert_eq!(prices.len(), 5);
-    }
+        use crate::PostgreSQLQuery;
 
-    #[tokio::test]
-    async fn test_commodities() {
-        let book = setup().await;
-        let commodities = book.commodities().await.unwrap();
-        assert_eq!(commodities.len(), 5);
-    }
-
-    #[tokio::test]
-    async fn test_currencies() {
-        let book = setup().await;
-        let currencies = book.currencies().await.unwrap();
-        assert_eq!(currencies.len(), 4);
-    }
-
-    #[tokio::test]
-    async fn test_exchange() {
-        let book = setup().await;
-        let commodity = book
-            .commodities()
+        static Q: OnceCell<Book<PostgreSQLQuery>> = OnceCell::const_new();
+        async fn setup() -> &'static Book<PostgreSQLQuery> {
+            Q.get_or_init(|| async {
+                let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+                let query = PostgreSQLQuery::new(uri)
+                    .await
+                    .unwrap_or_else(|e| panic!("{e} uri:{uri:?}"));
+                Book::new(query).await.unwrap()
+            })
             .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
-            .unwrap();
-        let currency = book
-            .commodities()
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
-            .unwrap();
+        }
 
-        let rate = book.exchange(&commodity, &currency).await.unwrap();
-        #[cfg(not(feature = "decimal"))]
-        assert_approx_eq!(f64, rate, 1.5);
-        #[cfg(feature = "decimal")]
-        assert_eq!(rate, Decimal::new(15, 1));
+        #[tokio::test]
+        async fn test_new() {
+            let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+            let query = PostgreSQLQuery::new(uri).await.unwrap();
+            Book::new(query).await.unwrap();
+        }
+
+        #[tokio::test]
+        async fn test_new_fail() {
+            assert!(matches!(
+                PostgreSQLQuery::new("postgresql://tests/sample/no.gnucash").await,
+                Err(crate::Error::Sql(_))
+            ));
+        }
+
+        #[tokio::test]
+        async fn test_accounts() {
+            let book = setup().await;
+            let accounts = book.accounts().await.unwrap();
+            assert_eq!(accounts.len(), 21);
+        }
+
+        #[tokio::test]
+        async fn test_accounts_contains_name() {
+            let book = setup().await;
+            let accounts = book.accounts_contains_name_ignore_case("aS").await.unwrap();
+            assert_eq!(accounts.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_account_contains_name() {
+            let book = setup().await;
+            let account = book
+                .account_contains_name_ignore_case("NAS")
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(account.name, "NASDAQ");
+        }
+
+        #[tokio::test]
+        async fn test_splits() {
+            let book = setup().await;
+            let splits = book.splits().await.unwrap();
+            assert_eq!(splits.len(), 25);
+        }
+
+        #[tokio::test]
+        async fn test_transactions() {
+            let book = setup().await;
+            let transactions = book.transactions().await.unwrap();
+            assert_eq!(transactions.len(), 11);
+        }
+
+        #[tokio::test]
+        async fn test_prices() {
+            let book = setup().await;
+            let prices = book.prices().await.unwrap();
+            assert_eq!(prices.len(), 5);
+        }
+
+        #[tokio::test]
+        async fn test_commodities() {
+            let book = setup().await;
+            let commodities = book.commodities().await.unwrap();
+            assert_eq!(commodities.len(), 5);
+        }
+
+        #[tokio::test]
+        async fn test_currencies() {
+            let book = setup().await;
+            let currencies = book.currencies().await.unwrap();
+            assert_eq!(currencies.len(), 4);
+        }
+
+        #[tokio::test]
+        async fn test_exchange() {
+            let book = setup().await;
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
+                .unwrap();
+
+            let rate = book.exchange(&commodity, &currency).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+        }
+    }
+
+    #[cfg(feature = "xml")]
+    mod xml {
+        use super::*;
+
+        use pretty_assertions::assert_eq;
+
+        use crate::XMLQuery;
+
+        static Q: OnceCell<Book<XMLQuery>> = OnceCell::const_new();
+        async fn setup() -> &'static Book<XMLQuery> {
+            Q.get_or_init(|| async {
+                let path: &str = &format!(
+                    "{}/tests/db/xml/complex_sample.gnucash",
+                    env!("CARGO_MANIFEST_DIR")
+                );
+
+                println!("work_dir: {:?}", std::env::current_dir());
+                let query = XMLQuery::new(path).unwrap();
+                Book::new(query).await.unwrap()
+            })
+            .await
+        }
+
+        #[tokio::test]
+        async fn test_new() {
+            let path: &str = &format!(
+                "{}/tests/db/xml/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+            let query = XMLQuery::new(path).unwrap();
+            Book::new(query).await.unwrap();
+        }
+
+        #[tokio::test]
+        async fn test_new_fail() {
+            assert!(matches!(
+                XMLQuery::new("tests/sample/no.gnucash"),
+                Err(crate::Error::IO(_))
+            ));
+        }
+
+        #[tokio::test]
+        async fn test_accounts() {
+            let book = setup().await;
+            let accounts = book.accounts().await.unwrap();
+			// 少一組 Template Root
+            assert_eq!(accounts.len(), 20);
+        }
+
+        #[tokio::test]
+        async fn test_accounts_contains_name() {
+            let book = setup().await;
+            let accounts = book.accounts_contains_name_ignore_case("aS").await.unwrap();
+            assert_eq!(accounts.len(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_account_contains_name() {
+            let book = setup().await;
+            let account = book
+                .account_contains_name_ignore_case("NAS")
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(account.name, "NASDAQ");
+        }
+
+        #[tokio::test]
+        async fn test_splits() {
+            let book = setup().await;
+            let splits = book.splits().await.unwrap();
+            assert_eq!(splits.len(), 25);
+        }
+
+        #[tokio::test]
+        async fn test_transactions() {
+            let book = setup().await;
+            let transactions = book.transactions().await.unwrap();
+            assert_eq!(transactions.len(), 11);
+        }
+
+        #[tokio::test]
+        async fn test_prices() {
+            let book = setup().await;
+            let prices = book.prices().await.unwrap();
+            assert_eq!(prices.len(), 5);
+        }
+
+        #[tokio::test]
+        async fn test_commodities() {
+            let book = setup().await;
+            let commodities = book.commodities().await.unwrap();
+			// 多一組 template
+            assert_eq!(commodities.len(), 6);
+        }
+
+        #[tokio::test]
+        async fn test_currencies() {
+            let book = setup().await;
+            let currencies = book.currencies().await.unwrap();
+            assert_eq!(currencies.len(), 4);
+        }
+
+        #[tokio::test]
+        async fn test_exchange() {
+            let book = setup().await;
+            let commodity = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "ADF")
+                .unwrap();
+            let currency = book
+                .commodities()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "AED")
+                .unwrap();
+
+            let rate = book.exchange(&commodity, &currency).await.unwrap();
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, rate, 1.5);
+            #[cfg(feature = "decimal")]
+            assert_eq!(rate, Decimal::new(15, 1));
+        }
     }
 }
