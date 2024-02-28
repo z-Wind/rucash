@@ -9,7 +9,7 @@ use crate::error::Error;
 use crate::query::xml::XMLQuery;
 use crate::query::{SplitQ, SplitT};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Split {
     pub guid: String,
     pub tx_guid: String,

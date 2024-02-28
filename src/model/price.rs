@@ -5,8 +5,7 @@ use crate::error::Error;
 use crate::model::Commodity;
 use crate::query::{CommodityQ, PriceT, Query};
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "decimal", derive(Eq, Hash))]
+#[derive(Clone, Debug)]
 pub struct Price<Q>
 where
     Q: Query,

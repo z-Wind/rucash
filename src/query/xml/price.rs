@@ -9,7 +9,7 @@ use crate::error::Error;
 use crate::query::xml::XMLQuery;
 use crate::query::{PriceQ, PriceT};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Price {
     pub guid: String,
     pub commodity_guid: String,

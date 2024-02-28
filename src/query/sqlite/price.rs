@@ -9,7 +9,7 @@ use crate::error::Error;
 use crate::query::sqlite::SQLiteQuery;
 use crate::query::{PriceQ, PriceT};
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, sqlx::FromRow)]
 pub struct Price {
     pub guid: String,
     pub commodity_guid: String,

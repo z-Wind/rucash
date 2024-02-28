@@ -7,7 +7,7 @@ use crate::error::Error;
 use crate::query::sqlite::SQLiteQuery;
 use crate::query::{TransactionQ, TransactionT};
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, sqlx::FromRow)]
 pub struct Transaction {
     pub guid: String,
     pub currency_guid: String,

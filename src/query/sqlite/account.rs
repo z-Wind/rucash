@@ -6,7 +6,7 @@ use crate::query::sqlite::SQLiteQuery;
 use crate::query::{AccountQ, AccountT};
 
 #[allow(clippy::struct_field_names)]
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, sqlx::FromRow)]
 pub struct Account {
     pub(crate) guid: String,
     pub(crate) name: String,

@@ -7,7 +7,7 @@ use crate::error::Error;
 use crate::query::xml::XMLQuery;
 use crate::query::{TransactionQ, TransactionT};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Transaction {
     pub guid: String,
     pub currency_guid: String,

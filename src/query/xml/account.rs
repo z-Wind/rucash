@@ -7,7 +7,7 @@ use crate::query::xml::XMLQuery;
 use crate::query::{AccountQ, AccountT};
 
 #[allow(clippy::struct_field_names)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Account {
     pub(crate) guid: String,
     pub(crate) name: String,

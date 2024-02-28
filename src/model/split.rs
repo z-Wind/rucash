@@ -5,8 +5,7 @@ use crate::error::Error;
 use crate::model::{Account, Transaction};
 use crate::query::{AccountQ, Query, SplitT, TransactionQ};
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "decimal", derive(Eq, Hash))]
+#[derive(Clone, Debug)]
 pub struct Split<Q>
 where
     Q: Query,

@@ -9,7 +9,7 @@ use crate::error::Error;
 use crate::query::mysql::MySQLQuery;
 use crate::query::{SplitQ, SplitT};
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, sqlx::FromRow)]
 pub struct Split {
     pub guid: String,
     pub tx_guid: String,

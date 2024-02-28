@@ -5,7 +5,7 @@ use crate::error::Error;
 use crate::model::{Commodity, Split};
 use crate::query::{CommodityQ, Query, SplitQ, TransactionT};
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Debug)]
 pub struct Transaction<Q>
 where
     Q: Query,

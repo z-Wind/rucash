@@ -6,7 +6,7 @@ use crate::model::{Commodity, Split};
 use crate::query::{AccountQ, AccountT, CommodityQ, Query, SplitQ};
 use crate::Book;
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Debug)]
 pub struct Account<Q>
 where
     Q: Query,

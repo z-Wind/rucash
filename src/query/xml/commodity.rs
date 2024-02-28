@@ -7,7 +7,7 @@ use crate::error::Error;
 use crate::query::xml::XMLQuery;
 use crate::query::{CommodityQ, CommodityT};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Commodity {
     pub(crate) guid: String,
     pub(crate) namespace: String,

@@ -5,7 +5,7 @@ use crate::error::Error;
 use crate::query::sqlite::SQLiteQuery;
 use crate::query::{CommodityQ, CommodityT};
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, sqlx::FromRow)]
 pub struct Commodity {
     pub(crate) guid: String,
     pub(crate) namespace: String,
