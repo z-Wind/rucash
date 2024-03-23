@@ -1,4 +1,3 @@
-use futures::future::{BoxFuture, FutureExt};
 use std::sync::Arc;
 
 use crate::error::Error;
@@ -107,37 +106,34 @@ where
         }
     }
 
-    fn balance_into_currency<'a>(
+    async fn balance_into_currency<'a>(
         &'a self,
         currency: &'a Commodity<Q>,
         book: &'a Book<Q>,
-    ) -> BoxFuture<'a, Result<crate::Num, Error>> {
-        async {
-            let mut net: crate::Num = self.splits().await?.iter().map(|s| s.quantity).sum();
-            let commodity = self.commodity().await?;
+    ) -> Result<crate::Num, Error> {
+        let mut net: crate::Num = self.splits().await?.iter().map(|s| s.quantity).sum();
+        let commodity = self.commodity().await?;
 
-            for child in self.children().await? {
-                let child_net = child.balance_into_currency(&commodity, book).await?;
-                net += child_net;
-            }
-
-            let rate = commodity.sell(currency, book).await.unwrap_or_else(|| {
-                panic!(
-                    "must have rate {} to {}",
-                    commodity.mnemonic, currency.mnemonic
-                )
-            });
-            // dbg!((
-            //     &commodity.mnemonic,
-            //     &currency.mnemonic,
-            //     rate,
-            //     &self.name,
-            //     net
-            // ));
-
-            Ok(net * rate)
+        for child in self.children().await? {
+            let child_net = Box::pin(child.balance_into_currency(&commodity, book)).await?;
+            net += child_net;
         }
-        .boxed()
+
+        let rate = commodity.sell(currency, book).await.unwrap_or_else(|| {
+            panic!(
+                "must have rate {} to {}",
+                commodity.mnemonic, currency.mnemonic
+            )
+        });
+        // dbg!((
+        //     &commodity.mnemonic,
+        //     &currency.mnemonic,
+        //     rate,
+        //     &self.name,
+        //     net
+        // ));
+
+        Ok(net * rate)
     }
 
     pub async fn balance(&self, book: &Book<Q>) -> Result<crate::Num, Error> {
