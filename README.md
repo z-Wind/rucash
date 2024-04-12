@@ -8,6 +8,11 @@
 <br />
 
 <div align="center">
+  <!-- CI -->
+  <a href="https://github.com/z-Wind/rucash/actions/workflows/ci.yml">
+    <img src="https://github.com/z-Wind/rucash/actions/workflows/ci.yml/badge.svg?style=flat-square"
+    alt="CI Result" />
+  </a>
   <!-- Version -->
   <a href="https://crates.io/crates/rucash">
     <img src="https://img.shields.io/crates/v/rucash.svg?style=flat-square"

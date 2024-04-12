@@ -552,7 +552,7 @@ mod tests {
         async fn test_accounts() {
             let book = setup().await;
             let accounts = book.accounts().await.unwrap();
-			// 少一組 Template Root
+            // 少一組 Template Root
             assert_eq!(accounts.len(), 20);
         }
 
@@ -599,7 +599,7 @@ mod tests {
         async fn test_commodities() {
             let book = setup().await;
             let commodities = book.commodities().await.unwrap();
-			// 多一組 template
+            // 多一組 template
             assert_eq!(commodities.len(), 6);
         }
 

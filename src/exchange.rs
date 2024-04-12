@@ -186,8 +186,8 @@ mod tests {
                 .into_iter()
                 .find(|c| c.mnemonic == "AED")
                 .unwrap();
-			assert_eq!(from.mnemonic, "ADF");
-			assert_eq!(to.mnemonic, "AED");
+            assert_eq!(from.mnemonic, "ADF");
+            assert_eq!(to.mnemonic, "AED");
             #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.5, exchange.cal(&from, &to).unwrap());
             #[cfg(feature = "decimal")]
@@ -379,8 +379,8 @@ mod tests {
                 .into_iter()
                 .find(|c| c.mnemonic == "AED")
                 .unwrap();
-			assert_eq!(from.mnemonic, "ADF");
-			assert_eq!(to.mnemonic, "AED");
+            assert_eq!(from.mnemonic, "ADF");
+            assert_eq!(to.mnemonic, "AED");
             #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.5, exchange.cal(&from, &to).unwrap());
             #[cfg(feature = "decimal")]
@@ -573,8 +573,8 @@ mod tests {
                 .into_iter()
                 .find(|c| c.mnemonic == "AED")
                 .unwrap();
-			assert_eq!(from.mnemonic, "ADF");
-			assert_eq!(to.mnemonic, "AED");
+            assert_eq!(from.mnemonic, "ADF");
+            assert_eq!(to.mnemonic, "AED");
             #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.5, exchange.cal(&from, &to).unwrap());
             #[cfg(feature = "decimal")]
@@ -769,8 +769,8 @@ mod tests {
                 .into_iter()
                 .find(|c| c.mnemonic == "AED")
                 .unwrap();
-			assert_eq!(from.mnemonic, "ADF");
-			assert_eq!(to.mnemonic, "AED");
+            assert_eq!(from.mnemonic, "ADF");
+            assert_eq!(to.mnemonic, "AED");
             #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, 1.5, exchange.cal(&from, &to).unwrap());
             #[cfg(feature = "decimal")]

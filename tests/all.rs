@@ -244,7 +244,10 @@ mod consistency {
         println!("vec_match(&v_sqlite, &v_xml)");
         assert!(vec_match(
             &v_sqlite,
-            &v_xml.into_iter().filter(|x| x.guid != "template").collect::<Vec<_>>(),
+            &v_xml
+                .into_iter()
+                .filter(|x| x.guid != "template")
+                .collect::<Vec<_>>(),
             cmp
         ),);
     }

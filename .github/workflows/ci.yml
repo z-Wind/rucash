@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Formatting
+        run: cargo fmt -- --check
+
+
+  lint:
+    name: Lint
+    needs: [format]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Clippy without Decimal
+        run: cargo clippy --features sqlite,postgresql,mysql,xml --all-targets -- -D warnings
+      - name: Clippy with Decimal
+        run: cargo clippy --features sqlite,postgresql,mysql,xml,decimal --all-targets -- -D warnings
+
+
+  test:
+    name: Test
+    needs: [lint]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Rust Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install latest nextest release
+      uses: taiki-e/install-action@nextest
+
+    # - name: Run tests --features sqlite,postgresql,mysql,xml
+    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlite,postgresql,mysql,xml
+    - name: Run tests --features sqlite
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlite
+    # - name: Run tests --features postgresql
+    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features postgresql
+    # - name: Run tests --features mysql
+    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features mysql
+    - name: Run tests --features xml
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features xml
+    # - name: Run tests --features sqlite,postgresql,mysql,xml,decimal
+    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlite,postgresql,mysql,xml,decimal
+    - name: Run tests --features sqlite,decimal
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlite,decimal
+    # - name: Run tests --features postgresql,decimal
+    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features postgresql,decimal
+    # - name: Run tests --features mysql,decimal
+    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features mysql,decimal
+    - name: Run tests --features xml,decimal
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features xml,decimal
+
