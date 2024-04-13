@@ -302,7 +302,13 @@ mod tests {
                 let result = AccountQ::commodity_guid(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
                     .unwrap();
-                assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
+                assert!(
+                    result
+                        .iter()
+                        .map(|x| &x.guid)
+                        .any(|guid| guid == "fcd795021c976ba75621ec39e75f6214"),
+                    "result does not contains fcd795021c976ba75621ec39e75f6214"
+                );
             }
 
             #[tokio::test]
@@ -724,7 +730,13 @@ mod tests {
                 let result = AccountQ::commodity_guid(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
                     .unwrap();
-                assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
+                assert!(
+                    result
+                        .iter()
+                        .map(|x| &x.guid)
+                        .any(|guid| guid == "fcd795021c976ba75621ec39e75f6214"),
+                    "result does not contains fcd795021c976ba75621ec39e75f6214"
+                );
             }
 
             #[tokio::test]
@@ -733,7 +745,13 @@ mod tests {
                 let result = AccountQ::parent_guid(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
                     .unwrap();
-                assert_eq!(result[0].guid, "3bc319753945b6dba3e1928abed49e35");
+                assert!(
+                    result
+                        .iter()
+                        .map(|x| &x.guid)
+                        .any(|guid| guid == "3bc319753945b6dba3e1928abed49e35"),
+                    "result does not contains 3bc319753945b6dba3e1928abed49e35"
+                );
             }
 
             #[tokio::test]
@@ -1146,7 +1164,13 @@ mod tests {
                 let result = AccountQ::commodity_guid(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
                     .unwrap();
-                assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
+                assert!(
+                    result
+                        .iter()
+                        .map(|x| &x.guid)
+                        .any(|guid| guid == "fcd795021c976ba75621ec39e75f6214"),
+                    "result does not contains fcd795021c976ba75621ec39e75f6214"
+                );
             }
 
             #[tokio::test]
@@ -1155,7 +1179,13 @@ mod tests {
                 let result = AccountQ::parent_guid(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
                     .unwrap();
-                assert_eq!(result[0].guid, "3bc319753945b6dba3e1928abed49e35");
+                assert!(
+                    result
+                        .iter()
+                        .map(|x| &x.guid)
+                        .any(|guid| guid == "3bc319753945b6dba3e1928abed49e35"),
+                    "result does not contains 3bc319753945b6dba3e1928abed49e35"
+                );
             }
 
             #[tokio::test]
@@ -1571,7 +1601,13 @@ mod tests {
             async fn test_commodity_guid() {
                 let query = setup().await;
                 let result = AccountQ::commodity_guid(query, "EUR").await.unwrap();
-                assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
+                assert!(
+                    result
+                        .iter()
+                        .map(|x| &x.guid)
+                        .any(|guid| guid == "fcd795021c976ba75621ec39e75f6214"),
+                    "result does not contains fcd795021c976ba75621ec39e75f6214"
+                );
             }
 
             #[tokio::test]
@@ -1580,7 +1616,13 @@ mod tests {
                 let result = AccountQ::parent_guid(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
                     .unwrap();
-                assert_eq!(result[0].guid, "3bc319753945b6dba3e1928abed49e35");
+                assert!(
+                    result
+                        .iter()
+                        .map(|x| &x.guid)
+                        .any(|guid| guid == "3bc319753945b6dba3e1928abed49e35"),
+                    "result does not contains 3bc319753945b6dba3e1928abed49e35"
+                );
             }
 
             #[tokio::test]

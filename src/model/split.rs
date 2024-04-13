@@ -241,16 +241,16 @@ mod tests {
             let result = Split::from_with_query(&item, query);
 
             assert_eq!(result.guid, "guid");
-            assert_eq!(result.tx_guid, "commodity_guid");
-            assert_eq!(result.account_guid, "currency_guid");
-            assert_eq!(result.memo, "currency_guid");
-            assert_eq!(result.action, "currency_guid");
+            assert_eq!(result.tx_guid, "tx_guid");
+            assert_eq!(result.account_guid, "account_guid");
+            assert_eq!(result.memo, "memo");
+            assert_eq!(result.action, "action");
             assert_eq!(result.reconcile_state, false);
             assert_eq!(
                 result.reconcile_datetime,
                 NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").ok()
             );
-            assert_eq!(result.lot_guid, "source");
+            assert_eq!(result.lot_guid, "lot_guid");
             #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, result.value, 100.0);
             #[cfg(feature = "decimal")]
@@ -332,16 +332,16 @@ mod tests {
             let result = Split::from_with_query(&item, query);
 
             assert_eq!(result.guid, "guid");
-            assert_eq!(result.tx_guid, "commodity_guid");
-            assert_eq!(result.account_guid, "currency_guid");
-            assert_eq!(result.memo, "currency_guid");
-            assert_eq!(result.action, "currency_guid");
+            assert_eq!(result.tx_guid, "tx_guid");
+            assert_eq!(result.account_guid, "account_guid");
+            assert_eq!(result.memo, "memo");
+            assert_eq!(result.action, "action");
             assert_eq!(result.reconcile_state, false);
             assert_eq!(
                 result.reconcile_datetime,
                 NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").ok()
             );
-            assert_eq!(result.lot_guid, "source");
+            assert_eq!(result.lot_guid, "lot_guid");
             #[cfg(not(feature = "decimal"))]
             assert_approx_eq!(f64, result.value, 100.0);
             #[cfg(feature = "decimal")]

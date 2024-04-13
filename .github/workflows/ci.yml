@@ -34,14 +34,39 @@ jobs:
       - name: Rust Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Clippy without Decimal
+      - name: Clippy --features sqlite,postgresql,mysql,xml
         run: cargo clippy --features sqlite,postgresql,mysql,xml --all-targets -- -D warnings
-      - name: Clippy with Decimal
+
+      - name: Clippy --features sqlite
+        run: cargo clippy --features sqlite --all-targets -- -D warnings
+
+      - name: Clippy --features postgresql
+        run: cargo clippy --features postgresql --all-targets -- -D warnings
+
+      - name: Clippy --features mysql
+        run: cargo clippy --features mysql --all-targets -- -D warnings
+
+      - name: Clippy --features xml
+        run: cargo clippy --features xml --all-targets -- -D warnings
+
+      - name: Clippy --features sqlite,postgresql,mysql,xml,decimal
         run: cargo clippy --features sqlite,postgresql,mysql,xml,decimal --all-targets -- -D warnings
 
+      - name: Clippy --features sqlite,decimal
+        run: cargo clippy --features sqlite,decimal --all-targets -- -D warnings
 
-  test:
-    name: Test
+      - name: Clippy --features postgresql,decimal
+        run: cargo clippy --features postgresql,decimal --all-targets -- -D warnings
+
+      - name: Clippy --features mysql,decimal
+        run: cargo clippy --features mysql,decimal --all-targets -- -D warnings
+
+      - name: Clippy --features xml,decimal
+        run: cargo clippy --features xml,decimal --all-targets -- -D warnings
+
+
+  test_xml:
+    name: Test XML
     needs: [lint]
     runs-on: ${{ matrix.os }}
     strategy:
@@ -50,6 +75,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - windows-latest
+
     steps:
     - uses: actions/checkout@v4
 
@@ -59,24 +85,157 @@ jobs:
     - name: Install latest nextest release
       uses: taiki-e/install-action@nextest
 
-    # - name: Run tests --features sqlite,postgresql,mysql,xml
-    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlite,postgresql,mysql,xml
-    - name: Run tests --features sqlite
-      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlite
-    # - name: Run tests --features postgresql
-    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features postgresql
-    # - name: Run tests --features mysql
-    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features mysql
     - name: Run tests --features xml
       run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features xml
-    # - name: Run tests --features sqlite,postgresql,mysql,xml,decimal
-    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlite,postgresql,mysql,xml,decimal
-    - name: Run tests --features sqlite,decimal
-      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlite,decimal
-    # - name: Run tests --features postgresql,decimal
-    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features postgresql,decimal
-    # - name: Run tests --features mysql,decimal
-    #   run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features mysql,decimal
+
     - name: Run tests --features xml,decimal
       run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features xml,decimal
 
+    - name: Run doc tests
+      run: |
+        cargo test --doc --features xml
+        cargo test --doc --features xml,decimal
+
+
+  test_sqlite:
+    name: Test SQLite
+    needs: [lint]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Rust Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install latest nextest release
+      uses: taiki-e/install-action@nextest
+      
+    - name: Check Schema
+      run: cargo check --features sqlite,schema --all-targets
+      env: 
+        DATABASE_URL: "sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro"
+
+    - name: Run tests --features sqlite
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlite
+
+    - name: Run tests --features sqlite,decimal
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlite,decimal
+
+    - name: Run doc tests
+      run: |
+        cargo test --doc --features sqlite
+        cargo test --doc --features sqlite,decimal
+
+
+  test_mysql:
+    name: Test MySQL
+    needs: [lint]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: user
+          MYSQL_PASSWORD: secret
+          MYSQL_DATABASE: complex_sample.gnucash
+        options: --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Rust Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install latest nextest release
+      uses: taiki-e/install-action@nextest
+    
+    - name: Prepare Database
+      run: |
+        mysql --version
+        mysql -u user --password=secret --host 127.0.0.1 --port 3306 complex_sample.gnucash < "${{ github.workspace }}/tests/db/mysql/complex_sample.gnucash.sql"
+    
+    - name: Check Schema
+      run: cargo check --features mysql,schema --all-targets
+      env: 
+        DATABASE_URL: "mysql://user:secret@localhost/complex_sample.gnucash"
+
+    - name: Run tests --features mysql
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features mysql
+
+    - name: Run tests --features mysql,decimal
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features mysql,decimal
+
+    - name: Run doc tests
+      run: |
+        cargo test --doc --features mysql
+        cargo test --doc --features mysql,decimal
+
+
+  test_postgresql:
+    name: Test PostgreSQL
+    needs: [lint]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16.2
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: complex_sample.gnucash
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Rust Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install latest nextest release
+      uses: taiki-e/install-action@nextest
+
+    - name: Prepare Database
+      run: |
+        psql --version
+        psql -d "postgresql://user:secret@localhost:5432/complex_sample.gnucash" < "${{ github.workspace }}/tests/db/postgresql/complex_sample.gnucash.sql"
+    
+    - name: Check Schema
+      run: cargo check --features postgresql,schema --all-targets
+      env: 
+        DATABASE_URL: "postgresql://user:secret@localhost:5432/complex_sample.gnucash"
+
+    - name: Run tests --features postgresql
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features postgresql
+
+    - name: Run tests --features postgresql,decimal
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features postgresql,decimal
+
+    - name: Run doc tests
+      run: |
+        cargo test --doc --features postgresql
+        cargo test --doc --features postgresql,decimal

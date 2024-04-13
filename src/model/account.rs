@@ -276,9 +276,24 @@ mod tests {
             let children = account.children().await.unwrap();
 
             assert_eq!(children.len(), 3);
-            assert_eq!(children[0].name, "Current");
-            assert_eq!(children[1].name, "Fixed");
-            assert_eq!(children[2].name, "Broker");
+            assert!(
+                children
+                    .iter()
+                    .map(|x| &x.name)
+                    .any(|name| name == "Current"),
+                "children does not contains Current"
+            );
+            assert!(
+                children.iter().map(|x| &x.name).any(|name| name == "Fixed"),
+                "children does not contains Fixed"
+            );
+            assert!(
+                children
+                    .iter()
+                    .map(|x| &x.name)
+                    .any(|name| name == "Broker"),
+                "children does not contains Broker"
+            );
         }
 
         #[tokio::test]
@@ -452,9 +467,24 @@ mod tests {
             let children = account.children().await.unwrap();
 
             assert_eq!(children.len(), 3);
-            assert_eq!(children[0].name, "Current");
-            assert_eq!(children[1].name, "Fixed");
-            assert_eq!(children[2].name, "Broker");
+            assert!(
+                children
+                    .iter()
+                    .map(|x| &x.name)
+                    .any(|name| name == "Current"),
+                "children does not contains Current"
+            );
+            assert!(
+                children.iter().map(|x| &x.name).any(|name| name == "Fixed"),
+                "children does not contains Fixed"
+            );
+            assert!(
+                children
+                    .iter()
+                    .map(|x| &x.name)
+                    .any(|name| name == "Broker"),
+                "children does not contains Broker"
+            );
         }
 
         #[tokio::test]
@@ -628,9 +658,24 @@ mod tests {
             let children = account.children().await.unwrap();
 
             assert_eq!(children.len(), 3);
-            assert_eq!(children[0].name, "Current");
-            assert_eq!(children[1].name, "Fixed");
-            assert_eq!(children[2].name, "Broker");
+            assert!(
+                children
+                    .iter()
+                    .map(|x| &x.name)
+                    .any(|name| name == "Current"),
+                "children does not contains Current"
+            );
+            assert!(
+                children.iter().map(|x| &x.name).any(|name| name == "Fixed"),
+                "children does not contains Fixed"
+            );
+            assert!(
+                children
+                    .iter()
+                    .map(|x| &x.name)
+                    .any(|name| name == "Broker"),
+                "children does not contains Broker"
+            );
         }
 
         #[tokio::test]
@@ -809,9 +854,24 @@ mod tests {
             let children = account.children().await.unwrap();
 
             assert_eq!(children.len(), 3);
-            assert_eq!(children[0].name, "Current");
-            assert_eq!(children[1].name, "Fixed");
-            assert_eq!(children[2].name, "Broker");
+            assert!(
+                children
+                    .iter()
+                    .map(|x| &x.name)
+                    .any(|name| name == "Current"),
+                "children does not contains Current"
+            );
+            assert!(
+                children.iter().map(|x| &x.name).any(|name| name == "Fixed"),
+                "children does not contains Fixed"
+            );
+            assert!(
+                children
+                    .iter()
+                    .map(|x| &x.name)
+                    .any(|name| name == "Broker"),
+                "children does not contains Broker"
+            );
         }
 
         #[tokio::test]

@@ -1,13 +1,13 @@
--- MySQL dump 10.13  Distrib 5.5.62, for Win64 (AMD64)
+-- MySQL dump 10.13  Distrib 8.0.36, for Win64 (x86_64)
 --
 -- Host: localhost    Database: complex_sample.gnucash
 -- ------------------------------------------------------
--- Server version	8.0.25
+-- Server version	8.0.36
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8 */;
+/*!50503 SET NAMES utf8mb4 */;
 /*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
 /*!40103 SET TIME_ZONE='+00:00' */;
 /*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
@@ -21,17 +21,17 @@
 
 DROP TABLE IF EXISTS `accounts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `accounts` (
   `guid` varchar(32) NOT NULL,
-  `name` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `account_type` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `name` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `account_type` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `commodity_guid` varchar(32) DEFAULT NULL,
   `commodity_scu` int NOT NULL,
   `non_std_scu` int NOT NULL,
   `parent_guid` varchar(32) DEFAULT NULL,
-  `code` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `description` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `code` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `description` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `hidden` int DEFAULT NULL,
   `placeholder` int DEFAULT NULL,
   PRIMARY KEY (`guid`)
@@ -54,15 +54,15 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `billterms`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `billterms` (
   `guid` varchar(32) NOT NULL,
-  `name` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `description` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `name` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `description` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `refcount` int NOT NULL,
   `invisible` int NOT NULL,
   `parent` varchar(32) DEFAULT NULL,
-  `type` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `type` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `duedays` int DEFAULT NULL,
   `discountdays` int DEFAULT NULL,
   `discount_num` bigint DEFAULT NULL,
@@ -87,7 +87,7 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `books`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `books` (
   `guid` varchar(32) NOT NULL,
   `root_account_guid` varchar(32) NOT NULL,
@@ -112,7 +112,7 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `budget_amounts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `budget_amounts` (
   `id` int NOT NULL AUTO_INCREMENT,
   `budget_guid` varchar(32) NOT NULL,
@@ -139,11 +139,11 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `budgets`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `budgets` (
   `guid` varchar(32) NOT NULL,
-  `name` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `description` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `name` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `description` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `num_periods` int NOT NULL,
   PRIMARY KEY (`guid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -164,17 +164,17 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `commodities`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `commodities` (
   `guid` varchar(32) NOT NULL,
-  `namespace` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `mnemonic` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `fullname` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `cusip` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `namespace` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `mnemonic` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `fullname` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `cusip` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `fraction` int NOT NULL,
   `quote_flag` int NOT NULL,
-  `quote_source` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `quote_tz` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `quote_source` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `quote_tz` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   PRIMARY KEY (`guid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -195,12 +195,12 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `customers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customers` (
   `guid` varchar(32) NOT NULL,
-  `name` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `id` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `notes` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `name` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `id` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `notes` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `active` int NOT NULL,
   `discount_num` bigint NOT NULL,
   `discount_denom` bigint NOT NULL,
@@ -208,22 +208,22 @@ CREATE TABLE `customers` (
   `credit_denom` bigint NOT NULL,
   `currency` varchar(32) NOT NULL,
   `tax_override` int NOT NULL,
-  `addr_name` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr1` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr2` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr3` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr4` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_phone` varchar(128) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_fax` varchar(128) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_email` varchar(256) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `shipaddr_name` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `shipaddr_addr1` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `shipaddr_addr2` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `shipaddr_addr3` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `shipaddr_addr4` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `shipaddr_phone` varchar(128) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `shipaddr_fax` varchar(128) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `shipaddr_email` varchar(256) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `addr_name` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr1` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr2` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr3` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr4` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_phone` varchar(128) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_fax` varchar(128) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_email` varchar(256) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `shipaddr_name` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `shipaddr_addr1` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `shipaddr_addr2` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `shipaddr_addr3` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `shipaddr_addr4` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `shipaddr_phone` varchar(128) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `shipaddr_fax` varchar(128) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `shipaddr_email` varchar(256) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `terms` varchar(32) DEFAULT NULL,
   `tax_included` int DEFAULT NULL,
   `taxtable` varchar(32) DEFAULT NULL,
@@ -246,13 +246,13 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `employees`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employees` (
   `guid` varchar(32) NOT NULL,
-  `username` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `id` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `language` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `acl` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `username` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `id` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `language` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `acl` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `active` int NOT NULL,
   `currency` varchar(32) NOT NULL,
   `ccard_guid` varchar(32) DEFAULT NULL,
@@ -260,14 +260,14 @@ CREATE TABLE `employees` (
   `workday_denom` bigint NOT NULL,
   `rate_num` bigint NOT NULL,
   `rate_denom` bigint NOT NULL,
-  `addr_name` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr1` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr2` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr3` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr4` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_phone` varchar(128) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_fax` varchar(128) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_email` varchar(256) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `addr_name` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr1` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr2` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr3` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr4` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_phone` varchar(128) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_fax` varchar(128) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_email` varchar(256) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   PRIMARY KEY (`guid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -287,14 +287,14 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `entries`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `entries` (
   `guid` varchar(32) NOT NULL,
   `date` datetime NOT NULL DEFAULT '1970-01-01 00:00:00',
   `date_entered` datetime DEFAULT '1970-01-01 00:00:00',
-  `description` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `action` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `notes` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `description` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `action` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `notes` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `quantity_num` bigint DEFAULT NULL,
   `quantity_denom` bigint DEFAULT NULL,
   `i_acct` varchar(32) DEFAULT NULL,
@@ -303,8 +303,8 @@ CREATE TABLE `entries` (
   `i_discount_num` bigint DEFAULT NULL,
   `i_discount_denom` bigint DEFAULT NULL,
   `invoice` varchar(32) DEFAULT NULL,
-  `i_disc_type` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `i_disc_how` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `i_disc_type` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `i_disc_how` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `i_taxable` int DEFAULT NULL,
   `i_taxincluded` int DEFAULT NULL,
   `i_taxtable` varchar(32) DEFAULT NULL,
@@ -339,7 +339,7 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `gnclock`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `gnclock` (
   `Hostname` varchar(255) DEFAULT NULL,
   `PID` int DEFAULT NULL
@@ -361,19 +361,19 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `invoices`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `invoices` (
   `guid` varchar(32) NOT NULL,
-  `id` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `id` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `date_opened` datetime DEFAULT '1970-01-01 00:00:00',
   `date_posted` datetime DEFAULT '1970-01-01 00:00:00',
-  `notes` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `notes` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `active` int NOT NULL,
   `currency` varchar(32) NOT NULL,
   `owner_type` int DEFAULT NULL,
   `owner_guid` varchar(32) DEFAULT NULL,
   `terms` varchar(32) DEFAULT NULL,
-  `billing_id` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `billing_id` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `post_txn` varchar(32) DEFAULT NULL,
   `post_lot` varchar(32) DEFAULT NULL,
   `post_acc` varchar(32) DEFAULT NULL,
@@ -400,12 +400,12 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `jobs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `jobs` (
   `guid` varchar(32) NOT NULL,
-  `id` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `name` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `reference` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `id` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `name` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `reference` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `active` int NOT NULL,
   `owner_type` int DEFAULT NULL,
   `owner_guid` varchar(32) DEFAULT NULL,
@@ -428,7 +428,7 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `lots`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `lots` (
   `guid` varchar(32) NOT NULL,
   `account_guid` varchar(32) DEFAULT NULL,
@@ -452,12 +452,12 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `orders`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `orders` (
   `guid` varchar(32) NOT NULL,
-  `id` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `notes` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `reference` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `id` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `notes` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `reference` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `active` int NOT NULL,
   `date_opened` datetime NOT NULL DEFAULT '1970-01-01 00:00:00',
   `date_closed` datetime NOT NULL DEFAULT '1970-01-01 00:00:00',
@@ -482,14 +482,14 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `prices`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `prices` (
   `guid` varchar(32) NOT NULL,
   `commodity_guid` varchar(32) NOT NULL,
   `currency_guid` varchar(32) NOT NULL,
   `date` datetime NOT NULL DEFAULT '1970-01-01 00:00:00',
-  `source` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `type` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `source` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `type` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `value_num` bigint NOT NULL,
   `value_denom` bigint NOT NULL,
   PRIMARY KEY (`guid`)
@@ -512,14 +512,14 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `recurrences`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `recurrences` (
   `id` int NOT NULL AUTO_INCREMENT,
   `obj_guid` varchar(32) NOT NULL,
   `recurrence_mult` int NOT NULL,
-  `recurrence_period_type` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `recurrence_period_type` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `recurrence_period_start` date NOT NULL,
-  `recurrence_weekend_adjust` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `recurrence_weekend_adjust` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -539,10 +539,10 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `schedxactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `schedxactions` (
   `guid` varchar(32) NOT NULL,
-  `name` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `name` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `enabled` int NOT NULL,
   `start_date` date DEFAULT NULL,
   `end_date` date DEFAULT NULL,
@@ -574,14 +574,14 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `slots`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `slots` (
   `id` int NOT NULL AUTO_INCREMENT,
   `obj_guid` varchar(32) NOT NULL,
-  `name` varchar(4096) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `name` varchar(4096) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `slot_type` int NOT NULL,
   `int64_val` bigint DEFAULT NULL,
-  `string_val` varchar(4096) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `string_val` varchar(4096) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `double_val` double DEFAULT NULL,
   `timespec_val` datetime DEFAULT '1970-01-01 00:00:00',
   `guid_val` varchar(32) DEFAULT NULL,
@@ -609,14 +609,14 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `splits`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `splits` (
   `guid` varchar(32) NOT NULL,
   `tx_guid` varchar(32) NOT NULL,
   `account_guid` varchar(32) NOT NULL,
-  `memo` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `action` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `reconcile_state` varchar(1) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `memo` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `action` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `reconcile_state` varchar(1) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `reconcile_date` datetime DEFAULT '1970-01-01 00:00:00',
   `value_num` bigint NOT NULL,
   `value_denom` bigint NOT NULL,
@@ -645,7 +645,7 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `taxtable_entries`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `taxtable_entries` (
   `id` int NOT NULL AUTO_INCREMENT,
   `taxtable` varchar(32) NOT NULL,
@@ -672,10 +672,10 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `taxtables`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `taxtables` (
   `guid` varchar(32) NOT NULL,
-  `name` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `name` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `refcount` bigint NOT NULL,
   `invisible` int NOT NULL,
   `parent` varchar(32) DEFAULT NULL,
@@ -698,14 +698,14 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `transactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `transactions` (
   `guid` varchar(32) NOT NULL,
   `currency_guid` varchar(32) NOT NULL,
-  `num` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `num` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `post_date` datetime DEFAULT '1970-01-01 00:00:00',
   `enter_date` datetime DEFAULT '1970-01-01 00:00:00',
-  `description` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `description` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   PRIMARY KEY (`guid`),
   KEY `tx_post_date_index` (`post_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -727,25 +727,25 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `vendors`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `vendors` (
   `guid` varchar(32) NOT NULL,
-  `name` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `id` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `notes` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `name` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `id` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `notes` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `currency` varchar(32) NOT NULL,
   `active` int NOT NULL,
   `tax_override` int NOT NULL,
-  `addr_name` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr1` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr2` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr3` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_addr4` varchar(1024) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_phone` varchar(128) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_fax` varchar(128) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `addr_email` varchar(256) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `addr_name` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr1` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr2` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr3` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_addr4` varchar(1024) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_phone` varchar(128) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_fax` varchar(128) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `addr_email` varchar(256) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `terms` varchar(32) DEFAULT NULL,
-  `tax_inc` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `tax_inc` varchar(2048) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
   `tax_table` varchar(32) DEFAULT NULL,
   PRIMARY KEY (`guid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -766,9 +766,9 @@ UNLOCK TABLES;
 
 DROP TABLE IF EXISTS `versions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `versions` (
-  `table_name` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `table_name` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `table_version` int NOT NULL,
   PRIMARY KEY (`table_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -783,10 +783,6 @@ LOCK TABLES `versions` WRITE;
 INSERT INTO `versions` VALUES ('accounts',1),('billterms',2),('books',1),('budgets',1),('budget_amounts',1),('commodities',1),('customers',2),('employees',2),('entries',4),('Gnucash',3000011),('Gnucash-Resave',19920),('invoices',4),('jobs',1),('lots',2),('orders',1),('prices',3),('recurrences',2),('schedxactions',1),('slots',4),('splits',5),('taxtables',2),('taxtable_entries',3),('transactions',4),('vendors',1);
 /*!40000 ALTER TABLE `versions` ENABLE KEYS */;
 UNLOCK TABLES;
-
---
--- Dumping routines for database 'complex_sample.gnucash'
---
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -797,4 +793,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2021-05-31 11:04:04
+-- Dump completed on 2024-04-13 15:29:39

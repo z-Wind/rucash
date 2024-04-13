@@ -22,15 +22,16 @@ check:
 	cargo check --features sqlite,postgresql,mysql,xml,decimal --all-targets
 	cargo clippy --features sqlite,postgresql,mysql,xml,decimal --all-targets
 checkschema:
-	DATABASE_URL=sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro;
-	cargo check --features sqlite,schema
-	DATABASE_URL=mysql://user:secret@localhost/complex_sample.gnucash;
-	cargo check --features mysql,schema
-	DATABASE_URL=postgresql://user:secret@localhost:5432/complex_sample.gnucash;
-	cargo check --features postgresql,schema
+	export DATABASE_URL=sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro
+	cargo check --features sqlite,schema --all-targets
+	export DATABASE_URL=mysql://user:secret@localhost/complex_sample.gnucash
+	cargo check --features mysql,schema --all-targets
+	export DATABASE_URL=postgresql://user:secret@localhost:5432/complex_sample.gnucash
+	cargo check --features postgresql,schema --all-targets
 publish:
 	cargo publish --all-features
-prepare:
-	cargo sqlx prepare --database-url sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro -- --tests --features sqlite,schema
-	cargo sqlx prepare --database-url mysql://user:secret@localhost/complex_sample.gnucash -- --tests --features mysql,schema
-	cargo sqlx prepare --database-url postgresql://user:secret@localhost:5432/complex_sample.gnucash -- --tests --features postgres,schema
+backup:
+# Using Gnucash to convert test files into MySQL and PostgreSQL formats, 
+# then dump them out, and restore them in the testing environment.
+	pg_dump -U user -f "tests/db/postgresql/complex_sample.gnucash.sql" complex_sample.gnucash
+	mysqldump -h localhost -u user -p complex_sample.gnucash > "tests/db/mysql/complex_sample.gnucash.sql"
