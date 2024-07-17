@@ -44,6 +44,8 @@ pub use query::mysql::MySQLQuery;
 pub use query::postgresql::PostgreSQLQuery;
 #[cfg(feature = "sqlite")]
 pub use query::sqlite::SQLiteQuery;
+#[cfg(feature = "sqlitefaster")]
+pub use query::sqlitefaster::SQLiteQuery as SQLiteQueryFaster;
 #[cfg(feature = "xml")]
 pub use query::xml::XMLQuery;
 pub use query::Query;

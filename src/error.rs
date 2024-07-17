@@ -18,6 +18,10 @@ pub enum Error {
     #[error("SQLx error: {0}")]
     Sql(#[from] sqlx::Error),
 
+    #[cfg(feature = "sqlitefaster")]
+    #[error("rusqlite error: {0}")]
+    Rusqlite(#[from] rusqlite::Error),
+
     #[cfg(feature = "xml")]
     #[error("XML error: {0}")]
     XML(#[from] xmltree::Error),

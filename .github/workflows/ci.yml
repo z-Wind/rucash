@@ -34,11 +34,14 @@ jobs:
       - name: Rust Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Clippy --features sqlite,postgresql,mysql,xml
-        run: cargo clippy --features sqlite,postgresql,mysql,xml --all-targets -- -D warnings
+      - name: Clippy --features sqlite,postgresql,mysql,xml,sqlitefaster
+        run: cargo clippy --features sqlite,postgresql,mysql,xml,sqlitefaster --all-targets -- -D warnings
 
       - name: Clippy --features sqlite
         run: cargo clippy --features sqlite --all-targets -- -D warnings
+
+      - name: Clippy --features sqlitefaster
+        run: cargo clippy --features sqlitefaster --all-targets -- -D warnings
 
       - name: Clippy --features postgresql
         run: cargo clippy --features postgresql --all-targets -- -D warnings
@@ -49,11 +52,14 @@ jobs:
       - name: Clippy --features xml
         run: cargo clippy --features xml --all-targets -- -D warnings
 
-      - name: Clippy --features sqlite,postgresql,mysql,xml,decimal
-        run: cargo clippy --features sqlite,postgresql,mysql,xml,decimal --all-targets -- -D warnings
+      - name: Clippy --features sqlite,postgresql,mysql,xml,sqlitefaster,decimal
+        run: cargo clippy --features sqlite,postgresql,mysql,xml,sqlitefaster,decimal --all-targets -- -D warnings
 
       - name: Clippy --features sqlite,decimal
         run: cargo clippy --features sqlite,decimal --all-targets -- -D warnings
+
+      - name: Clippy --features sqlitefaster,decimal
+        run: cargo clippy --features sqlitefaster,decimal --all-targets -- -D warnings
 
       - name: Clippy --features postgresql,decimal
         run: cargo clippy --features postgresql,decimal --all-targets -- -D warnings
@@ -132,6 +138,43 @@ jobs:
       run: |
         cargo test --doc --features sqlite
         cargo test --doc --features sqlite,decimal
+
+
+  test_sqlitefaster:
+    name: Test SQLiteFaster
+    needs: [lint]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Rust Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install latest nextest release
+      uses: taiki-e/install-action@nextest
+
+    - name: Check Schema
+      run: cargo check --features sqlitefaster --all-targets
+      env:
+        DATABASE_URL: "file:/tests/db/sqlite/complex_sample.gnucash"
+
+    - name: Run tests --features sqlitefaster
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlitefaster
+
+    - name: Run tests --features sqlitefaster,decimal
+      run: cargo nextest run --config-file ${{ github.workspace }}/.github/nextest.toml --profile ci --features sqlitefaster,decimal
+
+    - name: Run doc tests
+      run: |
+        cargo test --doc --features sqlitefaster
+        cargo test --doc --features sqlitefaster,decimal
 
 
   test_mysql:

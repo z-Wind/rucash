@@ -27,6 +27,7 @@ flate2 = "1.0"
 tokio = { version = "1.36", features = ["sync"] }
 num-traits = "0.2"
 thiserror = "1.0"
+rusqlite = { version = "*", features = ["bundled", "chrono"], optional = true }
 
 [lib]
 name = "rucash"
@@ -48,6 +49,7 @@ sqlx_common = [
     "sqlx/chrono",
 ]
 sqlite = ["sqlx_common", "sqlx/sqlite"]
+sqlitefaster = ["rusqlite"]
 postgresql = ["sqlx_common", "sqlx/postgres"]
 mysql = ["sqlx_common", "sqlx/mysql"]
 xml = ["xmltree"]
@@ -56,12 +58,17 @@ decimal = ["rust_decimal"]
 [[bench]]
 name = "benchmark"
 harness = false
-required-features = ["sqlite", "xml"]
+required-features = ["sqlite", "xml", "sqlitefaster"]
 
 [[test]]
 name = "sqlite"
 path = "tests/sqlite.rs"
 required-features = ["sqlite"]
+
+[[test]]
+name = "sqlitefaster"
+path = "tests/sqlitefaster.rs"
+required-features = ["sqlitefaster"]
 
 [[test]]
 name = "mysql"
@@ -81,4 +88,4 @@ required-features = ["postgresql"]
 [[test]]
 name = "all"
 path = "tests/all.rs"
-required-features = ["sqlite", "postgresql", "mysql", "xml"]
+required-features = ["sqlite", "postgresql", "mysql", "xml", "sqlitefaster"]

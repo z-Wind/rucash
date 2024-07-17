@@ -183,6 +183,89 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "sqlitefaster")]
+    mod sqlitefaster {
+        use super::*;
+
+        use pretty_assertions::assert_eq;
+
+        use crate::query::sqlitefaster::price::Price as PriceBase;
+        use crate::SQLiteQueryFaster;
+
+        #[allow(clippy::unused_async)]
+        async fn setup() -> SQLiteQueryFaster {
+            let uri: &str = &format!(
+                "{}/tests/db/sqlite/complex_sample.gnucash",
+                env!("CARGO_MANIFEST_DIR")
+            );
+
+            println!("work_dir: {:?}", std::env::current_dir());
+            SQLiteQueryFaster::new(uri).unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_from_with_query() {
+            let query = Arc::new(setup().await);
+            let item = PriceBase {
+                guid: "guid".to_string(),
+                commodity_guid: "commodity_guid".to_string(),
+                currency_guid: "currency_guid".to_string(),
+                date: NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
+                    .unwrap(),
+                source: Some("source".to_string()),
+                r#type: Some("type".to_string()),
+                value_num: 1000,
+                value_denom: 10,
+            };
+
+            let result = Price::from_with_query(&item, query);
+
+            assert_eq!(result.guid, "guid");
+            assert_eq!(result.commodity_guid, "commodity_guid");
+            assert_eq!(result.currency_guid, "currency_guid");
+            assert_eq!(
+                result.datetime,
+                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
+            );
+            assert_eq!(result.source, "source");
+            assert_eq!(result.r#type, "type");
+            #[cfg(not(feature = "decimal"))]
+            assert_approx_eq!(f64, result.value, 100.0);
+            #[cfg(feature = "decimal")]
+            assert_eq!(result.value, Decimal::new(100, 0));
+        }
+
+        #[tokio::test]
+        async fn commodity() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let price = book
+                .prices()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
+                .unwrap();
+            let commodity = price.commodity().await.unwrap();
+            assert_eq!(commodity.fullname, "Andorran Franc");
+        }
+
+        #[tokio::test]
+        async fn currency() {
+            let query = setup().await;
+            let book = Book::new(query).await.unwrap();
+            let price = book
+                .prices()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|x| x.guid == "0d6684f44fb018e882de76094ed9c433")
+                .unwrap();
+            let currency = price.currency().await.unwrap();
+            assert_eq!(currency.fullname, "UAE Dirham");
+        }
+    }
+
     #[cfg(feature = "mysql")]
     mod mysql {
         use super::*;
