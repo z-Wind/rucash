@@ -1,6 +1,7 @@
 {
     "rust-analyzer.cargo.features": [
         "sqlite",
+        "sqlitefaster",
         "postgresql",
         "mysql",
         "xml",
