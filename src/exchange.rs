@@ -1,4 +1,6 @@
 use chrono::NaiveDateTime;
+#[cfg(not(feature = "decimal"))]
+use num_traits::Zero;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
@@ -38,6 +40,11 @@ impl Exchange {
         for p in prices {
             let commodity = &p.commodity().await?.mnemonic;
             let currency = &p.currency().await?.mnemonic;
+
+            if p.value.is_zero() {
+                println!("Warning: ignore {} {commodity}/{currency} in exchange graph, becasue the value is zero.", p.datetime);
+                continue;
+            }
 
             graph
                 .entry(commodity.clone())
