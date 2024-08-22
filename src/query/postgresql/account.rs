@@ -133,13 +133,12 @@ mod tests {
     use tokio::sync::OnceCell;
 
     #[cfg(feature = "schema")]
-    impl<'q> PostgreSQLQuery {
-        // test schemas on compile time
-        #[allow(dead_code)]
-        async fn test_account_schemas(&self) {
-            let _ = sqlx::query_as!(
-                Account,
-                r"
+    // test schemas on compile time
+    #[allow(dead_code)]
+    fn test_account_schemas() {
+        let _ = sqlx::query_as!(
+            Account,
+            r"
     			SELECT
     			guid,
     			name,
@@ -154,10 +153,7 @@ mod tests {
     			placeholder
     			FROM accounts
     			"
-            )
-            .fetch_all(&self.pool)
-            .await;
-        }
+        );
     }
 
     static Q: OnceCell<PostgreSQLQuery> = OnceCell::const_new();

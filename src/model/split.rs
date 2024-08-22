@@ -114,111 +114,15 @@ mod tests {
         use crate::query::sqlite::split::Split as SplitBase;
         use crate::SQLiteQuery;
 
-        async fn setup() -> SQLiteQuery {
-            let uri: &str = &format!(
-                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
-                env!("CARGO_MANIFEST_DIR")
-            );
-
-            println!("work_dir: {:?}", std::env::current_dir());
-            SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
-        }
-
-        #[tokio::test]
-        async fn test_from_with_query() {
-            let query = Arc::new(setup().await);
-            let item = SplitBase {
-                guid: "guid".to_string(),
-                tx_guid: "tx_guid".to_string(),
-                account_guid: "account_guid".to_string(),
-                memo: "memo".to_string(),
-                action: "action".to_string(),
-                reconcile_state: "n".to_string(),
-                reconcile_date: NaiveDateTime::parse_from_str(
-                    "2014-12-24 10:59:00",
-                    "%Y-%m-%d %H:%M:%S",
-                )
-                .ok(),
-                lot_guid: Some("lot_guid".to_string()),
-
-                value_num: 1000,
-                value_denom: 10,
-                quantity_num: 1100,
-                quantity_denom: 10,
-            };
-
-            let result = Split::from_with_query(&item, query);
-
-            assert_eq!(result.guid, "guid");
-            assert_eq!(result.tx_guid, "tx_guid");
-            assert_eq!(result.account_guid, "account_guid");
-            assert_eq!(result.memo, "memo");
-            assert_eq!(result.action, "action");
-            assert_eq!(result.reconcile_state, false);
-            assert_eq!(
-                result.reconcile_datetime,
-                NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").ok()
-            );
-            assert_eq!(result.lot_guid, "lot_guid");
-            #[cfg(not(feature = "decimal"))]
-            assert_approx_eq!(f64, result.value, 100.0);
-            #[cfg(feature = "decimal")]
-            assert_eq!(result.value, Decimal::new(100, 0));
-            #[cfg(not(feature = "decimal"))]
-            assert_approx_eq!(f64, result.quantity, 110.0);
-            #[cfg(feature = "decimal")]
-            assert_eq!(result.quantity, Decimal::new(110, 0));
-        }
-
-        #[tokio::test]
-        async fn transaction() {
-            let query = setup().await;
-            let book = Book::new(query).await.unwrap();
-            let split = book
-                .splits()
-                .await
-                .unwrap()
-                .into_iter()
-                .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
-                .unwrap();
-            let transaction = split.transaction().await.unwrap();
-            assert_eq!(transaction.description, "income 1");
-        }
-
-        #[tokio::test]
-        async fn account() {
-            let query = setup().await;
-            let book = Book::new(query).await.unwrap();
-            let split = book
-                .splits()
-                .await
-                .unwrap()
-                .into_iter()
-                .find(|x| x.guid == "de832fe97e37811a7fff7e28b3a43425")
-                .unwrap();
-            let account = split.account().await.unwrap();
-            assert_eq!(account.name, "Cash");
-        }
-    }
-
-    #[cfg(feature = "sqlitefaster")]
-    mod sqlitefaster {
-        use super::*;
-
-        use pretty_assertions::assert_eq;
-
-        use crate::query::sqlitefaster::split::Split as SplitBase;
-        use crate::SQLiteQueryFaster;
-
         #[allow(clippy::unused_async)]
-        async fn setup() -> SQLiteQueryFaster {
+        async fn setup() -> SQLiteQuery {
             let uri: &str = &format!(
                 "{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
 
             println!("work_dir: {:?}", std::env::current_dir());
-            SQLiteQueryFaster::new(uri).unwrap()
+            SQLiteQuery::new(uri).unwrap()
         }
 
         #[tokio::test]

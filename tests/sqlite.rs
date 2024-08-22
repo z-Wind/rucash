@@ -8,7 +8,7 @@ use rucash::{Book, SQLiteQuery};
 
 pub fn uri() -> String {
     format!(
-        "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+        "{}/tests/db/sqlite/complex_sample.gnucash",
         env!("CARGO_MANIFEST_DIR")
     )
 }
@@ -19,22 +19,20 @@ mod book {
 
     #[tokio::test]
     async fn new() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         Book::new(query).await.unwrap();
     }
 
     #[tokio::test]
     #[should_panic]
     async fn new_fail() {
-        let query = SQLiteQuery::new("sqlite://tests/sample/no.gnucash")
-            .await
-            .unwrap();
+        let query = SQLiteQuery::new("tests/sample/no.gnucash").unwrap();
         Book::new(query).await.unwrap();
     }
 
     #[tokio::test]
     async fn accounts() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let accounts = book.accounts().await.unwrap();
         assert_eq!(accounts.len(), 21);
@@ -42,7 +40,7 @@ mod book {
 
     #[tokio::test]
     async fn accounts_filter() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let accounts = book
             .accounts()
@@ -55,7 +53,7 @@ mod book {
 
     #[tokio::test]
     async fn accounts_contains_name_ignore_case() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let accounts = book.accounts_contains_name_ignore_case("aS").await.unwrap();
         assert_eq!(accounts.len(), 3);
@@ -63,7 +61,7 @@ mod book {
 
     #[tokio::test]
     async fn account_contains_name_ignore_case() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let account = book
             .account_contains_name_ignore_case("NAS")
@@ -75,7 +73,7 @@ mod book {
 
     #[tokio::test]
     async fn splits() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let splits = book.splits().await.unwrap();
         assert_eq!(splits.len(), 25);
@@ -83,7 +81,7 @@ mod book {
 
     #[tokio::test]
     async fn transactions() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let transactions = book.transactions().await.unwrap();
         assert_eq!(transactions.len(), 11);
@@ -91,7 +89,7 @@ mod book {
 
     #[tokio::test]
     async fn prices() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let prices = book.prices().await.unwrap();
         assert_eq!(prices.len(), 5);
@@ -99,7 +97,7 @@ mod book {
 
     #[tokio::test]
     async fn commodities() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let commodities = book.commodities().await.unwrap();
         assert_eq!(commodities.len(), 5);
@@ -107,7 +105,7 @@ mod book {
 
     #[tokio::test]
     async fn currencies() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let currencies = book.currencies().await.unwrap();
         assert_eq!(currencies.len(), 4);
@@ -118,7 +116,7 @@ mod account {
     use pretty_assertions::assert_eq;
     #[tokio::test]
     async fn property() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let account = book
             .accounts()
@@ -143,7 +141,7 @@ mod account {
 
     #[tokio::test]
     async fn balance() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let account = book
             .accounts()
@@ -160,7 +158,7 @@ mod account {
     }
     #[tokio::test]
     async fn balance_diff_currency() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let account = book
             .accounts()
@@ -180,7 +178,7 @@ mod account {
     }
     #[tokio::test]
     async fn splits() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let account = book
             .account_contains_name_ignore_case("Cash")
@@ -193,7 +191,7 @@ mod account {
 
     #[tokio::test]
     async fn parent() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let account = book
             .account_contains_name_ignore_case("Cash")
@@ -206,7 +204,7 @@ mod account {
 
     #[tokio::test]
     async fn no_parent() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let account = book
             .account_contains_name_ignore_case("Root Account")
@@ -220,7 +218,7 @@ mod account {
 
     #[tokio::test]
     async fn children() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let account = book
             .account_contains_name_ignore_case("Current")
@@ -233,7 +231,7 @@ mod account {
 
     #[tokio::test]
     async fn commodity() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let account = book
             .account_contains_name_ignore_case("Cash")
@@ -251,7 +249,7 @@ mod split {
 
     #[tokio::test]
     async fn property() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let split = book
             .splits()
@@ -284,7 +282,7 @@ mod split {
 
     #[tokio::test]
     async fn transaction() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let split = book
             .splits()
@@ -299,7 +297,7 @@ mod split {
 
     #[tokio::test]
     async fn account() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let split = book
             .splits()
@@ -320,7 +318,7 @@ mod transaction {
 
     #[tokio::test]
     async fn property() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let transaction = book
             .transactions()
@@ -349,7 +347,7 @@ mod transaction {
 
     #[tokio::test]
     async fn currency() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let transaction = book
             .transactions()
@@ -364,7 +362,7 @@ mod transaction {
 
     #[tokio::test]
     async fn splits() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let transaction = book
             .transactions()
@@ -386,7 +384,7 @@ mod price {
 
     #[tokio::test]
     async fn property() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let price = book
             .prices()
@@ -414,7 +412,7 @@ mod price {
 
     #[tokio::test]
     async fn commodity() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let price = book
             .prices()
@@ -429,7 +427,7 @@ mod price {
 
     #[tokio::test]
     async fn currency() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let price = book
             .prices()
@@ -450,7 +448,7 @@ mod commodity {
 
     #[tokio::test]
     async fn property() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
@@ -473,7 +471,7 @@ mod commodity {
 
     #[tokio::test]
     async fn accounts() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
@@ -488,7 +486,7 @@ mod commodity {
 
     #[tokio::test]
     async fn transactions() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
@@ -503,7 +501,7 @@ mod commodity {
 
     #[tokio::test]
     async fn as_commodity_prices() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
@@ -518,7 +516,7 @@ mod commodity {
 
     #[tokio::test]
     async fn as_currency_prices() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
@@ -533,7 +531,7 @@ mod commodity {
 
     #[tokio::test]
     async fn as_commodity_or_currency_prices() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
@@ -549,7 +547,7 @@ mod commodity {
     #[tokio::test]
     async fn rate_direct() {
         // ADF => AED
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
@@ -579,7 +577,7 @@ mod commodity {
         assert_eq!(rate, Decimal::new(15, 1));
 
         // AED => EUR
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         let commodity = book
             .commodities()
@@ -611,7 +609,7 @@ mod commodity {
 
     #[tokio::test]
     async fn rate_indirect() {
-        let query = SQLiteQuery::new(&uri()).await.unwrap();
+        let query = SQLiteQuery::new(&uri()).unwrap();
         let book = Book::new(query).await.unwrap();
         // USD => AED
         let commodity = book

@@ -39,7 +39,7 @@ use rucash::{Book, SQLiteQuery};
 
 #[tokio::main]
 async fn main() {
-    let query = SQLiteQuery::new("sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro").await.unwrap();
+    let query = SQLiteQuery::new("tests/db/sqlite/complex_sample.gnucash").unwrap();
     let book = Book::new(query).await.unwrap();
     let accounts = book.accounts();
 }
@@ -49,7 +49,7 @@ async fn main() {
 ```toml
 # Cargo.toml
 [dependencies]
-rucash = { version = "0.4", features = [ "sqlite", "decimal" ] }
+rucash = { version = "0.5", features = [ "sqlite", "decimal" ] }
 ```
 
 #### Cargo Feature Flags

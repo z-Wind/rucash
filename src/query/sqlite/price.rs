@@ -2,14 +2,15 @@
 // ref: https://wiki.gnucash.org/wiki/SQL
 
 use chrono::NaiveDateTime;
+use rusqlite::Row;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
 
+use super::SQLiteQuery;
 use crate::error::Error;
-use crate::query::sqlite::SQLiteQuery;
 use crate::query::{PriceQ, PriceT};
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, sqlx::FromRow)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Price {
     pub guid: String,
     pub commodity_guid: String,
@@ -19,6 +20,23 @@ pub struct Price {
     pub r#type: Option<String>,
     pub value_num: i64,
     pub value_denom: i64,
+}
+
+impl<'a> TryFrom<&'a Row<'a>> for Price {
+    type Error = rusqlite::Error;
+
+    fn try_from(row: &'a Row<'a>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            guid: row.get(0)?,
+            commodity_guid: row.get(1)?,
+            currency_guid: row.get(2)?,
+            date: row.get(3)?,
+            source: row.get(4)?,
+            r#type: row.get(5)?,
+            value_num: row.get(6)?,
+            value_denom: row.get(7)?,
+        })
+    }
 }
 
 impl PriceT for Price {
@@ -72,41 +90,51 @@ impl PriceQ for SQLiteQuery {
     type P = Price;
 
     async fn all(&self) -> Result<Vec<Self::P>, Error> {
-        sqlx::query_as(SEL)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(SEL)?;
+        let result = stmt
+            .query([])?
+            .mapped(|row| Price::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
     async fn guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE guid = ?"))
-            .bind(guid)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE guid = ?"))?;
+        let result = stmt
+            .query([guid])?
+            .mapped(|row| Price::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE commodity_guid = ?"))
-            .bind(guid)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE commodity_guid = ?"))?;
+        let result = stmt
+            .query([guid])?
+            .mapped(|row| Price::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE currency_guid = ?"))
-            .bind(guid)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE currency_guid = ?"))?;
+        let result = stmt
+            .query([guid])?
+            .mapped(|row| Price::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
     async fn commodity_or_currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        sqlx::query_as(&format!(
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!(
             "{SEL}\nWHERE commodity_guid = ? OR currency_guid = ?"
-        ))
-        .bind(guid)
-        .bind(guid)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(std::convert::Into::into)
+        ))?;
+        let result = stmt
+            .query([guid, guid])?
+            .mapped(|row| Price::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
 }
 
@@ -120,13 +148,12 @@ mod tests {
     use tokio::sync::OnceCell;
 
     #[cfg(feature = "schema")]
-    impl<'q> SQLiteQuery {
-        // test schemas on compile time
-        #[allow(dead_code)]
-        async fn test_price_schemas(&self) {
-            let _ = sqlx::query_as!(
-                Price,
-                r#"
+    // test schemas on compile time
+    #[allow(dead_code)]
+    fn test_price_schemas() {
+        let _ = sqlx::query_as!(
+            Price,
+            r#"
 				SELECT
 				guid,
 				commodity_guid,
@@ -138,22 +165,19 @@ mod tests {
 				value_denom
 				FROM prices
 				"#,
-            )
-            .fetch_all(&self.pool)
-            .await;
-        }
+        );
     }
 
     static Q: OnceCell<SQLiteQuery> = OnceCell::const_new();
     async fn setup() -> &'static SQLiteQuery {
         Q.get_or_init(|| async {
             let uri: &str = &format!(
-                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                "{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
 
             println!("work_dir: {:?}", std::env::current_dir());
-            SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
+            SQLiteQuery::new(uri).unwrap()
         })
         .await
     }

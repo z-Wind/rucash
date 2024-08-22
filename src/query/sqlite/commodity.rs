@@ -1,11 +1,12 @@
 // ref: https://piecash.readthedocs.io/en/master/object_model.html
 // ref: https://wiki.gnucash.org/wiki/SQL
+use rusqlite::Row;
 
+use super::SQLiteQuery;
 use crate::error::Error;
-use crate::query::sqlite::SQLiteQuery;
 use crate::query::{CommodityQ, CommodityT};
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, sqlx::FromRow)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Commodity {
     pub(crate) guid: String,
     pub(crate) namespace: String,
@@ -16,6 +17,24 @@ pub struct Commodity {
     pub(crate) quote_flag: i64,
     pub(crate) quote_source: Option<String>,
     pub(crate) quote_tz: Option<String>,
+}
+
+impl<'a> TryFrom<&'a Row<'a>> for Commodity {
+    type Error = rusqlite::Error;
+
+    fn try_from(row: &'a Row<'a>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            guid: row.get(0)?,
+            namespace: row.get(1)?,
+            mnemonic: row.get(2)?,
+            fullname: row.get(3)?,
+            cusip: row.get(4)?,
+            fraction: row.get(5)?,
+            quote_flag: row.get(6)?,
+            quote_source: row.get(7)?,
+            quote_tz: row.get(8)?,
+        })
+    }
 }
 
 impl CommodityT for Commodity {
@@ -66,26 +85,33 @@ impl CommodityQ for SQLiteQuery {
     type C = Commodity;
 
     async fn all(&self) -> Result<Vec<Self::C>, Error> {
-        sqlx::query_as(SEL)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(SEL)?;
+        let result = stmt
+            .query([])?
+            .mapped(|row| Commodity::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::C>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE guid = ?"))
-            .bind(guid)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE guid = ?"))?;
+        let result = stmt
+            .query([guid])?
+            .mapped(|row| Commodity::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
 
     async fn namespace(&self, namespace: &str) -> Result<Vec<Self::C>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE namespace = ?"))
-            .bind(namespace)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE namespace = ?"))?;
+        let result = stmt
+            .query([namespace])?
+            .mapped(|row| Commodity::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
 }
 
@@ -97,13 +123,12 @@ mod tests {
     use tokio::sync::OnceCell;
 
     #[cfg(feature = "schema")]
-    impl<'q> SQLiteQuery {
-        // test schemas on compile time
-        #[allow(dead_code)]
-        async fn test_commodity_schemas(&self) {
-            let _ = sqlx::query_as!(
-                Commodity,
-                r"
+    // test schemas on compile time
+    #[allow(dead_code)]
+    fn test_commodity_schemas() {
+        let _ = sqlx::query_as!(
+            Commodity,
+            r"
 				SELECT
 				guid,
 				namespace,
@@ -116,22 +141,19 @@ mod tests {
 				quote_tz
 				FROM commodities
 				",
-            )
-            .fetch_all(&self.pool)
-            .await;
-        }
+        );
     }
 
     static Q: OnceCell<SQLiteQuery> = OnceCell::const_new();
     async fn setup() -> &'static SQLiteQuery {
         Q.get_or_init(|| async {
             let uri: &str = &format!(
-                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                "{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
 
             println!("work_dir: {:?}", std::env::current_dir());
-            SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
+            SQLiteQuery::new(uri).unwrap()
         })
         .await
     }

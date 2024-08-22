@@ -2,27 +2,25 @@ all: test build
 build:	
 	cargo build
 test:
-	cargo test --features sqlite,postgresql,mysql,xml,sqlitefaster
+	cargo test --features sqlite,postgresql,mysql,xml
 	cargo test --features sqlite
-	cargo test --features sqlitefaster
 	cargo test --features postgresql
 	cargo test --features mysql
 	cargo test --features xml
-	cargo test --features sqlite,postgresql,mysql,xml,sqlitefaster,decimal
+	cargo test --features sqlite,postgresql,mysql,xml,decimal
 	cargo test --features sqlite,decimal
-	cargo test --features sqlitefaster,decimal
 	cargo test --features postgresql,decimal
 	cargo test --features mysql,decimal
 	cargo test --features xml,decimal
 clean:
 	cargo clean
 bench:
-	cargo bench --features sqlite,xml,sqlitefaster
+	cargo bench --features sqlite,xml
 check:
-	cargo check --features sqlite,postgresql,mysql,xml,sqlitefaster --all-targets
-	cargo clippy --features sqlite,postgresql,mysql,xml,sqlitefaster --all-targets
-	cargo check --features sqlite,postgresql,mysql,xml,sqlitefaster,decimal --all-targets
-	cargo clippy --features sqlite,postgresql,mysql,xml,sqlitefaster,decimal --all-targets
+	cargo check --features sqlite,postgresql,mysql,xml --all-targets
+	cargo clippy --features sqlite,postgresql,mysql,xml --all-targets
+	cargo check --features sqlite,postgresql,mysql,xml,decimal --all-targets
+	cargo clippy --features sqlite,postgresql,mysql,xml,decimal --all-targets
 checkschema:
 	export DATABASE_URL=sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro
 	cargo check --features sqlite,schema --all-targets

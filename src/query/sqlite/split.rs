@@ -2,14 +2,15 @@
 // ref: https://wiki.gnucash.org/wiki/SQL
 
 use chrono::NaiveDateTime;
+use rusqlite::Row;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
 
+use super::SQLiteQuery;
 use crate::error::Error;
-use crate::query::sqlite::SQLiteQuery;
 use crate::query::{SplitQ, SplitT};
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, sqlx::FromRow)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Split {
     pub guid: String,
     pub tx_guid: String,
@@ -23,6 +24,27 @@ pub struct Split {
     pub quantity_num: i64,
     pub quantity_denom: i64,
     pub lot_guid: Option<String>,
+}
+
+impl<'a> TryFrom<&'a Row<'a>> for Split {
+    type Error = rusqlite::Error;
+
+    fn try_from(row: &'a Row<'a>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            guid: row.get(0)?,
+            tx_guid: row.get(1)?,
+            account_guid: row.get(2)?,
+            memo: row.get(3)?,
+            action: row.get(4)?,
+            reconcile_state: row.get(5)?,
+            reconcile_date: row.get(6)?,
+            value_num: row.get(7)?,
+            value_denom: row.get(8)?,
+            quantity_num: row.get(9)?,
+            quantity_denom: row.get(10)?,
+            lot_guid: row.get(11)?,
+        })
+    }
 }
 
 impl SplitT for Split {
@@ -83,7 +105,7 @@ impl SplitT for Split {
 }
 
 const SEL: &str = r"
-SELECT 	
+SELECT
 guid,
 tx_guid,
 account_guid,
@@ -103,34 +125,43 @@ impl SplitQ for SQLiteQuery {
     type S = Split;
 
     async fn all(&self) -> Result<Vec<Self::S>, Error> {
-        sqlx::query_as(SEL)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(SEL)?;
+        let result = stmt
+            .query([])?
+            .mapped(|row| Split::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE guid = ?"))
-            .bind(guid)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE guid = ?"))?;
+        let result = stmt
+            .query([guid])?
+            .mapped(|row| Split::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
 
     async fn account_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE account_guid = ?"))
-            .bind(guid)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE account_guid = ?"))?;
+        let result = stmt
+            .query([guid])?
+            .mapped(|row| Split::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
 
     async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE tx_guid = ?"))
-            .bind(guid)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE tx_guid = ?"))?;
+        let result = stmt
+            .query([guid])?
+            .mapped(|row| Split::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
 }
 
@@ -145,13 +176,12 @@ mod tests {
     use tokio::sync::OnceCell;
 
     #[cfg(feature = "schema")]
-    impl<'q> SQLiteQuery {
-        // test schemas on compile time
-        #[allow(dead_code)]
-        async fn test_split_schemas(&self) {
-            let _ = sqlx::query_as!(
-                Split,
-                r#"
+    // test schemas on compile time
+    #[allow(dead_code)]
+    fn test_split_schemas() {
+        let _ = sqlx::query_as!(
+            Split,
+            r#"
 				SELECT 	
 				guid,
 				tx_guid,
@@ -167,22 +197,19 @@ mod tests {
 				lot_guid
 				FROM splits
 				"#,
-            )
-            .fetch_all(&self.pool)
-            .await;
-        }
+        );
     }
 
     static Q: OnceCell<SQLiteQuery> = OnceCell::const_new();
     async fn setup() -> &'static SQLiteQuery {
         Q.get_or_init(|| async {
             let uri: &str = &format!(
-                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                "{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
 
             println!("work_dir: {:?}", std::env::current_dir());
-            SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
+            SQLiteQuery::new(uri).unwrap()
         })
         .await
     }

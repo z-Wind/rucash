@@ -85,13 +85,12 @@ mod tests {
     use tokio::sync::OnceCell;
 
     #[cfg(feature = "schema")]
-    impl<'q> MySQLQuery {
-        // test schemas on compile time
-        #[allow(dead_code)]
-        async fn test_transaction_schemas(&self) {
-            let _ = sqlx::query_as!(
-                Transaction,
-                r#"
+    // test schemas on compile time
+    #[allow(dead_code)]
+    fn test_transaction_schemas() {
+        let _ = sqlx::query_as!(
+            Transaction,
+            r#"
     			SELECT
     			guid,
     			currency_guid,
@@ -101,10 +100,7 @@ mod tests {
     			description
     			FROM transactions
     			"#,
-            )
-            .fetch_all(&self.pool)
-            .await;
-        }
+        );
     }
 
     static Q: OnceCell<MySQLQuery> = OnceCell::const_new();

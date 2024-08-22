@@ -14,11 +14,11 @@ pub enum Error {
     #[error("I/O error: {0}")]
     IO(#[from] std::io::Error),
 
-    #[cfg(any(feature = "sqlite", feature = "postgresql", feature = "mysql"))]
+    #[cfg(any(feature = "postgresql", feature = "mysql"))]
     #[error("SQLx error: {0}")]
     Sql(#[from] sqlx::Error),
 
-    #[cfg(feature = "sqlitefaster")]
+    #[cfg(feature = "sqlite")]
     #[error("rusqlite error: {0}")]
     Rusqlite(#[from] rusqlite::Error),
 

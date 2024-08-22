@@ -120,13 +120,12 @@ mod tests {
     use tokio::sync::OnceCell;
 
     #[cfg(feature = "schema")]
-    impl<'q> PostgreSQLQuery {
-        // test schemas on compile time
-        #[allow(dead_code)]
-        async fn test_price_schemas(&self) {
-            let _ = sqlx::query_as!(
-                Price,
-                r#"
+    // test schemas on compile time
+    #[allow(dead_code)]
+    fn test_price_schemas() {
+        let _ = sqlx::query_as!(
+            Price,
+            r#"
     			SELECT
     			guid,
     			commodity_guid,
@@ -138,10 +137,7 @@ mod tests {
     			value_denom
     			FROM prices
     			"#,
-            )
-            .fetch_all(&self.pool)
-            .await;
-        }
+        );
     }
 
     static Q: OnceCell<PostgreSQLQuery> = OnceCell::const_new();

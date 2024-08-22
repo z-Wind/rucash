@@ -145,13 +145,12 @@ mod tests {
     use tokio::sync::OnceCell;
 
     #[cfg(feature = "schema")]
-    impl<'q> MySQLQuery {
-        // test schemas on compile time
-        #[allow(dead_code)]
-        async fn test_split_schemas(&self) {
-            let _ = sqlx::query_as!(
-                Split,
-                r#"
+    // test schemas on compile time
+    #[allow(dead_code)]
+    fn test_split_schemas() {
+        let _ = sqlx::query_as!(
+            Split,
+            r#"
     			SELECT
     			guid,
     			tx_guid,
@@ -167,10 +166,7 @@ mod tests {
     			lot_guid
     			FROM splits
     			"#,
-            )
-            .fetch_all(&self.pool)
-            .await;
-        }
+        );
     }
 
     static Q: OnceCell<MySQLQuery> = OnceCell::const_new();

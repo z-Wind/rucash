@@ -2,12 +2,13 @@
 // ref: https://wiki.gnucash.org/wiki/SQL
 
 use chrono::NaiveDateTime;
+use rusqlite::Row;
 
+use super::SQLiteQuery;
 use crate::error::Error;
-use crate::query::sqlite::SQLiteQuery;
 use crate::query::{TransactionQ, TransactionT};
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, sqlx::FromRow)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Transaction {
     pub guid: String,
     pub currency_guid: String,
@@ -15,6 +16,21 @@ pub struct Transaction {
     pub post_date: Option<NaiveDateTime>,
     pub enter_date: Option<NaiveDateTime>,
     pub description: Option<String>,
+}
+
+impl<'a> TryFrom<&'a Row<'a>> for Transaction {
+    type Error = rusqlite::Error;
+
+    fn try_from(row: &'a Row<'a>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            guid: row.get(0)?,
+            currency_guid: row.get(1)?,
+            num: row.get(2)?,
+            post_date: row.get(3)?,
+            enter_date: row.get(4)?,
+            description: row.get(5)?,
+        })
+    }
 }
 
 impl TransactionT for Transaction {
@@ -54,26 +70,33 @@ impl TransactionQ for SQLiteQuery {
     type T = Transaction;
 
     async fn all(&self) -> Result<Vec<Self::T>, Error> {
-        sqlx::query_as(SEL)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(SEL)?;
+        let result = stmt
+            .query([])?
+            .mapped(|row| Transaction::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE guid = ?"))
-            .bind(guid)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE guid = ?"))?;
+        let result = stmt
+            .query([guid])?
+            .mapped(|row| Transaction::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
 
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE currency_guid = ?"))
-            .bind(guid)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(std::convert::Into::into)
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE currency_guid = ?"))?;
+        let result = stmt
+            .query([guid])?
+            .mapped(|row| Transaction::try_from(row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
     }
 }
 
@@ -85,13 +108,12 @@ mod tests {
     use tokio::sync::OnceCell;
 
     #[cfg(feature = "schema")]
-    impl<'q> SQLiteQuery {
-        // test schemas on compile time
-        #[allow(dead_code)]
-        async fn test_transaction_schemas(&self) {
-            let _ = sqlx::query_as!(
-                Transaction,
-                r#"
+    // test schemas on compile time
+    #[allow(dead_code)]
+    fn test_transaction_schemas() {
+        let _ = sqlx::query_as!(
+            Transaction,
+            r#"
 				SELECT
 				guid,
 				currency_guid,
@@ -101,22 +123,19 @@ mod tests {
 				description
 				FROM transactions
 				"#,
-            )
-            .fetch_all(&self.pool)
-            .await;
-        }
+        );
     }
 
     static Q: OnceCell<SQLiteQuery> = OnceCell::const_new();
     async fn setup() -> &'static SQLiteQuery {
         Q.get_or_init(|| async {
             let uri: &str = &format!(
-                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
+                "{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
 
             println!("work_dir: {:?}", std::env::current_dir());
-            SQLiteQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
+            SQLiteQuery::new(uri).unwrap()
         })
         .await
     }

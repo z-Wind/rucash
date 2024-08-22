@@ -1,9 +1,8 @@
-use rucash::{Book, MySQLQuery, PostgreSQLQuery, SQLiteQuery, SQLiteQueryFaster, XMLQuery};
+use rucash::{Book, MySQLQuery, PostgreSQLQuery, SQLiteQuery, XMLQuery};
 
 mod mysql;
 mod postgresql;
 mod sqlite;
-mod sqlitefaster;
 mod xml;
 
 mod consistency {
@@ -11,12 +10,7 @@ mod consistency {
     use pretty_assertions::assert_eq;
 
     async fn setup_sqlite() -> Book<SQLiteQuery> {
-        let query = SQLiteQuery::new(&sqlite::uri()).await.unwrap();
-        Book::new(query).await.unwrap()
-    }
-
-    async fn setup_sqlitefaster() -> Book<SQLiteQueryFaster> {
-        let query = SQLiteQueryFaster::new(&sqlitefaster::uri()).unwrap();
+        let query = SQLiteQuery::new(&sqlite::uri()).unwrap();
         Book::new(query).await.unwrap()
     }
 
@@ -67,9 +61,6 @@ mod consistency {
         let mut v_sqlite = setup_sqlite().await.accounts().await.unwrap();
         v_sqlite.sort_by_key(|x| x.guid.clone());
 
-        let mut v_sqlitefaster = setup_sqlitefaster().await.accounts().await.unwrap();
-        v_sqlitefaster.sort_by_key(|x| x.guid.clone());
-
         let mut v_postgresql = setup_postgresql().await.accounts().await.unwrap();
         v_postgresql.sort_by_key(|x| x.guid.clone());
 
@@ -79,8 +70,6 @@ mod consistency {
         let mut v_xml = setup_xml().await.accounts().await.unwrap();
         v_xml.sort_by_key(|x| x.guid.clone());
 
-        println!("vec_match(&v_sqlite, &v_sqlitefaster)");
-        assert!(vec_match(&v_sqlite, &v_sqlitefaster, cmp));
         println!("vec_match(&v_sqlite, &v_postgresql)");
         assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
         println!("vec_match(&v_sqlite, &v_mysql)");
@@ -119,9 +108,6 @@ mod consistency {
         let mut v_sqlite = setup_sqlite().await.splits().await.unwrap();
         v_sqlite.sort_by_key(|x| x.guid.clone());
 
-        let mut v_sqlitefaster = setup_sqlitefaster().await.splits().await.unwrap();
-        v_sqlitefaster.sort_by_key(|x| x.guid.clone());
-
         let mut v_postgresql = setup_postgresql().await.splits().await.unwrap();
         v_postgresql.sort_by_key(|x| x.guid.clone());
 
@@ -131,8 +117,6 @@ mod consistency {
         let mut v_xml = setup_xml().await.splits().await.unwrap();
         v_xml.sort_by_key(|x| x.guid.clone());
 
-        println!("vec_match(&v_sqlite, &v_sqlitefaster)");
-        assert!(vec_match(&v_sqlite, &v_sqlitefaster, cmp));
         println!("vec_match(&v_sqlite, &v_postgresql)");
         assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
         println!("vec_match(&v_sqlite, &v_mysql)");
@@ -161,9 +145,6 @@ mod consistency {
         let mut v_sqlite = setup_sqlite().await.transactions().await.unwrap();
         v_sqlite.sort_by_key(|x| x.guid.clone());
 
-        let mut v_sqlitefaster = setup_sqlitefaster().await.transactions().await.unwrap();
-        v_sqlitefaster.sort_by_key(|x| x.guid.clone());
-
         let mut v_postgresql = setup_postgresql().await.transactions().await.unwrap();
         v_postgresql.sort_by_key(|x| x.guid.clone());
 
@@ -173,8 +154,6 @@ mod consistency {
         let mut v_xml = setup_xml().await.transactions().await.unwrap();
         v_xml.sort_by_key(|x| x.guid.clone());
 
-        println!("vec_match(&v_sqlite, &v_sqlitefaster)");
-        assert!(vec_match(&v_sqlite, &v_sqlitefaster, cmp));
         println!("vec_match(&v_sqlite, &v_postgresql)");
         assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
         println!("vec_match(&v_sqlite, &v_mysql)");
@@ -205,9 +184,6 @@ mod consistency {
         let mut v_sqlite = setup_sqlite().await.prices().await.unwrap();
         v_sqlite.sort_by_key(|x| x.guid.clone());
 
-        let mut v_sqlitefaster = setup_sqlitefaster().await.prices().await.unwrap();
-        v_sqlitefaster.sort_by_key(|x| x.guid.clone());
-
         let mut v_postgresql = setup_postgresql().await.prices().await.unwrap();
         v_postgresql.sort_by_key(|x| x.guid.clone());
 
@@ -217,8 +193,6 @@ mod consistency {
         let mut v_xml = setup_xml().await.prices().await.unwrap();
         v_xml.sort_by_key(|x| x.guid.clone());
 
-        println!("vec_match(&v_sqlite, &v_sqlitefaster)");
-        assert!(vec_match(&v_sqlite, &v_sqlitefaster, cmp));
         println!("vec_match(&v_sqlite, &v_postgresql)");
         assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
         println!("vec_match(&v_sqlite, &v_mysql)");
@@ -254,9 +228,6 @@ mod consistency {
         let mut v_sqlite = setup_sqlite().await.commodities().await.unwrap();
         v_sqlite.sort_by_key(|x| x.mnemonic.clone());
 
-        let mut v_sqlitefaster = setup_sqlitefaster().await.commodities().await.unwrap();
-        v_sqlitefaster.sort_by_key(|x| x.guid.clone());
-
         let mut v_postgresql = setup_postgresql().await.commodities().await.unwrap();
         v_postgresql.sort_by_key(|x| x.mnemonic.clone());
 
@@ -266,8 +237,6 @@ mod consistency {
         let mut v_xml = setup_xml().await.commodities().await.unwrap();
         v_xml.sort_by_key(|x| x.mnemonic.clone());
 
-        println!("vec_match(&v_sqlite, &v_sqlitefaster)");
-        assert!(vec_match(&v_sqlite, &v_sqlitefaster, cmp));
         println!("vec_match(&v_sqlite, &v_postgresql)");
         assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
         println!("vec_match(&v_sqlite, &v_mysql)");

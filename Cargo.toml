@@ -1,6 +1,6 @@
 [package]
 name = "rucash"
-version = "0.4.2"
+version = "0.5.0"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/z-Wind/rucash"
@@ -18,16 +18,20 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-sqlx = { version = "0.8", optional = true }
+# sqlx = { version = "0.8", optional = true }
+sqlx = { git = "https://github.com/launchbadge/sqlx.git", rev = "6f2905695b9606b5f51b40ce10af63ac9e696bb8", optional = true }
 chrono = "0.4"
-rust_decimal = { version = "1.35", optional = true }
+rust_decimal = { version = "1.36", optional = true }
 xmltree = { version = "0.10", optional = true }
 itertools = "0.13"
 flate2 = "1.0"
 tokio = { version = "1.39", features = ["sync"] }
 num-traits = "0.2"
 thiserror = "1.0"
-rusqlite = { version = "*", features = ["bundled", "chrono"], optional = true }
+rusqlite = { version = "0.32", features = [
+    "bundled",
+    "chrono",
+], optional = true }
 
 [lib]
 name = "rucash"
@@ -41,15 +45,14 @@ tokio = { version = "1.39", features = ["rt-multi-thread", "macros"] }
 
 [features]
 default = []
-schema = []
+schema = ["sqlx_common", "sqlx/sqlite"]
 sqlx_common = [
     "sqlx/any",
     "sqlx/runtime-tokio-rustls",
     "sqlx/macros",
     "sqlx/chrono",
 ]
-sqlite = ["sqlx_common", "sqlx/sqlite"]
-sqlitefaster = ["rusqlite"]
+sqlite = ["rusqlite"]
 postgresql = ["sqlx_common", "sqlx/postgres"]
 mysql = ["sqlx_common", "sqlx/mysql"]
 xml = ["xmltree"]
@@ -58,17 +61,12 @@ decimal = ["rust_decimal"]
 [[bench]]
 name = "benchmark"
 harness = false
-required-features = ["sqlite", "xml", "sqlitefaster"]
+required-features = ["sqlite", "xml"]
 
 [[test]]
 name = "sqlite"
 path = "tests/sqlite.rs"
 required-features = ["sqlite"]
-
-[[test]]
-name = "sqlitefaster"
-path = "tests/sqlitefaster.rs"
-required-features = ["sqlitefaster"]
 
 [[test]]
 name = "mysql"
@@ -88,4 +86,4 @@ required-features = ["postgresql"]
 [[test]]
 name = "all"
 path = "tests/all.rs"
-required-features = ["sqlite", "postgresql", "mysql", "xml", "sqlitefaster"]
+required-features = ["sqlite", "postgresql", "mysql", "xml"]

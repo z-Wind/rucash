@@ -150,139 +150,12 @@ mod tests {
         async fn setup() -> &'static Book<SQLiteQuery> {
             Q.get_or_init(|| async {
                 let uri: &str = &format!(
-                    "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
-                    env!("CARGO_MANIFEST_DIR")
-                );
-
-                println!("work_dir: {:?}", std::env::current_dir());
-                let query = SQLiteQuery::new(uri).await.unwrap();
-                Book::new(query).await.unwrap()
-            })
-            .await
-        }
-
-        #[tokio::test]
-        async fn test_new() {
-            let uri: &str = &format!(
-                "sqlite://{}/tests/db/sqlite/complex_sample.gnucash",
-                env!("CARGO_MANIFEST_DIR")
-            );
-            let query = SQLiteQuery::new(uri).await.unwrap();
-            Book::new(query).await.unwrap();
-        }
-
-        #[tokio::test]
-        async fn test_new_fail() {
-            assert!(matches!(
-                SQLiteQuery::new("sqlite://tests/sample/no.gnucash").await,
-                Err(crate::Error::Sql(_))
-            ));
-        }
-
-        #[tokio::test]
-        async fn test_accounts() {
-            let book = setup().await;
-            let accounts = book.accounts().await.unwrap();
-            assert_eq!(accounts.len(), 21);
-        }
-
-        #[tokio::test]
-        async fn test_accounts_contains_name() {
-            let book = setup().await;
-            let accounts = book.accounts_contains_name_ignore_case("aS").await.unwrap();
-            assert_eq!(accounts.len(), 3);
-        }
-
-        #[tokio::test]
-        async fn test_account_contains_name() {
-            let book = setup().await;
-            let account = book
-                .account_contains_name_ignore_case("NAS")
-                .await
-                .unwrap()
-                .unwrap();
-            assert_eq!(account.name, "NASDAQ");
-        }
-
-        #[tokio::test]
-        async fn test_splits() {
-            let book = setup().await;
-            let splits = book.splits().await.unwrap();
-            assert_eq!(splits.len(), 25);
-        }
-
-        #[tokio::test]
-        async fn test_transactions() {
-            let book = setup().await;
-            let transactions = book.transactions().await.unwrap();
-            assert_eq!(transactions.len(), 11);
-        }
-
-        #[tokio::test]
-        async fn test_prices() {
-            let book = setup().await;
-            let prices = book.prices().await.unwrap();
-            assert_eq!(prices.len(), 5);
-        }
-
-        #[tokio::test]
-        async fn test_commodities() {
-            let book = setup().await;
-            let commodities = book.commodities().await.unwrap();
-            assert_eq!(commodities.len(), 5);
-        }
-
-        #[tokio::test]
-        async fn test_currencies() {
-            let book = setup().await;
-            let currencies = book.currencies().await.unwrap();
-            assert_eq!(currencies.len(), 4);
-        }
-
-        #[tokio::test]
-        async fn test_exchange() {
-            let book = setup().await;
-            let commodity = book
-                .commodities()
-                .await
-                .unwrap()
-                .into_iter()
-                .find(|x| x.guid == "d821d6776fde9f7c2d01b67876406fd3")
-                .unwrap();
-            let currency = book
-                .commodities()
-                .await
-                .unwrap()
-                .into_iter()
-                .find(|x| x.guid == "5f586908098232e67edb1371408bfaa8")
-                .unwrap();
-
-            let rate = book.exchange(&commodity, &currency).await.unwrap();
-            #[cfg(not(feature = "decimal"))]
-            assert_approx_eq!(f64, rate, 1.5);
-            #[cfg(feature = "decimal")]
-            assert_eq!(rate, Decimal::new(15, 1));
-        }
-    }
-
-    #[cfg(feature = "sqlitefaster")]
-    mod sqlitefaster {
-        use super::*;
-
-        use pretty_assertions::assert_eq;
-
-        use crate::SQLiteQueryFaster;
-
-        static Q: OnceCell<Book<SQLiteQueryFaster>> = OnceCell::const_new();
-        async fn setup() -> &'static Book<SQLiteQueryFaster> {
-            Q.get_or_init(|| async {
-                let uri: &str = &format!(
                     "{}/tests/db/sqlite/complex_sample.gnucash",
                     env!("CARGO_MANIFEST_DIR")
                 );
 
                 println!("work_dir: {:?}", std::env::current_dir());
-                let query = SQLiteQueryFaster::new(uri).unwrap();
+                let query = SQLiteQuery::new(uri).unwrap();
                 Book::new(query).await.unwrap()
             })
             .await
@@ -294,14 +167,14 @@ mod tests {
                 "{}/tests/db/sqlite/complex_sample.gnucash",
                 env!("CARGO_MANIFEST_DIR")
             );
-            let query = SQLiteQueryFaster::new(uri).unwrap();
+            let query = SQLiteQuery::new(uri).unwrap();
             Book::new(query).await.unwrap();
         }
 
         #[tokio::test]
         async fn test_new_fail() {
             assert!(matches!(
-                SQLiteQueryFaster::new("sqlite://tests/sample/no.gnucash"),
+                SQLiteQuery::new("tests/sample/no.gnucash"),
                 Err(crate::Error::Rusqlite(_))
             ));
         }

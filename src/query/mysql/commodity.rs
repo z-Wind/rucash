@@ -97,13 +97,12 @@ mod tests {
     use tokio::sync::OnceCell;
 
     #[cfg(feature = "schema")]
-    impl<'q> MySQLQuery {
-        // test schemas on compile time
-        #[allow(dead_code)]
-        async fn test_commodity_schemas(&self) {
-            let _ = sqlx::query_as!(
-                Commodity,
-                r"
+    // test schemas on compile time
+    #[allow(dead_code)]
+    fn test_commodity_schemas() {
+        let _ = sqlx::query_as!(
+            Commodity,
+            r"
     			SELECT
     			guid,
     			namespace,
@@ -116,10 +115,7 @@ mod tests {
     			quote_tz
     			FROM commodities
     			",
-            )
-            .fetch_all(&self.pool)
-            .await;
-        }
+        );
     }
 
     static Q: OnceCell<MySQLQuery> = OnceCell::const_new();

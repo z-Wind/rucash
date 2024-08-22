@@ -5,7 +5,7 @@
 //!
 //!     #[tokio::main]
 //!     async fn main() {
-//!         let query = SQLiteQuery::new("sqlite://tests/db/sqlite/complex_sample.gnucash?mode=ro").await.unwrap();
+//!         let query = SQLiteQuery::new("tests/db/sqlite/complex_sample.gnucash").unwrap();
 //!         let book = Book::new(query).await.unwrap();
 //!         let accounts = book.accounts();
 //!     }
@@ -44,8 +44,6 @@ pub use query::mysql::MySQLQuery;
 pub use query::postgresql::PostgreSQLQuery;
 #[cfg(feature = "sqlite")]
 pub use query::sqlite::SQLiteQuery;
-#[cfg(feature = "sqlitefaster")]
-pub use query::sqlitefaster::SQLiteQuery as SQLiteQueryFaster;
 #[cfg(feature = "xml")]
 pub use query::xml::XMLQuery;
 pub use query::Query;
