@@ -18,11 +18,10 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-# sqlx = { version = "0.8", optional = true }
-sqlx = { git = "https://github.com/launchbadge/sqlx.git", rev = "6f2905695b9606b5f51b40ce10af63ac9e696bb8", optional = true }
+sqlx = { version = "0.8", optional = true }
 chrono = "0.4"
 rust_decimal = { version = "1.36", optional = true }
-xmltree = { version = "0.10", optional = true }
+xmltree = { version = "0.11", optional = true }
 itertools = "0.13"
 flate2 = "1.0"
 tokio = { version = "1.39", features = ["sync"] }
