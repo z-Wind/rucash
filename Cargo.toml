@@ -24,9 +24,9 @@ rust_decimal = { version = "1.36", optional = true }
 xmltree = { version = "0.11", optional = true }
 itertools = "0.13"
 flate2 = "1.0"
-tokio = { version = "1.40", features = ["sync"] }
+tokio = { version = "1.41", features = ["sync"] }
 num-traits = "0.2"
-thiserror = "1.0"
+thiserror = "2.0"
 rusqlite = { version = "0.32", features = [
     "bundled",
     "chrono",
@@ -40,7 +40,7 @@ crate-type = ["cdylib", "rlib"]
 criterion = { version = "0.5", features = ["async_tokio"] }
 float-cmp = "0.10"
 pretty_assertions = "1.4"
-tokio = { version = "1.40", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.41", features = ["rt-multi-thread", "macros"] }
 
 [features]
 default = []
