@@ -42,7 +42,10 @@ impl Exchange {
             let currency = &p.currency().await?.mnemonic;
 
             if p.value.is_zero() {
-                println!("Warning: ignore {} {commodity}/{currency} in exchange graph, becasue the value is zero.", p.datetime);
+                println!(
+                    "Warning: ignore {} {commodity}/{currency} in exchange graph, becasue the value is zero.",
+                    p.datetime
+                );
                 continue;
             }
 

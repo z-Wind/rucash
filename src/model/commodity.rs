@@ -108,8 +108,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::sqlite::commodity::Commodity as CommodityBase;
         use crate::SQLiteQuery;
+        use crate::query::sqlite::commodity::Commodity as CommodityBase;
 
         #[allow(clippy::unused_async)]
         async fn setup() -> SQLiteQuery {
@@ -326,8 +326,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::mysql::commodity::Commodity as CommodityBase;
         use crate::MySQLQuery;
+        use crate::query::mysql::commodity::Commodity as CommodityBase;
 
         async fn setup() -> MySQLQuery {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
@@ -538,8 +538,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::postgresql::commodity::Commodity as CommodityBase;
         use crate::PostgreSQLQuery;
+        use crate::query::postgresql::commodity::Commodity as CommodityBase;
 
         async fn setup() -> PostgreSQLQuery {
             let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
@@ -750,8 +750,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::xml::commodity::Commodity as CommodityBase;
         use crate::XMLQuery;
+        use crate::query::xml::commodity::Commodity as CommodityBase;
 
         fn setup() -> XMLQuery {
             let path: &str = &format!(

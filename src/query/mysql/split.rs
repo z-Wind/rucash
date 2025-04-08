@@ -135,7 +135,6 @@ impl SplitQ for MySQLQuery {
 }
 
 #[cfg(test)]
-
 mod tests {
     use super::*;
 

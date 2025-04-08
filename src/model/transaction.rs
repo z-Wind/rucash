@@ -43,7 +43,7 @@ where
                 model: "Commodity".to_string(),
                 guid: self.currency_guid.clone(),
             });
-        };
+        }
 
         let mut currencies = CommodityQ::guid(&*self.query, &self.currency_guid).await?;
 
@@ -83,8 +83,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::sqlite::transaction::Transaction as TransactionBase;
         use crate::SQLiteQuery;
+        use crate::query::sqlite::transaction::Transaction as TransactionBase;
 
         #[allow(clippy::unused_async)]
         async fn setup() -> SQLiteQuery {
@@ -170,8 +170,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::mysql::transaction::Transaction as TransactionBase;
         use crate::MySQLQuery;
+        use crate::query::mysql::transaction::Transaction as TransactionBase;
 
         async fn setup() -> MySQLQuery {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
@@ -251,8 +251,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::postgresql::transaction::Transaction as TransactionBase;
         use crate::PostgreSQLQuery;
+        use crate::query::postgresql::transaction::Transaction as TransactionBase;
 
         async fn setup() -> PostgreSQLQuery {
             let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
@@ -332,8 +332,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::xml::transaction::Transaction as TransactionBase;
         use crate::XMLQuery;
+        use crate::query::xml::transaction::Transaction as TransactionBase;
 
         fn setup() -> XMLQuery {
             let path: &str = &format!(

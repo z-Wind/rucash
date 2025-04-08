@@ -55,7 +55,7 @@ impl Split {
         let reconcile_state = e
             .get_child("reconciled-state")
             .and_then(xmltree::Element::get_text)
-            .map_or(false, |x| x != "n");
+            .is_some_and(|x| x != "n");
         let reconcile_date = e
             .get_child("reconciled-date")
             .and_then(xmltree::Element::get_text)

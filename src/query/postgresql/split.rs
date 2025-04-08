@@ -135,7 +135,6 @@ impl SplitQ for PostgreSQLQuery {
 }
 
 #[cfg(test)]
-
 mod tests {
     use super::*;
 

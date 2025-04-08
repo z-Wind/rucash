@@ -51,7 +51,7 @@ where
                 model: "Transaction".to_string(),
                 guid: self.tx_guid.clone(),
             });
-        };
+        }
 
         let mut transactions = TransactionQ::guid(&*self.query, &self.tx_guid).await?;
 
@@ -76,7 +76,7 @@ where
                 model: "Account".to_string(),
                 guid: self.account_guid.clone(),
             });
-        };
+        }
 
         let mut accounts = AccountQ::guid(&*self.query, &self.account_guid).await?;
 
@@ -111,8 +111,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::sqlite::split::Split as SplitBase;
         use crate::SQLiteQuery;
+        use crate::query::sqlite::split::Split as SplitBase;
 
         #[allow(clippy::unused_async)]
         async fn setup() -> SQLiteQuery {
@@ -208,8 +208,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::mysql::split::Split as SplitBase;
         use crate::MySQLQuery;
+        use crate::query::mysql::split::Split as SplitBase;
 
         async fn setup() -> MySQLQuery {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
@@ -299,8 +299,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::postgresql::split::Split as SplitBase;
         use crate::PostgreSQLQuery;
+        use crate::query::postgresql::split::Split as SplitBase;
 
         async fn setup() -> PostgreSQLQuery {
             let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
@@ -390,8 +390,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::xml::split::Split as SplitBase;
         use crate::XMLQuery;
+        use crate::query::xml::split::Split as SplitBase;
 
         fn setup() -> XMLQuery {
             let path: &str = &format!(

@@ -38,6 +38,7 @@ pub type Num = rust_decimal::Decimal;
 
 pub use book::Book;
 pub use error::Error;
+pub use query::Query;
 #[cfg(feature = "mysql")]
 pub use query::mysql::MySQLQuery;
 #[cfg(feature = "postgresql")]
@@ -46,4 +47,3 @@ pub use query::postgresql::PostgreSQLQuery;
 pub use query::sqlite::SQLiteQuery;
 #[cfg(feature = "xml")]
 pub use query::xml::XMLQuery;
-pub use query::Query;

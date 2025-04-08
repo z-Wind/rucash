@@ -74,7 +74,7 @@ impl TryFrom<&Element> for Account {
         let hidden = e
             .get_child("hidden")
             .and_then(xmltree::Element::get_text)
-            .map_or(false, |x| x == "true");
+            .is_some_and(|x| x == "true");
 
         let slots: Vec<&Element> = match e.get_child("slots") {
             None => Vec::new(),
@@ -94,7 +94,7 @@ impl TryFrom<&Element> for Account {
             })
             .and_then(|e| e.get_child("value"))
             .and_then(xmltree::Element::get_text)
-            .map_or(false, |x| x == "true");
+            .is_some_and(|x| x == "true");
 
         Ok(Self {
             guid,

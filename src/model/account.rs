@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use crate::Book;
 use crate::error::Error;
 use crate::model::{Commodity, Split};
 use crate::query::{AccountQ, AccountT, CommodityQ, Query, SplitQ};
-use crate::Book;
 
 #[derive(Clone, Debug)]
 pub struct Account<Q>
@@ -58,7 +58,7 @@ where
     pub async fn parent(&self) -> Result<Option<Account<Q>>, Error> {
         if self.parent_guid.is_empty() {
             return Ok(None);
-        };
+        }
 
         let mut accounts = AccountQ::guid(&*self.query, &self.parent_guid).await?;
 
@@ -166,8 +166,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::sqlite::account::Account as AccountBase;
         use crate::SQLiteQuery;
+        use crate::query::sqlite::account::Account as AccountBase;
 
         #[allow(clippy::unused_async)]
         async fn setup() -> SQLiteQuery {
@@ -363,8 +363,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::mysql::account::Account as AccountBase;
         use crate::MySQLQuery;
+        use crate::query::mysql::account::Account as AccountBase;
 
         async fn setup() -> MySQLQuery {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
@@ -554,8 +554,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::postgresql::account::Account as AccountBase;
         use crate::PostgreSQLQuery;
+        use crate::query::postgresql::account::Account as AccountBase;
 
         async fn setup() -> PostgreSQLQuery {
             let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
@@ -745,8 +745,8 @@ mod tests {
 
         use pretty_assertions::assert_eq;
 
-        use crate::query::xml::account::Account as AccountBase;
         use crate::XMLQuery;
+        use crate::query::xml::account::Account as AccountBase;
 
         fn setup() -> XMLQuery {
             let path: &str = &format!(

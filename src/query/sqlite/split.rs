@@ -166,7 +166,6 @@ impl SplitQ for SQLiteQuery {
 }
 
 #[cfg(test)]
-
 mod tests {
     use super::*;
 
