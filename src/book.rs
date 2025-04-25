@@ -21,12 +21,12 @@ where
 {
     pub async fn new(query: Q) -> Result<Self, Error> {
         let query = Arc::new(query);
-        let mut book = Self {
+        let book = Self {
             query,
             exchange_graph: None,
         };
 
-        book.update_exchange_graph().await?;
+        //book.update_exchange_graph().await?;
         Ok(book)
     }
 

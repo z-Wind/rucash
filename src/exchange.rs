@@ -43,7 +43,7 @@ impl Exchange {
 
             if p.value.is_zero() {
                 println!(
-                    "Warning: ignore {} {commodity}/{currency} in exchange graph, becasue the value is zero.",
+                    "Warning: ignore {} {commodity}/{currency} in exchange graph, because the value is zero.",
                     p.datetime
                 );
                 continue;
