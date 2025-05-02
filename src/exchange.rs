@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::error::Error;
 use crate::model::{Commodity, Price};
-use crate::query::{PriceQ, Query};
+use crate::query::{CommodityQ, PriceQ, Query};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Exchange {
@@ -35,15 +35,33 @@ impl Exchange {
             .map(|x| Price::from_with_query(&x, query.clone()))
             .collect();
 
+        let commodities_map: HashMap<String, String> = CommodityQ::all(&*query)
+            .await?
+            .into_iter()
+            .map(|x| {
+                let c = Commodity::from_with_query(&x, query.clone());
+                (c.guid.clone(), c.mnemonic.clone())
+            })
+            .collect();
+
         let mut graph: HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>> =
             HashMap::new();
+
         for p in prices {
-            let commodity = &p.commodity().await?.mnemonic;
-            let currency = &p.currency().await?.mnemonic;
+            let commodity = commodities_map
+                .get(&p.commodity_guid).ok_or(Error::GuidNotFound {
+                    model: "Commodity".to_string(),
+                    guid: p.commodity_guid.clone(),
+                })?;
+            let currency = commodities_map
+                .get(&p.currency_guid).ok_or(Error::GuidNotFound {
+                    model: "Commodity".to_string(),
+                    guid: p.currency_guid.clone(),
+                })?;
 
             if p.value.is_zero() {
                 println!(
-                    "Warning: ignore {} {commodity}/{currency} in exchange graph, becasue the value is zero.",
+                    "Warning: ignore {} {commodity}/{currency} in exchange graph, because the value is zero.",
                     p.datetime
                 );
                 continue;
