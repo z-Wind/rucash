@@ -68,7 +68,7 @@ impl SplitT for Split {
     }
     fn reconcile_datetime(&self) -> Option<NaiveDateTime> {
         let datetime = self.reconcile_date?;
-        if datetime == NaiveDateTime::UNIX_EPOCH {
+        if datetime.and_utc() == chrono::DateTime::UNIX_EPOCH {
             return None;
         }
         Some(datetime)
