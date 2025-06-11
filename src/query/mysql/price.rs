@@ -42,14 +42,12 @@ impl PriceT for Price {
     }
 
     #[cfg(not(feature = "decimal"))]
-    #[must_use]
     #[allow(clippy::cast_precision_loss)]
     fn value(&self) -> f64 {
         self.value_num as f64 / self.value_denom as f64
     }
 
     #[cfg(feature = "decimal")]
-    #[must_use]
     fn value(&self) -> Decimal {
         Decimal::new(self.value_num, 0) / Decimal::new(self.value_denom, 0)
     }

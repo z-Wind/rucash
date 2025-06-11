@@ -1,6 +1,6 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime};
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
 use xmltree::Element;
@@ -132,7 +132,7 @@ impl SplitT for Split {
     }
     fn reconcile_datetime(&self) -> Option<NaiveDateTime> {
         let datetime = self.reconcile_date?;
-        if datetime.and_utc() == chrono::DateTime::UNIX_EPOCH {
+        if datetime.and_utc() == DateTime::UNIX_EPOCH {
             return None;
         }
         Some(datetime)
@@ -142,27 +142,23 @@ impl SplitT for Split {
     }
 
     #[cfg(not(feature = "decimal"))]
-    #[must_use]
     #[allow(clippy::cast_precision_loss)]
     fn value(&self) -> f64 {
         self.value_num as f64 / self.value_denom as f64
     }
 
     #[cfg(feature = "decimal")]
-    #[must_use]
     fn value(&self) -> Decimal {
         Decimal::new(self.value_num, 0) / Decimal::new(self.value_denom, 0)
     }
 
     #[cfg(not(feature = "decimal"))]
-    #[must_use]
     #[allow(clippy::cast_precision_loss)]
     fn quantity(&self) -> f64 {
         self.quantity_num as f64 / self.quantity_denom as f64
     }
 
     #[cfg(feature = "decimal")]
-    #[must_use]
     fn quantity(&self) -> Decimal {
         Decimal::new(self.quantity_num, 0) / Decimal::new(self.quantity_denom, 0)
     }
