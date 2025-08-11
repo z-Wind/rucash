@@ -4,6 +4,7 @@
 use chrono::{DateTime, NaiveDateTime};
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
+use sqlx::AssertSqlSafe;
 
 use crate::error::Error;
 use crate::query::mysql::MySQLQuery;
@@ -106,7 +107,7 @@ impl SplitQ for MySQLQuery {
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE guid = ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
@@ -114,7 +115,7 @@ impl SplitQ for MySQLQuery {
     }
 
     async fn account_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE account_guid = ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE account_guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
@@ -122,7 +123,7 @@ impl SplitQ for MySQLQuery {
     }
 
     async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE tx_guid = ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE tx_guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await

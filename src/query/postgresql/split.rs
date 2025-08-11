@@ -4,6 +4,7 @@
 use chrono::{DateTime, NaiveDateTime};
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
+use sqlx::AssertSqlSafe;
 
 use crate::error::Error;
 use crate::query::postgresql::PostgreSQLQuery;
@@ -106,7 +107,7 @@ impl SplitQ for PostgreSQLQuery {
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE guid = $1"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = $1")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
@@ -114,7 +115,7 @@ impl SplitQ for PostgreSQLQuery {
     }
 
     async fn account_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE account_guid = $1"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE account_guid = $1")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
@@ -122,7 +123,7 @@ impl SplitQ for PostgreSQLQuery {
     }
 
     async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE tx_guid = $1"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE tx_guid = $1")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await

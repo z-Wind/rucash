@@ -2,6 +2,7 @@
 // ref: https://wiki.gnucash.org/wiki/SQL
 
 use chrono::NaiveDateTime;
+use sqlx::AssertSqlSafe;
 
 use crate::error::Error;
 use crate::query::mysql::MySQLQuery;
@@ -61,7 +62,7 @@ impl TransactionQ for MySQLQuery {
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE guid = ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
@@ -69,7 +70,7 @@ impl TransactionQ for MySQLQuery {
     }
 
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE currency_guid = ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE currency_guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await

@@ -1,6 +1,8 @@
 // ref: https://piecash.readthedocs.io/en/master/object_model.html
 // ref: https://wiki.gnucash.org/wiki/SQL
 
+use sqlx::AssertSqlSafe;
+
 use crate::error::Error;
 use crate::query::mysql::MySQLQuery;
 use crate::query::{AccountQ, AccountT};
@@ -84,7 +86,7 @@ impl AccountQ for MySQLQuery {
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE guid = ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
@@ -92,7 +94,7 @@ impl AccountQ for MySQLQuery {
     }
 
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE commodity_guid = ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE commodity_guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
@@ -100,7 +102,7 @@ impl AccountQ for MySQLQuery {
     }
 
     async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE parent_guid = ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE parent_guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
@@ -108,7 +110,7 @@ impl AccountQ for MySQLQuery {
     }
 
     async fn name(&self, name: &str) -> Result<Vec<Self::A>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE name = ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE name = ?")))
             .bind(name)
             .fetch_all(&self.pool)
             .await
@@ -117,7 +119,7 @@ impl AccountQ for MySQLQuery {
 
     async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::A>, Error> {
         let name = format!("%{name}%");
-        sqlx::query_as(&format!("{SEL}\nWHERE name LIKE ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE name LIKE ?")))
             .bind(name)
             .fetch_all(&self.pool)
             .await

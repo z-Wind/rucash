@@ -1,6 +1,8 @@
 // ref: https://piecash.readthedocs.io/en/master/object_model.html
 // ref: https://wiki.gnucash.org/wiki/SQL
 
+use sqlx::AssertSqlSafe;
+
 use crate::error::Error;
 use crate::query::mysql::MySQLQuery;
 use crate::query::{CommodityQ, CommodityT};
@@ -73,7 +75,7 @@ impl CommodityQ for MySQLQuery {
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::C>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE guid = ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
@@ -81,7 +83,7 @@ impl CommodityQ for MySQLQuery {
     }
 
     async fn namespace(&self, namespace: &str) -> Result<Vec<Self::C>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE namespace = ?"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE namespace = ?")))
             .bind(namespace)
             .fetch_all(&self.pool)
             .await

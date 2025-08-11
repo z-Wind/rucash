@@ -4,6 +4,7 @@
 use chrono::NaiveDateTime;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
+use sqlx::AssertSqlSafe;
 
 use crate::error::Error;
 use crate::query::postgresql::PostgreSQLQuery;
@@ -76,30 +77,30 @@ impl PriceQ for PostgreSQLQuery {
             .map_err(std::convert::Into::into)
     }
     async fn guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE guid = $1"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = $1")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
             .map_err(std::convert::Into::into)
     }
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE commodity_guid = $1"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE commodity_guid = $1")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
             .map_err(std::convert::Into::into)
     }
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        sqlx::query_as(&format!("{SEL}\nWHERE currency_guid = $1"))
+        sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE currency_guid = $1")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
             .map_err(std::convert::Into::into)
     }
     async fn commodity_or_currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        sqlx::query_as(&format!(
+        sqlx::query_as(AssertSqlSafe(format!(
             "{SEL}\nWHERE commodity_guid = $1 OR currency_guid = $1"
-        ))
+        )))
         .bind(guid)
         .bind(guid)
         .fetch_all(&self.pool)
