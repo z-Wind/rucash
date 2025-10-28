@@ -1,13 +1,13 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use chrono::NaiveDateTime;
-use xmltree::Element;
+use roxmltree::{Document, Node};
 
 use crate::error::Error;
 use crate::query::xml::XMLQuery;
 use crate::query::{TransactionQ, TransactionT};
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Default, Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Transaction {
     pub guid: String,
     pub currency_guid: String,
@@ -17,56 +17,62 @@ pub struct Transaction {
     pub description: Option<String>,
 }
 
-impl TryFrom<&Element> for Transaction {
+impl TryFrom<Node<'_, '_>> for Transaction {
     type Error = Error;
-    fn try_from(e: &Element) -> Result<Self, Error> {
-        let guid = e
-            .get_child("id")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Transaction guid".to_string(),
-            })?;
-        let currency_guid = e
-            .get_child("currency")
-            .and_then(|x| x.get_child("id"))
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Transaction currency_guid".to_string(),
-            })?;
-        let num = e
-            .get_child("num")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .unwrap_or_default();
-        let post_date = e
-            .get_child("date-posted")
-            .and_then(|x| x.get_child("date"))
-            .and_then(xmltree::Element::get_text)
-            // .map(std::borrow::Cow::into_owned)
-            .map(|x| chrono::NaiveDateTime::parse_from_str(&x, "%Y-%m-%d %H:%M:%S%z"))
-            .transpose()?;
-        let enter_date = e
-            .get_child("date-entered")
-            .and_then(|x| x.get_child("date"))
-            .and_then(xmltree::Element::get_text)
-            // .map(std::borrow::Cow::into_owned)
-            .map(|x| chrono::NaiveDateTime::parse_from_str(&x, "%Y-%m-%d %H:%M:%S%z"))
-            .transpose()?;
-        let description = e
-            .get_child("description")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
 
-        Ok(Self {
-            guid,
-            currency_guid,
-            num,
-            post_date,
-            enter_date,
-            description,
-        })
+    fn try_from(n: Node) -> Result<Self, Error> {
+        let mut transaction = Self::default();
+        for child in n.children() {
+            match child.tag_name().name() {
+                "id" => {
+                    transaction.guid = child
+                        .text()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Transaction guid".to_string(),
+                        })?
+                        .to_string();
+                }
+                "currency" => {
+                    transaction.currency_guid = child
+                        .children()
+                        .find(|n| n.has_tag_name("id"))
+                        .and_then(|n| n.text())
+                        .map(std::string::ToString::to_string)
+                        .ok_or(Error::XMLFromElement {
+                            model: "Transaction currency_guid".to_string(),
+                        })?;
+                }
+                "num" => {
+                    transaction.num = child
+                        .text()
+                        .map(std::string::ToString::to_string)
+                        .unwrap_or_default();
+                }
+                "date-posted" => {
+                    transaction.post_date = child
+                        .children()
+                        .find(|n| n.has_tag_name("date"))
+                        .and_then(|n| n.text())
+                        .map(|x| chrono::NaiveDateTime::parse_from_str(x, "%Y-%m-%d %H:%M:%S%z"))
+                        .transpose()?;
+                }
+                "date-entered" => {
+                    transaction.enter_date = child
+                        .children()
+                        .find(|n| n.has_tag_name("date"))
+                        .and_then(|n| n.text())
+                        .map(|x| chrono::NaiveDateTime::parse_from_str(x, "%Y-%m-%d %H:%M:%S%z"))
+                        .transpose()?;
+                }
+                "description" => {
+                    transaction.description = child.text().map(std::string::ToString::to_string);
+                }
+
+                _ => {}
+            }
+        }
+
+        Ok(transaction)
     }
 }
 
@@ -96,11 +102,14 @@ impl TransactionQ for XMLQuery {
     type T = Transaction;
 
     async fn all(&self) -> Result<Vec<Self::T>, Error> {
-        self.tree
-            .children
-            .iter()
-            .filter_map(xmltree::XMLNode::as_element)
-            .filter(|e| e.name == "transaction")
+        let doc = Document::parse(&self.text)?;
+
+        doc.root_element()
+            .children()
+            .find(|n| n.has_tag_name("book"))
+            .expect("must exist book")
+            .children()
+            .filter(|n| n.has_tag_name("transaction"))
             .map(Self::T::try_from)
             .collect()
     }
@@ -206,12 +215,13 @@ mod tests {
             </gnc-v2>
             "#;
 
-        let e = Element::parse(data.as_bytes())
-            .unwrap()
-            .take_child("transaction")
+        let doc = Document::parse(data).unwrap();
+        let n = doc
+            .descendants()
+            .find(|n| n.has_tag_name("transaction"))
             .unwrap();
 
-        let transaction = Transaction::try_from(&e).unwrap();
+        let transaction = Transaction::try_from(n).unwrap();
 
         assert_eq!(transaction.guid, "6c8876003c4a6026e38e3afb67d6f2b1");
         assert_eq!(transaction.currency_guid, "EUR");

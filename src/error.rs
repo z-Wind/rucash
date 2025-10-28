@@ -24,10 +24,7 @@ pub enum Error {
 
     #[cfg(feature = "xml")]
     #[error("XML error: {0}")]
-    XML(#[from] xmltree::Error),
-    #[cfg(feature = "xml")]
-    #[error("XML parse error: {0}")]
-    XMLParse(#[from] xmltree::ParseError),
+    XML(#[from] roxmltree::Error),
     #[cfg(feature = "xml")]
     #[error("XML {model} from element")]
     XMLFromElement { model: String },
@@ -37,7 +34,4 @@ pub enum Error {
     #[cfg(feature = "xml")]
     #[error("XML parseNaiveDatetime error: {0}")]
     XMLParseNaiveDatetime(#[from] chrono::ParseError),
-    #[cfg(feature = "xml")]
-    #[error("XML no splits: {0}")]
-    XMLNoSplit(String),
 }

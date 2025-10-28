@@ -5,17 +5,16 @@ pub(crate) mod split;
 pub(crate) mod transaction;
 
 use flate2::read::GzDecoder;
+use roxmltree::Document;
 use std::fs::File;
 use std::io::Read;
-use std::sync::Arc;
-use xmltree::Element;
 
 use super::Query;
 use crate::error::Error;
 
 #[derive(Debug, Clone)]
 pub struct XMLQuery {
-    tree: Arc<Element>,
+    text: String,
 }
 
 impl XMLQuery {
@@ -26,14 +25,13 @@ impl XMLQuery {
         let mut data = String::new();
         d.read_to_string(&mut data)?;
 
-        let mut root: Element = Element::parse(data.as_bytes())?;
-        root = root
-            .take_child("book")
+        let doc = Document::parse(&data)?;
+        doc.root_element()
+            .children()
+            .find(|n| n.has_tag_name("book"))
             .ok_or(Error::NoBook(path.to_string()))?;
 
-        Ok(Self {
-            tree: Arc::new(root),
-        })
+        Ok(Self { text: data })
     }
 }
 

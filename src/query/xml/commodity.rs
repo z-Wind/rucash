@@ -1,13 +1,13 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use itertools::Itertools;
-use xmltree::Element;
+use roxmltree::{Document, Node};
 
 use crate::error::Error;
 use crate::query::xml::XMLQuery;
 use crate::query::{CommodityQ, CommodityT};
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Default, Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Commodity {
     pub(crate) guid: String,
     pub(crate) namespace: String,
@@ -20,58 +20,58 @@ pub struct Commodity {
     pub(crate) quote_tz: Option<String>,
 }
 
-impl TryFrom<&Element> for Commodity {
+impl TryFrom<Node<'_, '_>> for Commodity {
     type Error = Error;
-    fn try_from(e: &Element) -> Result<Self, Error> {
-        let guid = e
-            .get_child("id")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Commodity guid".to_string(),
-            })?;
-        let namespace = e
-            .get_child("space")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Commodity namespace".to_string(),
-            })?;
-        let mnemonic = guid.clone();
-        let fullname = e
-            .get_child("name")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let cusip = e
-            .get_child("cusip")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let fraction = e
-            .get_child("fraction")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .map_or(100, |x| x.parse().expect("must be i32"));
-        let quote_flag = e.get_child("get_quotes").is_some();
-        let quote_source = e
-            .get_child("quote_source")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let quote_tz = e
-            .get_child("quote_tz")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
+    fn try_from(n: Node) -> Result<Self, Error> {
+        let mut commodity = Self {
+            fraction: 100,
+            ..Self::default()
+        };
 
-        Ok(Self {
-            guid,
-            namespace,
-            mnemonic,
-            fullname,
-            cusip,
-            fraction,
-            quote_flag,
-            quote_source,
-            quote_tz,
-        })
+        for child in n.children() {
+            match child.tag_name().name() {
+                "id" => {
+                    commodity.guid = child
+                        .text()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Commodity guid".to_string(),
+                        })?
+                        .to_string();
+                    commodity.mnemonic = commodity.guid.clone();
+                }
+                "space" => {
+                    commodity.namespace = child
+                        .text()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Commodity namespacee".to_string(),
+                        })?
+                        .to_string();
+                }
+                "name" => {
+                    commodity.fullname = child.text().map(std::string::ToString::to_string);
+                }
+                "cusip" => {
+                    commodity.cusip = child.text().map(std::string::ToString::to_string);
+                }
+                "fraction" => {
+                    commodity.fraction = child
+                        .text()
+                        .map_or(100, |x| x.parse().expect("must be i32"));
+                }
+                "get_quotes" => {
+                    commodity.quote_flag = true;
+                }
+                "quote_source" => {
+                    commodity.quote_source = child.text().map(std::string::ToString::to_string);
+                }
+                "quote_tz" => {
+                    commodity.quote_tz = child.text().map(std::string::ToString::to_string);
+                }
+                _ => {}
+            }
+        }
+
+        Ok(commodity)
     }
 }
 
@@ -111,37 +111,46 @@ impl CommodityQ for XMLQuery {
     type C = Commodity;
 
     async fn all(&self) -> Result<Vec<Self::C>, Error> {
-        let mut commodities: Vec<Self::C> = self
-            .tree
-            .children
-            .iter()
-            .filter_map(xmltree::XMLNode::as_element)
-            .filter(|e| e.name == "commodity")
+        let doc = Document::parse(&self.text)?;
+
+        let book = doc
+            .root_element()
+            .children()
+            .find(|n| n.has_tag_name("book"))
+            .expect("must exist book");
+
+        let mut commodities: Vec<Self::C> = book
+            .children()
+            .filter(|n| n.has_tag_name("commodity"))
             .map(Self::C::try_from)
-            .collect::<Result<Vec<Self::C>, Error>>()?;
+            .collect::<Result<_, _>>()?;
 
-        let mut prices: Vec<Self::C> = match self.tree.get_child("pricedb") {
-            None => Vec::new(),
-            Some(node) => node
-                .children
-                .iter()
-                .filter_map(xmltree::XMLNode::as_element)
-                .filter(|e| e.name == "price")
-                .flat_map(|e| {
-                    let cmdty = e.get_child("commodity").ok_or(Error::XMLFromElement {
-                        model: "Commodity price commodity".to_string(),
-                    });
-                    let cmdty = cmdty.map(Self::C::try_from);
+        let mut prices: Vec<Self::C> = book
+            .children()
+            .find(|n| n.has_tag_name("pricedb"))
+            .map_or_else(
+                || Ok(Vec::new()),
+                |n| {
+                    n.children()
+                        .filter(|n| n.has_tag_name("price"))
+                        .flat_map(|n| {
+                            let mut results = Vec::new();
+                            for child in n.children() {
+                                match child.tag_name().name() {
+                                    "commodity" | "currency" => {
+                                        results.push(Self::C::try_from(child));
+                                    }
 
-                    let crncy = e.get_child("currency").ok_or(Error::XMLFromElement {
-                        model: "Commodity price currency".to_string(),
-                    });
-                    let crncy = crncy.map(Self::C::try_from);
+                                    _ => {}
+                                }
+                            }
 
-                    vec![cmdty, crncy]
-                })
-                .collect::<Result<Result<Vec<Self::C>, Error>, Error>>()??,
-        };
+                            results
+                        })
+                        .collect()
+                },
+            )?;
+
         commodities.append(&mut prices);
 
         commodities.sort_unstable_by(|c1, c2| c1.guid.cmp(&c2.guid));
@@ -229,12 +238,13 @@ mod tests {
             </gnc-v2>
             "#;
 
-        let e = Element::parse(data.as_bytes())
-            .unwrap()
-            .take_child("commodity")
+        let doc = Document::parse(data).unwrap();
+        let n = doc
+            .descendants()
+            .find(|n| n.has_tag_name("commodity"))
             .unwrap();
 
-        let commodity = Commodity::try_from(&e).unwrap();
+        let commodity = Commodity::try_from(n).unwrap();
 
         assert_eq!(commodity.guid, "EUR");
         assert_eq!(commodity.namespace, "CURRENCY");

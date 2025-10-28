@@ -1,6 +1,6 @@
 [package]
 name = "rucash"
-version = "0.5.0"
+version = "0.6.0"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/z-Wind/rucash"
@@ -20,11 +20,11 @@ rustdoc-args = ["--cfg", "docsrs"]
 # sqlx = { version = "0.8", optional = true }
 sqlx = { git = "https://github.com/launchbadge/sqlx.git", optional = true }
 chrono = "0.4"
-rust_decimal = { version = "1.37", optional = true }
-xmltree = { version = "0.11", optional = true }
+rust_decimal = { version = "1.39", optional = true }
+roxmltree = { version = "0.21", optional = true }
 itertools = "0.14"
 flate2 = "1.1"
-tokio = { version = "1.47", features = ["sync"] }
+tokio = { version = "1.48", features = ["sync"] }
 num-traits = "0.2"
 thiserror = "2.0"
 rusqlite = { version = "0.37", features = [
@@ -40,7 +40,7 @@ crate-type = ["cdylib", "rlib"]
 criterion = { version = "0.7", features = ["async_tokio"] }
 float-cmp = "0.10"
 pretty_assertions = "1.4"
-tokio = { version = "1.47", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.48", features = ["rt-multi-thread", "macros"] }
 
 [features]
 default = []
@@ -49,7 +49,7 @@ sqlx_common = ["sqlx/any", "sqlx/runtime-tokio", "sqlx/macros", "sqlx/chrono"]
 sqlite = ["rusqlite"]
 postgresql = ["sqlx_common", "sqlx/postgres"]
 mysql = ["sqlx_common", "sqlx/mysql"]
-xml = ["xmltree"]
+xml = ["roxmltree"]
 decimal = ["rust_decimal"]
 
 [[bench]]

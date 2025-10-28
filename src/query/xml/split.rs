@@ -1,15 +1,15 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use chrono::{DateTime, NaiveDateTime};
+use roxmltree::{Document, Node};
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
-use xmltree::Element;
 
 use crate::error::Error;
 use crate::query::xml::XMLQuery;
 use crate::query::{SplitQ, SplitT};
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Default, Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Split {
     pub guid: String,
     pub tx_guid: String,
@@ -26,88 +26,98 @@ pub struct Split {
 }
 
 impl Split {
-    fn try_from(tx_guid: String, e: &Element) -> Result<Self, Error> {
-        let guid = e
-            .get_child("id")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Split guid".to_string(),
-            })?;
-
-        let account_guid = e
-            .get_child("account")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Split account_guid".to_string(),
-            })?;
-        let memo = e
-            .get_child("memo")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .unwrap_or_default();
-        let action = e
-            .get_child("action")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .unwrap_or_default();
-        let reconcile_state = e
-            .get_child("reconciled-state")
-            .and_then(xmltree::Element::get_text)
-            .is_some_and(|x| x != "n");
-        let reconcile_date = e
-            .get_child("reconciled-date")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .map(|x| chrono::NaiveDateTime::parse_from_str(&x, "%Y-%m-%d %H:%M:%S"))
-            .transpose()?;
-
-        let splits = e
-            .get_child("value")
-            .ok_or(Error::XMLNoSplit("no child value".to_string()))?
-            .get_text()
-            .ok_or(Error::XMLNoSplit("no child value".to_string()))?;
-        let mut splits = splits.split('/');
-        let value_num = splits
-            .next()
-            .ok_or(Error::XMLNoSplit("no child value_num".to_string()))?
-            .parse()?;
-        let value_denom = splits
-            .next()
-            .ok_or(Error::XMLNoSplit("no child value_denom".to_string()))?
-            .parse()?;
-
-        let splits = e
-            .get_child("quantity")
-            .ok_or(Error::XMLNoSplit("no child quantity".to_string()))?
-            .get_text()
-            .ok_or(Error::XMLNoSplit("no child quantity".to_string()))?;
-        let mut splits = splits.split('/');
-        let quantity_num = splits
-            .next()
-            .ok_or(Error::XMLNoSplit("no child quantity_num".to_string()))?
-            .parse()?;
-        let quantity_denom = splits
-            .next()
-            .ok_or(Error::XMLNoSplit("no child quantity_denom".to_string()))?
-            .parse()?;
-        let lot_guid = None;
-
-        Ok(Self {
-            guid,
+    fn try_from(tx_guid: String, n: Node) -> Result<Self, Error> {
+        let mut split = Self {
             tx_guid,
-            account_guid,
-            memo,
-            action,
-            reconcile_state,
-            reconcile_date,
-            value_num,
-            value_denom,
-            quantity_num,
-            quantity_denom,
-            lot_guid,
-        })
+            ..Self::default()
+        };
+
+        for child in n.children() {
+            match child.tag_name().name() {
+                "id" => {
+                    split.guid = child
+                        .text()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Split guid".to_string(),
+                        })?
+                        .to_string();
+                }
+                "account" => {
+                    split.account_guid = child
+                        .text()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Split account_guid".to_string(),
+                        })?
+                        .to_string();
+                }
+                "memo" => {
+                    split.memo = child
+                        .text()
+                        .map(std::string::ToString::to_string)
+                        .unwrap_or_default();
+                }
+                "action" => {
+                    split.action = child
+                        .text()
+                        .map(std::string::ToString::to_string)
+                        .unwrap_or_default();
+                }
+                "reconciled-state" => {
+                    split.reconcile_state = child.text().is_some_and(|x| x != "n");
+                }
+                "reconcile-date" => {
+                    split.reconcile_date = child
+                        .text()
+                        .map(|x| chrono::NaiveDateTime::parse_from_str(x, "%Y-%m-%d %H:%M:%S"))
+                        .transpose()?;
+                }
+                "value" => {
+                    let mut splits =
+                        child
+                            .text()
+                            .map(|s| s.split('/'))
+                            .ok_or(Error::XMLFromElement {
+                                model: "Split value".to_string(),
+                            })?;
+                    split.value_num = splits
+                        .next()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Split value value_num".to_string(),
+                        })?
+                        .parse()?;
+                    split.value_denom = splits
+                        .next()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Split value value_denom".to_string(),
+                        })?
+                        .parse()?;
+                }
+                "quantity" => {
+                    let mut splits =
+                        child
+                            .text()
+                            .map(|s| s.split('/'))
+                            .ok_or(Error::XMLFromElement {
+                                model: "Split quantity".to_string(),
+                            })?;
+                    split.quantity_num = splits
+                        .next()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Split quantity quantity_num".to_string(),
+                        })?
+                        .parse()?;
+                    split.quantity_denom = splits
+                        .next()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Split quantity quantity_denom".to_string(),
+                        })?
+                        .parse()?;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(split)
     }
 }
 
@@ -168,31 +178,38 @@ impl SplitQ for XMLQuery {
     type S = Split;
 
     async fn all(&self) -> Result<Vec<Self::S>, Error> {
-        let mut splits = Vec::new();
-        for e in self
-            .tree
-            .children
-            .iter()
-            .filter_map(xmltree::XMLNode::as_element)
-            .filter(|e| e.name == "transaction")
-        {
-            let tx_guid = e
-                .get_child("id")
-                .and_then(xmltree::Element::get_text)
-                .map(std::borrow::Cow::into_owned)
-                .ok_or(Error::XMLNoSplit("no tx_guid".to_string()))?;
+        let doc = Document::parse(&self.text)?;
 
-            let mut temp = e
-                .get_child("splits")
-                .ok_or(Error::XMLNoSplit("no child splits".to_string()))?
-                .children
-                .iter()
-                .filter_map(xmltree::XMLNode::as_element)
-                .map(move |e| Split::try_from(tx_guid.clone(), e))
-                .collect::<Result<Vec<_>, Error>>()?;
-            splits.append(&mut temp);
-        }
-        Ok(splits)
+        doc.root_element()
+            .children()
+            .find(|n| n.has_tag_name("book"))
+            .expect("must exist book")
+            .children()
+            .filter(|n| n.has_tag_name("transaction"))
+            .map(|n| {
+                let tx_guid = n
+                    .children()
+                    .find(|n| n.has_tag_name("id"))
+                    .and_then(|n| n.text())
+                    .map(std::string::ToString::to_string)
+                    .ok_or(Error::XMLFromElement {
+                        model: "Split no tx_guid".to_string(),
+                    })?;
+
+                let splits = n.children().find(|n| n.has_tag_name("splits")).ok_or(
+                    Error::XMLFromElement {
+                        model: "Split no child splits".to_string(),
+                    },
+                )?;
+
+                splits
+                    .children()
+                    .filter(|n| n.has_tag_name("split"))
+                    .map(move |n| Split::try_from(tx_guid.clone(), n))
+                    .collect::<Result<Vec<_>, Error>>()
+            })
+            .collect::<Result<Vec<_>, Error>>()
+            .map(|splits| splits.into_iter().flatten().collect())
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
@@ -280,12 +297,10 @@ mod tests {
                 </gnc-v2>
                 "#;
 
-        let e = Element::parse(data.as_bytes())
-            .unwrap()
-            .take_child("split")
-            .unwrap();
+        let doc = Document::parse(data).unwrap();
+        let n = doc.descendants().find(|n| n.has_tag_name("split")).unwrap();
 
-        let split = Split::try_from(String::from("6c8876003c4a6026e38e3afb67d6f2b1"), &e).unwrap();
+        let split = Split::try_from(String::from("6c8876003c4a6026e38e3afb67d6f2b1"), n).unwrap();
 
         assert_eq!(split.guid, "de832fe97e37811a7fff7e28b3a43425");
         assert_eq!(split.tx_guid, "6c8876003c4a6026e38e3afb67d6f2b1");

@@ -1,13 +1,13 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
-use xmltree::Element;
+use roxmltree::{Document, Node};
 
 use crate::error::Error;
 use crate::query::xml::XMLQuery;
 use crate::query::{AccountQ, AccountT};
 
 #[allow(clippy::struct_field_names)]
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Default, Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Account {
     pub(crate) guid: String,
     pub(crate) name: String,
@@ -22,93 +22,74 @@ pub struct Account {
     pub(crate) placeholder: bool,
 }
 
-impl TryFrom<&Element> for Account {
+impl TryFrom<Node<'_, '_>> for Account {
     type Error = Error;
-    fn try_from(e: &Element) -> Result<Self, Error> {
-        let guid = e
-            .get_child("id")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Account guid".to_string(),
-            })?;
-        let name = e
-            .get_child("name")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Account name".to_string(),
-            })?;
-        let account_type = e
-            .get_child("type")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Account type".to_string(),
-            })?;
-        let commodity_guid = e
-            .get_child("commodity")
-            .and_then(|x| x.get_child("id"))
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let commodity_scu = e
-            .get_child("commodity-scu")
-            .and_then(xmltree::Element::get_text)
-            .map_or(Ok(0), |x| x.parse::<i64>())?;
-        let non_std_scu = e
-            .get_child("non-std-scu")
-            .and_then(xmltree::Element::get_text)
-            .map_or(Ok(0), |x| x.parse::<i64>())?;
-        let parent_guid = e
-            .get_child("parent")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let code = e
-            .get_child("code")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let description = e
-            .get_child("description")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-        let hidden = e
-            .get_child("hidden")
-            .and_then(xmltree::Element::get_text)
-            .is_some_and(|x| x == "true");
+    fn try_from(n: Node) -> Result<Self, Error> {
+        let mut account = Self::default();
+        for child in n.children() {
+            match child.tag_name().name() {
+                "name" => {
+                    account.name = child
+                        .text()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Account name".to_string(),
+                        })?
+                        .to_string();
+                }
+                "id" => {
+                    account.guid = child
+                        .text()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Account guid".to_string(),
+                        })?
+                        .to_string();
+                }
+                "type" => {
+                    account.account_type = child
+                        .text()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Account type".to_string(),
+                        })?
+                        .to_string();
+                }
+                "commodity" => {
+                    account.commodity_guid = child
+                        .children()
+                        .find(|n| n.has_tag_name("id"))
+                        .and_then(|n| n.text())
+                        .map(std::string::ToString::to_string);
+                }
+                "commodity-scu" => {
+                    account.commodity_scu = child.text().map_or(Ok(0), str::parse::<i64>)?;
+                }
+                "non-std-scu" => {
+                    account.non_std_scu = child.text().map_or(Ok(0), str::parse::<i64>)?;
+                }
+                "parent" => {
+                    account.parent_guid = child.text().map(std::string::ToString::to_string);
+                }
+                "code" => {
+                    account.code = child.text().map(std::string::ToString::to_string);
+                }
+                "description" => {
+                    account.description = child.text().map(std::string::ToString::to_string);
+                }
+                "hidden" => {
+                    account.hidden = child.text().is_some_and(|x| x == "true");
+                }
+                "slots" => {
+                    account.placeholder = child
+                        .descendants()
+                        .find(|n| n.has_tag_name("key"))
+                        .and_then(|n| n.next_sibling_element())
+                        .and_then(|n| n.text())
+                        .is_some_and(|x| x == "true");
+                }
+                _ => {}
+            }
+        }
 
-        let slots: Vec<&Element> = match e.get_child("slots") {
-            None => Vec::new(),
-            Some(x) => x
-                .children
-                .iter()
-                .filter_map(xmltree::XMLNode::as_element)
-                .collect(),
-        };
-        let placeholder = slots
-            .iter()
-            .find(|e| {
-                e.get_child("key")
-                    .and_then(xmltree::Element::get_text)
-                    .map(std::borrow::Cow::into_owned)
-                    == Some("placeholder".to_string())
-            })
-            .and_then(|e| e.get_child("value"))
-            .and_then(xmltree::Element::get_text)
-            .is_some_and(|x| x == "true");
-
-        Ok(Self {
-            guid,
-            name,
-            account_type,
-            commodity_guid,
-            commodity_scu,
-            non_std_scu,
-            parent_guid,
-            code,
-            description,
-            hidden,
-            placeholder,
-        })
+        Ok(account)
     }
 }
 
@@ -152,11 +133,14 @@ impl AccountQ for XMLQuery {
     type A = Account;
 
     async fn all(&self) -> Result<Vec<Self::A>, Error> {
-        self.tree
-            .children
-            .iter()
-            .filter_map(xmltree::XMLNode::as_element)
-            .filter(|e| e.name == "account")
+        let doc = Document::parse(&self.text)?;
+
+        doc.root_element()
+            .children()
+            .find(|n| n.has_tag_name("book"))
+            .expect("must exist book")
+            .children()
+            .filter(|n| n.has_tag_name("account"))
             .map(Self::A::try_from)
             .collect()
     }
@@ -261,8 +245,8 @@ mod tests {
                 <act:commodity-scu>100</act:commodity-scu>
                 <act:slots>
                     <slot>
-                    <slot:key>placeholder</slot:key>
-                    <slot:value type="string">true</slot:value>
+                        <slot:key>placeholder</slot:key>
+                        <slot:value type="string">true</slot:value>
                     </slot>
                 </act:slots>
                 <act:parent type="guid">00622dda21937b29e494179de5013f82</act:parent>
@@ -270,12 +254,13 @@ mod tests {
             </gnc-v2>
             "#;
 
-        let e = Element::parse(data.as_bytes())
-            .unwrap()
-            .take_child("account")
+        let doc = Document::parse(data).unwrap();
+        let n = doc
+            .descendants()
+            .find(|n| n.has_tag_name("account"))
             .unwrap();
 
-        let account = Account::try_from(&e).unwrap();
+        let account = Account::try_from(n).unwrap();
 
         assert_eq!(account.guid, "fcd795021c976ba75621ec39e75f6214");
         assert_eq!(account.name, "Asset");

@@ -1,15 +1,15 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use chrono::NaiveDateTime;
+use roxmltree::{Document, Node};
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
-use xmltree::Element;
 
 use crate::error::Error;
 use crate::query::xml::XMLQuery;
 use crate::query::{PriceQ, PriceT};
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Default, Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Price {
     pub guid: String,
     pub commodity_guid: String,
@@ -21,71 +21,82 @@ pub struct Price {
     pub value_denom: i64,
 }
 
-impl TryFrom<&Element> for Price {
+impl TryFrom<Node<'_, '_>> for Price {
     type Error = Error;
-    fn try_from(e: &Element) -> Result<Self, Error> {
-        let guid = e
-            .get_child("id")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Price guid".to_string(),
-            })?;
-        let commodity_guid = e
-            .get_child("commodity")
-            .and_then(|x| x.get_child("id"))
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Price commodity_guid".to_string(),
-            })?;
-        let currency_guid = e
-            .get_child("currency")
-            .and_then(|x| x.get_child("id"))
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .ok_or(Error::XMLFromElement {
-                model: "Price currency_guid".to_string(),
-            })?;
-        let date = e
-            .get_child("time")
-            .and_then(|x| x.get_child("date"))
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned)
-            .map(|x| {
-                chrono::NaiveDateTime::parse_from_str(&x, "%Y-%m-%d %H:%M:%S%z")
-                    .expect("%Y-%m-%d %H:%M:%S%z")
-            })
-            .expect("time must exist");
-        let source = e
-            .get_child("source")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
+    fn try_from(n: Node) -> Result<Self, Error> {
+        let mut price = Self::default();
+        for child in n.children() {
+            match child.tag_name().name() {
+                "id" => {
+                    price.guid = child
+                        .text()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Price guid".to_string(),
+                        })?
+                        .to_string();
+                }
+                "commodity" => {
+                    price.commodity_guid = child
+                        .children()
+                        .find(|n| n.has_tag_name("id"))
+                        .and_then(|n| n.text())
+                        .map(std::string::ToString::to_string)
+                        .ok_or(Error::XMLFromElement {
+                            model: "Price commodity_guid".to_string(),
+                        })?;
+                }
+                "currency" => {
+                    price.currency_guid = child
+                        .children()
+                        .find(|n| n.has_tag_name("id"))
+                        .and_then(|n| n.text())
+                        .map(std::string::ToString::to_string)
+                        .ok_or(Error::XMLFromElement {
+                            model: "Price currency_guid".to_string(),
+                        })?;
+                }
+                "time" => {
+                    price.date = child
+                        .children()
+                        .find(|n| n.has_tag_name("date"))
+                        .and_then(|n| n.text())
+                        .map(|x| chrono::NaiveDateTime::parse_from_str(x, "%Y-%m-%d %H:%M:%S%z"))
+                        .ok_or(Error::XMLFromElement {
+                            model: "Price time".to_string(),
+                        })??;
+                }
+                "source" => {
+                    price.source = child.text().map(std::string::ToString::to_string);
+                }
+                "type" => {
+                    price.r#type = child.text().map(std::string::ToString::to_string);
+                }
+                "value" => {
+                    let mut splits =
+                        child
+                            .text()
+                            .map(|s| s.split('/'))
+                            .ok_or(Error::XMLFromElement {
+                                model: "Price value".to_string(),
+                            })?;
+                    price.value_num = splits
+                        .next()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Price value value_num".to_string(),
+                        })?
+                        .parse()?;
+                    price.value_denom = splits
+                        .next()
+                        .ok_or(Error::XMLFromElement {
+                            model: "Price value value_denom".to_string(),
+                        })?
+                        .parse()?;
+                }
+                _ => {}
+            }
+        }
 
-        let r#type = e
-            .get_child("type")
-            .and_then(xmltree::Element::get_text)
-            .map(std::borrow::Cow::into_owned);
-
-        let splits = e
-            .get_child("value")
-            .expect("value must exist")
-            .get_text()
-            .unwrap();
-        let mut splits = splits.split('/');
-        let value_num = splits.next().unwrap().parse().unwrap();
-        let value_denom = splits.next().unwrap().parse().unwrap();
-
-        Ok(Self {
-            guid,
-            commodity_guid,
-            currency_guid,
-            date,
-            source,
-            r#type,
-            value_num,
-            value_denom,
-        })
+        Ok(price)
     }
 }
 
@@ -125,17 +136,23 @@ impl PriceQ for XMLQuery {
     type P = Price;
 
     async fn all(&self) -> Result<Vec<Self::P>, Error> {
-        let prices = match self.tree.get_child("pricedb") {
-            None => Vec::new(),
-            Some(node) => node
-                .children
-                .iter()
-                .filter_map(xmltree::XMLNode::as_element)
-                .filter(|e| e.name == "price")
-                .map(Self::P::try_from)
-                .collect::<Result<Vec<Self::P>, Error>>()?,
-        };
-        Ok(prices)
+        let doc = Document::parse(&self.text)?;
+
+        doc.root_element()
+            .children()
+            .find(|n| n.has_tag_name("book"))
+            .expect("must exist book")
+            .children()
+            .find(|n| n.has_tag_name("pricedb"))
+            .map_or_else(
+                || Ok(Vec::new()),
+                |n| {
+                    n.children()
+                        .filter(|n| n.has_tag_name("price"))
+                        .map(Self::P::try_from)
+                        .collect()
+                },
+            )
     }
     async fn guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
         let results = self.all().await?;
@@ -240,12 +257,10 @@ mod tests {
             </gnc-v2>
             "#;
 
-        let e = Element::parse(data.as_bytes())
-            .unwrap()
-            .take_child("price")
-            .unwrap();
+        let doc = Document::parse(data).unwrap();
+        let n = doc.descendants().find(|n| n.has_tag_name("price")).unwrap();
 
-        let price = Price::try_from(&e).unwrap();
+        let price = Price::try_from(n).unwrap();
 
         assert_eq!(price.guid, "0d6684f44fb018e882de76094ed9c433");
         assert_eq!(price.commodity_guid, "ADF");
