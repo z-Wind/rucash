@@ -111,6 +111,11 @@ impl CommodityQ for XMLQuery {
     type C = Commodity;
 
     async fn all(&self) -> Result<Vec<Self::C>, Error> {
+        let mut cache = self.commodities.lock().unwrap();
+        if let Some(cache) = cache.clone() {
+            return Ok(cache);
+        }
+
         let doc = Document::parse(&self.text)?;
 
         let book = doc
@@ -154,10 +159,14 @@ impl CommodityQ for XMLQuery {
         commodities.append(&mut prices);
 
         commodities.sort_unstable_by(|c1, c2| c1.guid.cmp(&c2.guid));
-        Ok(commodities
+        commodities = commodities
             .into_iter()
             .dedup_by(|x, y| x.guid == y.guid)
-            .collect())
+            .collect();
+
+        *cache = Some(commodities.clone());
+
+        Ok(commodities)
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::C>, Error> {

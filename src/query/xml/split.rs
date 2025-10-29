@@ -178,9 +178,15 @@ impl SplitQ for XMLQuery {
     type S = Split;
 
     async fn all(&self) -> Result<Vec<Self::S>, Error> {
+        let mut cache = self.splits.lock().unwrap();
+        if let Some(cache) = cache.clone() {
+            return Ok(cache);
+        }
+
         let doc = Document::parse(&self.text)?;
 
-        doc.root_element()
+        let splits: Vec<_> = doc
+            .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
             .expect("must exist book")
@@ -209,7 +215,11 @@ impl SplitQ for XMLQuery {
                     .collect::<Result<Vec<_>, Error>>()
             })
             .collect::<Result<Vec<_>, Error>>()
-            .map(|splits| splits.into_iter().flatten().collect())
+            .map(|splits| splits.into_iter().flatten().collect())?;
+
+        *cache = Some(splits.clone());
+
+        Ok(splits)
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {

@@ -3,7 +3,7 @@ use std::hint::black_box;
 
 fn uri_sqlite() -> String {
     format!(
-        "file:/{}/tests/db/sqlite/complex_sample.gnucash",
+        "{}/tests/db/sqlite/complex_sample.gnucash",
         env!("CARGO_MANIFEST_DIR")
     )
 }

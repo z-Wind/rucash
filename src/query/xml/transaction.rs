@@ -102,16 +102,26 @@ impl TransactionQ for XMLQuery {
     type T = Transaction;
 
     async fn all(&self) -> Result<Vec<Self::T>, Error> {
+        let mut cache = self.transactions.lock().unwrap();
+        if let Some(cache) = cache.clone() {
+            return Ok(cache);
+        }
+
         let doc = Document::parse(&self.text)?;
 
-        doc.root_element()
+        let transactions = doc
+            .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
             .expect("must exist book")
             .children()
             .filter(|n| n.has_tag_name("transaction"))
             .map(Self::T::try_from)
-            .collect()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        *cache = Some(transactions.clone());
+
+        Ok(transactions)
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {

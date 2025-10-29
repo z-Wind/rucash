@@ -8,13 +8,25 @@ use flate2::read::GzDecoder;
 use roxmltree::Document;
 use std::fs::File;
 use std::io::Read;
+use std::sync::{Arc, Mutex};
 
 use super::Query;
 use crate::error::Error;
+use account::Account;
+use commodity::Commodity;
+use price::Price;
+use split::Split;
+use transaction::Transaction;
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct XMLQuery {
-    text: String,
+    text: Arc<String>,
+
+    accounts: Arc<Mutex<Option<Vec<Account>>>>,
+    commodities: Arc<Mutex<Option<Vec<Commodity>>>>,
+    prices: Arc<Mutex<Option<Vec<Price>>>>,
+    splits: Arc<Mutex<Option<Vec<Split>>>>,
+    transactions: Arc<Mutex<Option<Vec<Transaction>>>>,
 }
 
 impl XMLQuery {
@@ -31,7 +43,11 @@ impl XMLQuery {
             .find(|n| n.has_tag_name("book"))
             .ok_or(Error::NoBook(path.to_string()))?;
 
-        Ok(Self { text: data })
+        Ok(Self {
+            text: Arc::new(data),
+
+            ..Self::default()
+        })
     }
 }
 

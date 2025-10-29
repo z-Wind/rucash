@@ -136,9 +136,15 @@ impl PriceQ for XMLQuery {
     type P = Price;
 
     async fn all(&self) -> Result<Vec<Self::P>, Error> {
+        let mut cache = self.prices.lock().unwrap();
+        if let Some(cache) = cache.clone() {
+            return Ok(cache);
+        }
+
         let doc = Document::parse(&self.text)?;
 
-        doc.root_element()
+        let prices = doc
+            .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
             .expect("must exist book")
@@ -152,7 +158,11 @@ impl PriceQ for XMLQuery {
                         .map(Self::P::try_from)
                         .collect()
                 },
-            )
+            )?;
+
+        *cache = Some(prices.clone());
+
+        Ok(prices)
     }
     async fn guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
         let results = self.all().await?;

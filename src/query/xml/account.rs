@@ -133,16 +133,26 @@ impl AccountQ for XMLQuery {
     type A = Account;
 
     async fn all(&self) -> Result<Vec<Self::A>, Error> {
+        let mut cache = self.accounts.lock().unwrap();
+        if let Some(cache) = cache.clone() {
+            return Ok(cache);
+        }
+
         let doc = Document::parse(&self.text)?;
 
-        doc.root_element()
+        let accounts = doc
+            .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
             .expect("must exist book")
             .children()
             .filter(|n| n.has_tag_name("account"))
             .map(Self::A::try_from)
-            .collect()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        *cache = Some(accounts.clone());
+
+        Ok(accounts)
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
