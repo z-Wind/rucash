@@ -137,11 +137,14 @@ impl PriceQ for XMLQuery {
 
     async fn all(&self) -> Result<Vec<Self::P>, Error> {
         let mut cache = self.prices.lock().unwrap();
-        if let Some(cache) = cache.clone() {
+        if let Some(cache) = cache.clone()
+            && self.is_file_unchanged()?
+        {
             return Ok(cache);
         }
 
-        let doc = Document::parse(&self.text)?;
+        let data = self.gnucash_data()?;
+        let doc = Document::parse(&data)?;
 
         let prices = doc
             .root_element()

@@ -134,11 +134,14 @@ impl AccountQ for XMLQuery {
 
     async fn all(&self) -> Result<Vec<Self::A>, Error> {
         let mut cache = self.accounts.lock().unwrap();
-        if let Some(cache) = cache.clone() {
+        if let Some(cache) = cache.clone()
+            && self.is_file_unchanged()?
+        {
             return Ok(cache);
         }
 
-        let doc = Document::parse(&self.text)?;
+        let data = self.gnucash_data()?;
+        let doc = Document::parse(&data)?;
 
         let accounts = doc
             .root_element()

@@ -23,15 +23,18 @@ pub enum Error {
     Rusqlite(#[from] rusqlite::Error),
 
     #[cfg(feature = "xml")]
-    #[error("XML error: {0}")]
+    #[error("roxmltree error: {0}")]
     XML(#[from] roxmltree::Error),
     #[cfg(feature = "xml")]
     #[error("XML {model} from element")]
     XMLFromElement { model: String },
     #[cfg(feature = "xml")]
-    #[error("XML parseInt error: {0}")]
-    XMLParseInt(#[from] std::num::ParseIntError),
+    #[error("Parse int error: {0}")]
+    ParseInt(#[from] std::num::ParseIntError),
     #[cfg(feature = "xml")]
-    #[error("XML parseNaiveDatetime error: {0}")]
-    XMLParseNaiveDatetime(#[from] chrono::ParseError),
+    #[error("Chrono parse error: {0}")]
+    ChronoParse(#[from] chrono::ParseError),
+    #[cfg(feature = "xml")]
+    #[error("PathBuf error: {0}")]
+    PathBuf(#[from] core::convert::Infallible),
 }

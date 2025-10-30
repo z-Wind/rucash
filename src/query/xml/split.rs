@@ -179,11 +179,14 @@ impl SplitQ for XMLQuery {
 
     async fn all(&self) -> Result<Vec<Self::S>, Error> {
         let mut cache = self.splits.lock().unwrap();
-        if let Some(cache) = cache.clone() {
+        if let Some(cache) = cache.clone()
+            && self.is_file_unchanged()?
+        {
             return Ok(cache);
         }
 
-        let doc = Document::parse(&self.text)?;
+        let data = self.gnucash_data()?;
+        let doc = Document::parse(&data)?;
 
         let splits: Vec<_> = doc
             .root_element()

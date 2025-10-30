@@ -112,11 +112,14 @@ impl CommodityQ for XMLQuery {
 
     async fn all(&self) -> Result<Vec<Self::C>, Error> {
         let mut cache = self.commodities.lock().unwrap();
-        if let Some(cache) = cache.clone() {
+        if let Some(cache) = cache.clone()
+            && self.is_file_unchanged()?
+        {
             return Ok(cache);
         }
 
-        let doc = Document::parse(&self.text)?;
+        let data = self.gnucash_data()?;
+        let doc = Document::parse(&data)?;
 
         let book = doc
             .root_element()

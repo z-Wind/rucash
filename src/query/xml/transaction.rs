@@ -103,11 +103,14 @@ impl TransactionQ for XMLQuery {
 
     async fn all(&self) -> Result<Vec<Self::T>, Error> {
         let mut cache = self.transactions.lock().unwrap();
-        if let Some(cache) = cache.clone() {
+        if let Some(cache) = cache.clone()
+            && self.is_file_unchanged()?
+        {
             return Ok(cache);
         }
 
-        let doc = Document::parse(&self.text)?;
+        let data = self.gnucash_data()?;
+        let doc = Document::parse(&data)?;
 
         let transactions = doc
             .root_element()
