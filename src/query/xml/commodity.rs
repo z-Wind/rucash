@@ -1,7 +1,8 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
-use itertools::Itertools;
 use roxmltree::{Document, Node};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::error::Error;
 use crate::query::xml::XMLQuery;
@@ -18,6 +19,57 @@ pub struct Commodity {
     pub(crate) quote_flag: bool,
     pub(crate) quote_source: Option<String>,
     pub(crate) quote_tz: Option<String>,
+}
+
+impl XMLQuery {
+    fn commodity_map(&self) -> Result<Arc<HashMap<String, Commodity>>, Error> {
+        let mut cache = self.commodities.lock().unwrap();
+        if let Some(cache) = &*cache
+            && self.is_file_unchanged()?
+        {
+            return Ok(cache.clone());
+        }
+
+        let data = self.gnucash_data()?;
+        let doc = Document::parse(&data)?;
+
+        let book = doc
+            .root_element()
+            .children()
+            .find(|n| n.has_tag_name("book"))
+            .expect("must exist book");
+
+        let mut commodities: HashMap<String, Commodity> = book
+            .children()
+            .filter(|n| n.has_tag_name("commodity"))
+            .map(|n| {
+                let result = Commodity::try_from(n);
+                result.map(|c| (c.guid.clone(), c))
+            })
+            .collect::<Result<_, _>>()?;
+
+        if let Some(pricedb) = book.children().find(|n| n.has_tag_name("pricedb")) {
+            for price in pricedb.children().filter(|n| n.has_tag_name("price")) {
+                for child in price.children() {
+                    match child.tag_name().name() {
+                        "commodity" | "currency" => {
+                            let commodity = Commodity::try_from(child)?;
+                            commodities
+                                .entry(commodity.guid.clone())
+                                .or_insert(commodity);
+                        }
+
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        let commodities = Arc::new(commodities);
+        *cache = Some(commodities.clone());
+
+        Ok(commodities)
+    }
 }
 
 impl TryFrom<Node<'_, '_>> for Commodity {
@@ -111,77 +163,24 @@ impl CommodityQ for XMLQuery {
     type C = Commodity;
 
     async fn all(&self) -> Result<Vec<Self::C>, Error> {
-        let mut cache = self.commodities.lock().unwrap();
-        if let Some(cache) = cache.clone()
-            && self.is_file_unchanged()?
-        {
-            return Ok(cache);
-        }
+        let map = self.commodity_map()?;
 
-        let data = self.gnucash_data()?;
-        let doc = Document::parse(&data)?;
-
-        let book = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .expect("must exist book");
-
-        let mut commodities: Vec<Self::C> = book
-            .children()
-            .filter(|n| n.has_tag_name("commodity"))
-            .map(Self::C::try_from)
-            .collect::<Result<_, _>>()?;
-
-        let mut prices: Vec<Self::C> = book
-            .children()
-            .find(|n| n.has_tag_name("pricedb"))
-            .map_or_else(
-                || Ok(Vec::new()),
-                |n| {
-                    n.children()
-                        .filter(|n| n.has_tag_name("price"))
-                        .flat_map(|n| {
-                            let mut results = Vec::new();
-                            for child in n.children() {
-                                match child.tag_name().name() {
-                                    "commodity" | "currency" => {
-                                        results.push(Self::C::try_from(child));
-                                    }
-
-                                    _ => {}
-                                }
-                            }
-
-                            results
-                        })
-                        .collect()
-                },
-            )?;
-
-        commodities.append(&mut prices);
-
-        commodities.sort_unstable_by(|c1, c2| c1.guid.cmp(&c2.guid));
-        commodities = commodities
-            .into_iter()
-            .dedup_by(|x, y| x.guid == y.guid)
-            .collect();
-
-        *cache = Some(commodities.clone());
-
-        Ok(commodities)
+        Ok(map.values().cloned().collect())
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::C>, Error> {
-        let results = self.all().await?;
-        Ok(results.into_iter().filter(|x| x.guid == guid).collect())
+        let map = self.commodity_map()?;
+
+        Ok(map.get(guid).into_iter().cloned().collect())
     }
 
     async fn namespace(&self, namespace: &str) -> Result<Vec<Self::C>, Error> {
-        let results = self.all().await?;
-        Ok(results
-            .into_iter()
+        let map = self.commodity_map()?;
+
+        Ok(map
+            .values()
             .filter(|x| x.namespace == namespace)
+            .cloned()
             .collect())
     }
 }

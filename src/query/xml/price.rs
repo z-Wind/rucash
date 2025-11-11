@@ -4,6 +4,8 @@ use chrono::NaiveDateTime;
 use roxmltree::{Document, Node};
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::error::Error;
 use crate::query::xml::XMLQuery;
@@ -19,6 +21,45 @@ pub struct Price {
     pub r#type: Option<String>,
     pub value_num: i64,
     pub value_denom: i64,
+}
+
+impl XMLQuery {
+    fn price_map(&self) -> Result<Arc<HashMap<String, Price>>, Error> {
+        let mut cache = self.prices.lock().unwrap();
+        if let Some(cache) = &*cache
+            && self.is_file_unchanged()?
+        {
+            return Ok(cache.clone());
+        }
+
+        let data = self.gnucash_data()?;
+        let doc = Document::parse(&data)?;
+
+        let prices = doc
+            .root_element()
+            .children()
+            .find(|n| n.has_tag_name("book"))
+            .expect("must exist book")
+            .children()
+            .find(|n| n.has_tag_name("pricedb"))
+            .map_or_else(
+                || Ok(HashMap::new()),
+                |n| {
+                    n.children()
+                        .filter(|n| n.has_tag_name("price"))
+                        .map(|n| {
+                            let result = Price::try_from(n);
+                            result.map(|p| (p.guid.clone(), p))
+                        })
+                        .collect()
+                },
+            )?;
+
+        let prices = Arc::new(prices);
+        *cache = Some(prices.clone());
+
+        Ok(prices)
+    }
 }
 
 impl TryFrom<Node<'_, '_>> for Price {
@@ -136,60 +177,44 @@ impl PriceQ for XMLQuery {
     type P = Price;
 
     async fn all(&self) -> Result<Vec<Self::P>, Error> {
-        let mut cache = self.prices.lock().unwrap();
-        if let Some(cache) = cache.clone()
-            && self.is_file_unchanged()?
-        {
-            return Ok(cache);
-        }
+        let map = self.price_map()?;
 
-        let data = self.gnucash_data()?;
-        let doc = Document::parse(&data)?;
-
-        let prices = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .find(|n| n.has_tag_name("pricedb"))
-            .map_or_else(
-                || Ok(Vec::new()),
-                |n| {
-                    n.children()
-                        .filter(|n| n.has_tag_name("price"))
-                        .map(Self::P::try_from)
-                        .collect()
-                },
-            )?;
-
-        *cache = Some(prices.clone());
-
-        Ok(prices)
+        Ok(map.values().cloned().collect())
     }
+
     async fn guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        let results = self.all().await?;
-        Ok(results.into_iter().filter(|x| x.guid == guid).collect())
+        let map = self.price_map()?;
+
+        Ok(map.get(guid).into_iter().cloned().collect())
     }
+
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        let results = self.all().await?;
-        Ok(results
-            .into_iter()
+        let map = self.price_map()?;
+
+        Ok(map
+            .values()
             .filter(|x| x.commodity_guid == guid)
+            .cloned()
             .collect())
     }
+
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        let results = self.all().await?;
-        Ok(results
-            .into_iter()
+        let map = self.price_map()?;
+
+        Ok(map
+            .values()
             .filter(|x| x.currency_guid == guid)
+            .cloned()
             .collect())
     }
+
     async fn commodity_or_currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        let results = self.all().await?;
-        Ok(results
-            .into_iter()
+        let map = self.price_map()?;
+
+        Ok(map
+            .values()
             .filter(|x| x.commodity_guid == guid || x.currency_guid == guid)
+            .cloned()
             .collect())
     }
 }
@@ -351,7 +376,13 @@ mod tests {
     #[tokio::test]
     async fn currency_guid() {
         let query = setup().await;
-        let result = query.currency_guid("AED").await.unwrap();
+        let result: Vec<_> = query
+            .currency_guid("AED")
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|p| p.commodity_guid == "ADF")
+            .collect();
 
         #[cfg(not(feature = "decimal"))]
         assert_approx_eq!(f64, result[0].value(), 1.5);

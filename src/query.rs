@@ -1702,7 +1702,12 @@ mod tests {
             #[tokio::test]
             async fn currency_guid() {
                 let query = setup().await;
-                let result = PriceQ::currency_guid(query, "AED").await.unwrap();
+                let result: Vec<_> = PriceQ::currency_guid(query, "AED")
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .filter(|p| p.commodity_guid == "ADF")
+                    .collect();
 
                 #[cfg(not(feature = "decimal"))]
                 assert_approx_eq!(f64, result[0].value(), 1.5);

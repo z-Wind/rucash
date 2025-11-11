@@ -2,6 +2,8 @@
 
 use chrono::NaiveDateTime;
 use roxmltree::{Document, Node};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::error::Error;
 use crate::query::xml::XMLQuery;
@@ -15,6 +17,38 @@ pub struct Transaction {
     pub post_date: Option<NaiveDateTime>,
     pub enter_date: Option<NaiveDateTime>,
     pub description: Option<String>,
+}
+
+impl XMLQuery {
+    fn transaction_map(&self) -> Result<Arc<HashMap<String, Transaction>>, Error> {
+        let mut cache = self.transactions.lock().unwrap();
+        if let Some(cache) = &*cache
+            && self.is_file_unchanged()?
+        {
+            return Ok(cache.clone());
+        }
+
+        let data = self.gnucash_data()?;
+        let doc = Document::parse(&data)?;
+
+        let transactions = doc
+            .root_element()
+            .children()
+            .find(|n| n.has_tag_name("book"))
+            .expect("must exist book")
+            .children()
+            .filter(|n| n.has_tag_name("transaction"))
+            .map(|n| {
+                let result = Transaction::try_from(n);
+                result.map(|t| (t.guid.clone(), t))
+            })
+            .collect::<Result<HashMap<_, _>, _>>()?;
+
+        let transactions = Arc::new(transactions);
+        *cache = Some(transactions.clone());
+
+        Ok(transactions)
+    }
 }
 
 impl TryFrom<Node<'_, '_>> for Transaction {
@@ -102,41 +136,24 @@ impl TransactionQ for XMLQuery {
     type T = Transaction;
 
     async fn all(&self) -> Result<Vec<Self::T>, Error> {
-        let mut cache = self.transactions.lock().unwrap();
-        if let Some(cache) = cache.clone()
-            && self.is_file_unchanged()?
-        {
-            return Ok(cache);
-        }
+        let map = self.transaction_map()?;
 
-        let data = self.gnucash_data()?;
-        let doc = Document::parse(&data)?;
-
-        let transactions = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .filter(|n| n.has_tag_name("transaction"))
-            .map(Self::T::try_from)
-            .collect::<Result<Vec<_>, _>>()?;
-
-        *cache = Some(transactions.clone());
-
-        Ok(transactions)
+        Ok(map.values().cloned().collect())
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
-        let results = self.all().await?;
-        Ok(results.into_iter().filter(|x| x.guid == guid).collect())
+        let map = self.transaction_map()?;
+
+        Ok(map.get(guid).into_iter().cloned().collect())
     }
 
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
-        let results = self.all().await?;
-        Ok(results
-            .into_iter()
+        let map = self.transaction_map()?;
+
+        Ok(map
+            .values()
             .filter(|x| x.currency_guid == guid)
+            .cloned()
             .collect())
     }
 }

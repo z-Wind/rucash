@@ -6,6 +6,7 @@ pub(crate) mod transaction;
 
 use flate2::read::GzDecoder;
 use roxmltree::Document;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
@@ -21,16 +22,22 @@ use price::Price;
 use split::Split;
 use transaction::Transaction;
 
+type AccountMap = Arc<HashMap<String, Account>>;
+type CommodityMap = Arc<HashMap<String, Commodity>>;
+type PriceMap = Arc<HashMap<String, Price>>;
+type SplitMap = Arc<HashMap<String, Split>>;
+type TransactionMap = Arc<HashMap<String, Transaction>>;
+
 #[derive(Debug, Clone)]
 pub struct XMLQuery {
     file_path: Arc<PathBuf>,
     file_modified_time: Arc<Mutex<SystemTime>>,
 
-    accounts: Arc<Mutex<Option<Vec<Account>>>>,
-    commodities: Arc<Mutex<Option<Vec<Commodity>>>>,
-    prices: Arc<Mutex<Option<Vec<Price>>>>,
-    splits: Arc<Mutex<Option<Vec<Split>>>>,
-    transactions: Arc<Mutex<Option<Vec<Transaction>>>>,
+    accounts: Arc<Mutex<Option<AccountMap>>>,
+    commodities: Arc<Mutex<Option<CommodityMap>>>,
+    prices: Arc<Mutex<Option<PriceMap>>>,
+    splits: Arc<Mutex<Option<SplitMap>>>,
+    transactions: Arc<Mutex<Option<TransactionMap>>>,
 }
 
 impl XMLQuery {

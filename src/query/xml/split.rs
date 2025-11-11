@@ -4,6 +4,8 @@ use chrono::{DateTime, NaiveDateTime};
 use roxmltree::{Document, Node};
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::error::Error;
 use crate::query::xml::XMLQuery;
@@ -23,6 +25,58 @@ pub struct Split {
     pub quantity_num: i64,
     pub quantity_denom: i64,
     pub lot_guid: Option<String>,
+}
+
+impl XMLQuery {
+    fn split_map(&self) -> Result<Arc<HashMap<String, Split>>, Error> {
+        let mut cache = self.splits.lock().unwrap();
+        if let Some(cache) = &*cache
+            && self.is_file_unchanged()?
+        {
+            return Ok(cache.clone());
+        }
+
+        let data = self.gnucash_data()?;
+        let doc = Document::parse(&data)?;
+
+        let mut splits = HashMap::new();
+
+        for transaction in doc
+            .root_element()
+            .children()
+            .find(|n| n.has_tag_name("book"))
+            .expect("must exist book")
+            .children()
+            .filter(|n| n.has_tag_name("transaction"))
+        {
+            let tx_guid = transaction
+                .children()
+                .find(|n| n.has_tag_name("id"))
+                .and_then(|n| n.text())
+                .map(std::string::ToString::to_string)
+                .ok_or(Error::XMLFromElement {
+                    model: "Split no tx_guid".to_string(),
+                })?;
+
+            for split in transaction
+                .children()
+                .find(|n| n.has_tag_name("splits"))
+                .ok_or(Error::XMLFromElement {
+                    model: "Split no child splits".to_string(),
+                })?
+                .children()
+                .filter(|n| n.has_tag_name("split"))
+            {
+                let split = Split::try_from(tx_guid.clone(), split)?;
+                splits.insert(split.guid.clone(), split);
+            }
+        }
+
+        let splits = Arc::new(splits);
+        *cache = Some(splits.clone());
+
+        Ok(splits)
+    }
 }
 
 impl Split {
@@ -179,69 +233,35 @@ impl SplitQ for XMLQuery {
     type S = Split;
 
     async fn all(&self) -> Result<Vec<Self::S>, Error> {
-        let mut cache = self.splits.lock().unwrap();
-        if let Some(cache) = cache.clone()
-            && self.is_file_unchanged()?
-        {
-            return Ok(cache);
-        }
+        let map = self.split_map()?;
 
-        let data = self.gnucash_data()?;
-        let doc = Document::parse(&data)?;
-
-        let splits: Vec<_> = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .filter(|n| n.has_tag_name("transaction"))
-            .map(|n| {
-                let tx_guid = n
-                    .children()
-                    .find(|n| n.has_tag_name("id"))
-                    .and_then(|n| n.text())
-                    .map(std::string::ToString::to_string)
-                    .ok_or(Error::XMLFromElement {
-                        model: "Split no tx_guid".to_string(),
-                    })?;
-
-                let splits = n.children().find(|n| n.has_tag_name("splits")).ok_or(
-                    Error::XMLFromElement {
-                        model: "Split no child splits".to_string(),
-                    },
-                )?;
-
-                splits
-                    .children()
-                    .filter(|n| n.has_tag_name("split"))
-                    .map(move |n| Split::try_from(tx_guid.clone(), n))
-                    .collect::<Result<Vec<_>, Error>>()
-            })
-            .collect::<Result<Vec<_>, Error>>()
-            .map(|splits| splits.into_iter().flatten().collect())?;
-
-        *cache = Some(splits.clone());
-
-        Ok(splits)
+        Ok(map.values().cloned().collect())
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        let results = self.all().await?;
-        Ok(results.into_iter().filter(|x| x.guid == guid).collect())
+        let map = self.split_map()?;
+
+        Ok(map.get(guid).into_iter().cloned().collect())
     }
 
     async fn account_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        let results = self.all().await?;
-        Ok(results
-            .into_iter()
-            .filter(|x: &Split| x.account_guid == guid)
+        let map = self.split_map()?;
+
+        Ok(map
+            .values()
+            .filter(|x| x.account_guid == guid)
+            .cloned()
             .collect())
     }
 
     async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        let results = self.all().await?;
-        Ok(results.into_iter().filter(|x| x.tx_guid == guid).collect())
+        let map = self.split_map()?;
+
+        Ok(map
+            .values()
+            .filter(|x| x.tx_guid == guid)
+            .cloned()
+            .collect())
     }
 }
 

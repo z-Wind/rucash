@@ -52,7 +52,6 @@ where
                 guid: self.tx_guid.clone(),
             });
         }
-
         let mut transactions = TransactionQ::guid(&*self.query, &self.tx_guid).await?;
 
         match transactions.pop() {

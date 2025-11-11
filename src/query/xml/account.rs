@@ -1,5 +1,8 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use roxmltree::{Document, Node};
 
 use crate::error::Error;
@@ -20,6 +23,39 @@ pub struct Account {
     pub(crate) description: Option<String>,
     pub(crate) hidden: bool,
     pub(crate) placeholder: bool,
+}
+
+impl XMLQuery {
+    fn account_map(&self) -> Result<Arc<HashMap<String, Account>>, Error> {
+        let mut cache = self.accounts.lock().unwrap();
+        if let Some(cache) = &*cache
+            && self.is_file_unchanged()?
+        {
+            return Ok(cache.clone());
+        }
+
+        let data = self.gnucash_data()?;
+        let doc = Document::parse(&data)?;
+
+        let accounts = doc
+            .root_element()
+            .children()
+            .find(|n| n.has_tag_name("book"))
+            .expect("must exist book")
+            .children()
+            .filter(|n| n.has_tag_name("account"))
+            .map(|n| {
+                let result = Account::try_from(n);
+
+                result.map(|a| (a.guid.clone(), a))
+            })
+            .collect::<Result<HashMap<_, _>, _>>()?;
+
+        let accounts = Arc::new(accounts);
+        *cache = Some(accounts.clone());
+
+        Ok(accounts)
+    }
 }
 
 impl TryFrom<Node<'_, '_>> for Account {
@@ -133,62 +169,50 @@ impl AccountQ for XMLQuery {
     type A = Account;
 
     async fn all(&self) -> Result<Vec<Self::A>, Error> {
-        let mut cache = self.accounts.lock().unwrap();
-        if let Some(cache) = cache.clone()
-            && self.is_file_unchanged()?
-        {
-            return Ok(cache);
-        }
+        let map = self.account_map()?;
 
-        let data = self.gnucash_data()?;
-        let doc = Document::parse(&data)?;
-
-        let accounts = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .filter(|n| n.has_tag_name("account"))
-            .map(Self::A::try_from)
-            .collect::<Result<Vec<_>, _>>()?;
-
-        *cache = Some(accounts.clone());
-
-        Ok(accounts)
+        Ok(map.values().cloned().collect())
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        let results = self.all().await?;
-        Ok(results.into_iter().filter(|x| x.guid == guid).collect())
+        let map = self.account_map()?;
+
+        Ok(map.get(guid).into_iter().cloned().collect())
     }
 
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        let results = self.all().await?;
-        Ok(results
-            .into_iter()
+        let map = self.account_map()?;
+
+        Ok(map
+            .values()
             .filter(|x| x.commodity_guid.as_ref().is_some_and(|id| id == guid))
+            .cloned()
             .collect())
     }
 
     async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        let results = self.all().await?;
-        Ok(results
-            .into_iter()
+        let map = self.account_map()?;
+
+        Ok(map
+            .values()
             .filter(|x| x.parent_guid.as_ref().is_some_and(|id| id == guid))
+            .cloned()
             .collect())
     }
 
     async fn name(&self, name: &str) -> Result<Vec<Self::A>, Error> {
-        let results = self.all().await?;
-        Ok(results.into_iter().filter(|x| x.name == name).collect())
+        let map = self.account_map()?;
+
+        Ok(map.values().filter(|x| x.name == name).cloned().collect())
     }
 
     async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::A>, Error> {
-        let results = self.all().await?;
-        Ok(results
-            .into_iter()
-            .filter(|x: &Account| x.name.to_lowercase().contains(&name.to_lowercase()))
+        let map = self.account_map()?;
+
+        Ok(map
+            .values()
+            .filter(|x| x.name.to_lowercase().contains(&name.to_lowercase()))
+            .cloned()
             .collect())
     }
 }
