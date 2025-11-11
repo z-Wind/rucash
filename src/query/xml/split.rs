@@ -67,8 +67,9 @@ impl Split {
                 }
                 "reconcile-date" => {
                     split.reconcile_date = child
-                        .text()
-                        .map(|x| chrono::NaiveDateTime::parse_from_str(x, "%Y-%m-%d %H:%M:%S"))
+                        .first_element_child()
+                        .and_then(|ts| ts.text())
+                        .map(|x| chrono::NaiveDateTime::parse_from_str(x, "%Y-%m-%d %H:%M:%S %z"))
                         .transpose()?;
                 }
                 "value" => {
