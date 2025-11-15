@@ -5,8 +5,8 @@ use roxmltree::{Document, Node};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use super::{FileTimeIndex, XMLQuery};
 use crate::error::Error;
-use crate::query::xml::XMLQuery;
 use crate::query::{TransactionQ, TransactionT};
 
 #[derive(Default, Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
@@ -23,7 +23,7 @@ impl XMLQuery {
     fn transaction_map(&self) -> Result<Arc<HashMap<String, Transaction>>, Error> {
         let mut cache = self.transactions.lock().unwrap();
         if let Some(cache) = &*cache
-            && self.is_file_unchanged()?
+            && self.is_file_unchanged(FileTimeIndex::Transactions as usize)?
         {
             return Ok(cache.clone());
         }

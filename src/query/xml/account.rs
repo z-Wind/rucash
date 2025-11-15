@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use roxmltree::{Document, Node};
 
+use super::{FileTimeIndex, XMLQuery};
 use crate::error::Error;
-use crate::query::xml::XMLQuery;
 use crate::query::{AccountQ, AccountT};
 
 #[allow(clippy::struct_field_names)]
@@ -29,7 +29,7 @@ impl XMLQuery {
     fn account_map(&self) -> Result<Arc<HashMap<String, Account>>, Error> {
         let mut cache = self.accounts.lock().unwrap();
         if let Some(cache) = &*cache
-            && self.is_file_unchanged()?
+            && self.is_file_unchanged(FileTimeIndex::Accounts as usize)?
         {
             return Ok(cache.clone());
         }

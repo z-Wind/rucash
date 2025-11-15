@@ -7,8 +7,8 @@ use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use super::{FileTimeIndex, XMLQuery};
 use crate::error::Error;
-use crate::query::xml::XMLQuery;
 use crate::query::{SplitQ, SplitT};
 
 #[derive(Default, Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
@@ -31,7 +31,7 @@ impl XMLQuery {
     fn split_map(&self) -> Result<Arc<HashMap<String, Split>>, Error> {
         let mut cache = self.splits.lock().unwrap();
         if let Some(cache) = &*cache
-            && self.is_file_unchanged()?
+            && self.is_file_unchanged(FileTimeIndex::Splits as usize)?
         {
             return Ok(cache.clone());
         }
@@ -81,7 +81,7 @@ impl XMLQuery {
     fn account_splits_map(&self) -> Result<Arc<HashMap<String, Vec<Split>>>, Error> {
         let mut cache = self.account_splits.lock().unwrap();
         if let Some(cache) = &*cache
-            && self.is_file_unchanged()?
+            && self.is_file_unchanged(FileTimeIndex::AccountSplits as usize)?
         {
             return Ok(cache.clone());
         }

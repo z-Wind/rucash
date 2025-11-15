@@ -29,10 +29,20 @@ type SplitMap = Arc<HashMap<String, Split>>;
 type TransactionMap = Arc<HashMap<String, Transaction>>;
 type AccountSplitsMap = Arc<HashMap<String, Vec<Split>>>;
 
+#[repr(usize)]
+enum FileTimeIndex {
+    Accounts = 0,
+    Commodities,
+    Prices,
+    Splits,
+    Transactions,
+    AccountSplits,
+}
+
 #[derive(Debug, Clone)]
 pub struct XMLQuery {
     file_path: Arc<PathBuf>,
-    file_modified_time: Arc<Mutex<SystemTime>>,
+    file_modified_time: Arc<Mutex<[SystemTime; 6]>>,
 
     accounts: Arc<Mutex<Option<AccountMap>>>,
     commodities: Arc<Mutex<Option<CommodityMap>>>,
@@ -48,7 +58,7 @@ impl XMLQuery {
     pub fn new(path: &str) -> Result<Self, Error> {
         let path = PathBuf::from_str(path)?;
         let query = Self {
-            file_modified_time: Arc::new(Mutex::new(path.metadata()?.modified()?)),
+            file_modified_time: Arc::new(Mutex::new([path.metadata()?.modified()?; 6])),
             file_path: Arc::new(path),
 
             accounts: Arc::default(),
@@ -79,15 +89,15 @@ impl XMLQuery {
         Ok(data)
     }
 
-    fn is_file_unchanged(&self) -> Result<bool, Error> {
+    fn is_file_unchanged(&self, i: usize) -> Result<bool, Error> {
         let meta = self.file_path.metadata()?;
         let time = meta.modified()?;
 
         let mut record_time = self.file_modified_time.lock().unwrap();
-        let is_unchanged = time == *record_time;
+        let is_unchanged = time == (*record_time)[i];
 
         if !is_unchanged {
-            *record_time = time;
+            (*record_time)[i] = time;
         }
 
         Ok(is_unchanged)
@@ -121,6 +131,10 @@ mod tests {
         println!("work_dir: {:?}", std::env::current_dir());
         let query = XMLQuery::new(path).unwrap();
 
-        assert!(query.is_file_unchanged().unwrap());
+        assert!(
+            query
+                .is_file_unchanged(FileTimeIndex::Accounts as usize)
+                .unwrap()
+        );
     }
 }
