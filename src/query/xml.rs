@@ -27,6 +27,7 @@ type CommodityMap = Arc<HashMap<String, Commodity>>;
 type PriceMap = Arc<HashMap<String, Price>>;
 type SplitMap = Arc<HashMap<String, Split>>;
 type TransactionMap = Arc<HashMap<String, Transaction>>;
+type AccountSplitsMap = Arc<HashMap<String, Vec<Split>>>;
 
 #[derive(Debug, Clone)]
 pub struct XMLQuery {
@@ -38,6 +39,8 @@ pub struct XMLQuery {
     prices: Arc<Mutex<Option<PriceMap>>>,
     splits: Arc<Mutex<Option<SplitMap>>>,
     transactions: Arc<Mutex<Option<TransactionMap>>>,
+
+    account_splits: Arc<Mutex<Option<AccountSplitsMap>>>,
 }
 
 impl XMLQuery {
@@ -53,6 +56,8 @@ impl XMLQuery {
             prices: Arc::default(),
             splits: Arc::default(),
             transactions: Arc::default(),
+
+            account_splits: Arc::default(),
         };
 
         let data = query.gnucash_data()?;

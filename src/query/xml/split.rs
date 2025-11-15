@@ -77,6 +77,30 @@ impl XMLQuery {
 
         Ok(splits)
     }
+
+    fn account_splits_map(&self) -> Result<Arc<HashMap<String, Vec<Split>>>, Error> {
+        let mut cache = self.account_splits.lock().unwrap();
+        if let Some(cache) = &*cache
+            && self.is_file_unchanged()?
+        {
+            return Ok(cache.clone());
+        }
+
+        let splits = self.split_map()?;
+        let mut account_splits: HashMap<String, Vec<Split>> = HashMap::new();
+
+        for split in splits.values() {
+            account_splits
+                .entry(split.account_guid.clone())
+                .or_default()
+                .push(split.clone());
+        }
+
+        let account_splits = Arc::new(account_splits);
+        *cache = Some(account_splits.clone());
+
+        Ok(account_splits)
+    }
 }
 
 impl Split {
@@ -245,13 +269,9 @@ impl SplitQ for XMLQuery {
     }
 
     async fn account_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        let map = self.split_map()?;
+        let map = self.account_splits_map()?;
 
-        Ok(map
-            .values()
-            .filter(|x| x.account_guid == guid)
-            .cloned()
-            .collect())
+        Ok(map.get(guid).cloned().unwrap_or_default())
     }
 
     async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
