@@ -1,11 +1,11 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use chrono::NaiveDateTime;
-use roxmltree::{Document, Node};
+use roxmltree::Node;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::{FileTimeIndex, XMLQuery};
+use super::XMLQuery;
 use crate::error::Error;
 use crate::query::{TransactionQ, TransactionT};
 
@@ -21,33 +21,8 @@ pub struct Transaction {
 
 impl XMLQuery {
     fn transaction_map(&self) -> Result<Arc<HashMap<String, Transaction>>, Error> {
-        let mut cache = self.transactions.lock().unwrap();
-        if let Some(cache) = &*cache
-            && self.is_file_unchanged(FileTimeIndex::Transactions as usize)?
-        {
-            return Ok(cache.clone());
-        }
-
-        let data = self.gnucash_data()?;
-        let doc = Document::parse(&data)?;
-
-        let transactions = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .filter(|n| n.has_tag_name("transaction"))
-            .map(|n| {
-                let result = Transaction::try_from(n);
-                result.map(|t| (t.guid.clone(), t))
-            })
-            .collect::<Result<HashMap<_, _>, _>>()?;
-
-        let transactions = Arc::new(transactions);
-        *cache = Some(transactions.clone());
-
-        Ok(transactions)
+        self.update_cache()?;
+        Ok(self.transactions.lock().unwrap().clone())
     }
 }
 
@@ -163,6 +138,7 @@ mod tests {
     use super::*;
 
     use pretty_assertions::assert_eq;
+    use roxmltree::Document;
     use tokio::sync::OnceCell;
 
     static Q: OnceCell<XMLQuery> = OnceCell::const_new();

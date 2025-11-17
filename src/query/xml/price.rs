@@ -1,13 +1,13 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use chrono::NaiveDateTime;
-use roxmltree::{Document, Node};
+use roxmltree::Node;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::{FileTimeIndex, XMLQuery};
+use super::XMLQuery;
 use crate::error::Error;
 use crate::query::{PriceQ, PriceT};
 
@@ -25,40 +25,8 @@ pub struct Price {
 
 impl XMLQuery {
     fn price_map(&self) -> Result<Arc<HashMap<String, Price>>, Error> {
-        let mut cache = self.prices.lock().unwrap();
-        if let Some(cache) = &*cache
-            && self.is_file_unchanged(FileTimeIndex::Prices as usize)?
-        {
-            return Ok(cache.clone());
-        }
-
-        let data = self.gnucash_data()?;
-        let doc = Document::parse(&data)?;
-
-        let prices = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .find(|n| n.has_tag_name("pricedb"))
-            .map_or_else(
-                || Ok(HashMap::new()),
-                |n| {
-                    n.children()
-                        .filter(|n| n.has_tag_name("price"))
-                        .map(|n| {
-                            let result = Price::try_from(n);
-                            result.map(|p| (p.guid.clone(), p))
-                        })
-                        .collect()
-                },
-            )?;
-
-        let prices = Arc::new(prices);
-        *cache = Some(prices.clone());
-
-        Ok(prices)
+        self.update_cache()?;
+        Ok(self.prices.lock().unwrap().clone())
     }
 }
 
@@ -226,6 +194,7 @@ mod tests {
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
     use pretty_assertions::assert_eq;
+    use roxmltree::Document;
     use tokio::sync::OnceCell;
 
     static Q: OnceCell<XMLQuery> = OnceCell::const_new();

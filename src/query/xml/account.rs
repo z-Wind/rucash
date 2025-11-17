@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use roxmltree::{Document, Node};
+use roxmltree::Node;
 
-use super::{FileTimeIndex, XMLQuery};
+use super::XMLQuery;
 use crate::error::Error;
 use crate::query::{AccountQ, AccountT};
 
@@ -27,34 +27,8 @@ pub struct Account {
 
 impl XMLQuery {
     fn account_map(&self) -> Result<Arc<HashMap<String, Account>>, Error> {
-        let mut cache = self.accounts.lock().unwrap();
-        if let Some(cache) = &*cache
-            && self.is_file_unchanged(FileTimeIndex::Accounts as usize)?
-        {
-            return Ok(cache.clone());
-        }
-
-        let data = self.gnucash_data()?;
-        let doc = Document::parse(&data)?;
-
-        let accounts = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .filter(|n| n.has_tag_name("account"))
-            .map(|n| {
-                let result = Account::try_from(n);
-
-                result.map(|a| (a.guid.clone(), a))
-            })
-            .collect::<Result<HashMap<_, _>, _>>()?;
-
-        let accounts = Arc::new(accounts);
-        *cache = Some(accounts.clone());
-
-        Ok(accounts)
+        self.update_cache()?;
+        Ok(self.accounts.lock().unwrap().clone())
     }
 }
 
@@ -222,6 +196,7 @@ mod tests {
     use super::*;
 
     use pretty_assertions::assert_eq;
+    use roxmltree::Document;
     use tokio::sync::OnceCell;
 
     static Q: OnceCell<XMLQuery> = OnceCell::const_new();

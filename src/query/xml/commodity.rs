@@ -1,10 +1,10 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
-use roxmltree::{Document, Node};
+use roxmltree::Node;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::{FileTimeIndex, XMLQuery};
+use super::XMLQuery;
 use crate::error::Error;
 use crate::query::{CommodityQ, CommodityT};
 
@@ -23,52 +23,8 @@ pub struct Commodity {
 
 impl XMLQuery {
     fn commodity_map(&self) -> Result<Arc<HashMap<String, Commodity>>, Error> {
-        let mut cache = self.commodities.lock().unwrap();
-        if let Some(cache) = &*cache
-            && self.is_file_unchanged(FileTimeIndex::Commodities as usize)?
-        {
-            return Ok(cache.clone());
-        }
-
-        let data = self.gnucash_data()?;
-        let doc = Document::parse(&data)?;
-
-        let book = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .expect("must exist book");
-
-        let mut commodities: HashMap<String, Commodity> = book
-            .children()
-            .filter(|n| n.has_tag_name("commodity"))
-            .map(|n| {
-                let result = Commodity::try_from(n);
-                result.map(|c| (c.guid.clone(), c))
-            })
-            .collect::<Result<_, _>>()?;
-
-        if let Some(pricedb) = book.children().find(|n| n.has_tag_name("pricedb")) {
-            for price in pricedb.children().filter(|n| n.has_tag_name("price")) {
-                for child in price.children() {
-                    match child.tag_name().name() {
-                        "commodity" | "currency" => {
-                            let commodity = Commodity::try_from(child)?;
-                            commodities
-                                .entry(commodity.guid.clone())
-                                .or_insert(commodity);
-                        }
-
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-        let commodities = Arc::new(commodities);
-        *cache = Some(commodities.clone());
-
-        Ok(commodities)
+        self.update_cache()?;
+        Ok(self.commodities.lock().unwrap().clone())
     }
 }
 
@@ -190,6 +146,7 @@ mod tests {
     use super::*;
 
     use pretty_assertions::assert_eq;
+    use roxmltree::Document;
     use tokio::sync::OnceCell;
 
     static Q: OnceCell<XMLQuery> = OnceCell::const_new();

@@ -1,13 +1,13 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use chrono::{DateTime, NaiveDateTime};
-use roxmltree::{Document, Node};
+use roxmltree::Node;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::{FileTimeIndex, XMLQuery};
+use super::XMLQuery;
 use crate::error::Error;
 use crate::query::{SplitQ, SplitT};
 
@@ -29,82 +29,18 @@ pub struct Split {
 
 impl XMLQuery {
     fn split_map(&self) -> Result<Arc<HashMap<String, Split>>, Error> {
-        let mut cache = self.splits.lock().unwrap();
-        if let Some(cache) = &*cache
-            && self.is_file_unchanged(FileTimeIndex::Splits as usize)?
-        {
-            return Ok(cache.clone());
-        }
-
-        let data = self.gnucash_data()?;
-        let doc = Document::parse(&data)?;
-
-        let mut splits = HashMap::new();
-
-        for transaction in doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .filter(|n| n.has_tag_name("transaction"))
-        {
-            let tx_guid = transaction
-                .children()
-                .find(|n| n.has_tag_name("id"))
-                .and_then(|n| n.text())
-                .map(std::string::ToString::to_string)
-                .ok_or(Error::XMLFromElement {
-                    model: "Split no tx_guid".to_string(),
-                })?;
-
-            for split in transaction
-                .children()
-                .find(|n| n.has_tag_name("splits"))
-                .ok_or(Error::XMLFromElement {
-                    model: "Split no child splits".to_string(),
-                })?
-                .children()
-                .filter(|n| n.has_tag_name("split"))
-            {
-                let split = Split::try_from(tx_guid.clone(), split)?;
-                splits.insert(split.guid.clone(), split);
-            }
-        }
-
-        let splits = Arc::new(splits);
-        *cache = Some(splits.clone());
-
-        Ok(splits)
+        self.update_cache()?;
+        Ok(self.splits.lock().unwrap().clone())
     }
 
     fn account_splits_map(&self) -> Result<Arc<HashMap<String, Vec<Split>>>, Error> {
-        let mut cache = self.account_splits.lock().unwrap();
-        if let Some(cache) = &*cache
-            && self.is_file_unchanged(FileTimeIndex::AccountSplits as usize)?
-        {
-            return Ok(cache.clone());
-        }
-
-        let splits = self.split_map()?;
-        let mut account_splits: HashMap<String, Vec<Split>> = HashMap::new();
-
-        for split in splits.values() {
-            account_splits
-                .entry(split.account_guid.clone())
-                .or_default()
-                .push(split.clone());
-        }
-
-        let account_splits = Arc::new(account_splits);
-        *cache = Some(account_splits.clone());
-
-        Ok(account_splits)
+        self.update_cache()?;
+        Ok(self.account_splits.lock().unwrap().clone())
     }
 }
 
 impl Split {
-    fn try_from(tx_guid: String, n: Node) -> Result<Self, Error> {
+    pub(super) fn try_from(tx_guid: String, n: Node) -> Result<Self, Error> {
         let mut split = Self {
             tx_guid,
             ..Self::default()
@@ -292,6 +228,7 @@ mod tests {
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
     use pretty_assertions::assert_eq;
+    use roxmltree::Document;
     use tokio::sync::OnceCell;
 
     static Q: OnceCell<XMLQuery> = OnceCell::const_new();
@@ -343,7 +280,10 @@ mod tests {
                     xmlns:vendor="http://www.gnucash.org/XML/vendor">
                     <trn:split>
                         <split:id type="guid">de832fe97e37811a7fff7e28b3a43425</split:id>
-                        <split:reconciled-state>n</split:reconciled-state>
+                        <split:reconciled-state>y</split:reconciled-state>
+                        <split:reconcile-date>
+                            <ts:date>2013-01-23 15:59:59 +0000</ts:date>
+                        </split:reconcile-date>
                         <split:value>15000/100</split:value>
                         <split:quantity>15000/100</split:quantity>
                         <split:account type="guid">93fc043c3062aaa1297b30e543d2cd0d</split:account>
@@ -361,8 +301,11 @@ mod tests {
         assert_eq!(split.account_guid, "93fc043c3062aaa1297b30e543d2cd0d");
         assert_eq!(split.memo, "");
         assert_eq!(split.action, "");
-        assert_eq!(split.reconcile_state, false);
-        assert_eq!(split.reconcile_date, None);
+        assert_eq!(split.reconcile_state, true);
+        assert_eq!(
+            split.reconcile_date,
+            Some("2013-01-23T15:59:59".parse().unwrap(),)
+        );
         assert_eq!(split.value_num, 15000);
         assert_eq!(split.value_denom, 100);
         #[cfg(not(feature = "decimal"))]
