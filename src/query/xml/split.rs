@@ -4,8 +4,6 @@ use chrono::{DateTime, NaiveDateTime};
 use roxmltree::Node;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
-use std::collections::HashMap;
-use std::sync::Arc;
 
 use super::XMLQuery;
 use crate::error::Error;
@@ -28,14 +26,19 @@ pub struct Split {
 }
 
 impl XMLQuery {
-    fn split_map(&self) -> Result<Arc<HashMap<String, Split>>, Error> {
+    fn split_map(&self) -> Result<super::SplitMap, Error> {
         self.update_cache()?;
         Ok(self.splits.lock().unwrap().clone())
     }
 
-    fn account_splits_map(&self) -> Result<Arc<HashMap<String, Vec<Split>>>, Error> {
+    fn account_splits_map(&self) -> Result<super::AccountSplitsMap, Error> {
         self.update_cache()?;
         Ok(self.account_splits.lock().unwrap().clone())
+    }
+
+    fn transaction_splits_map(&self) -> Result<super::AccountSplitsMap, Error> {
+        self.update_cache()?;
+        Ok(self.transaction_splits.lock().unwrap().clone())
     }
 }
 
@@ -195,29 +198,31 @@ impl SplitQ for XMLQuery {
     async fn all(&self) -> Result<Vec<Self::S>, Error> {
         let map = self.split_map()?;
 
-        Ok(map.values().cloned().collect())
+        Ok(map.values().map(|x| (**x).clone()).collect())
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
         let map = self.split_map()?;
 
-        Ok(map.get(guid).into_iter().cloned().collect())
+        Ok(map.get(guid).map(|x| (**x).clone()).into_iter().collect())
     }
 
     async fn account_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
         let map = self.account_splits_map()?;
 
-        Ok(map.get(guid).cloned().unwrap_or_default())
+        Ok(map
+            .get(guid)
+            .map(|v| v.iter().map(|x| (**x).clone()).collect())
+            .unwrap_or_default())
     }
 
     async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        let map = self.split_map()?;
+        let map = self.transaction_splits_map()?;
 
         Ok(map
-            .values()
-            .filter(|x| x.tx_guid == guid)
-            .cloned()
-            .collect())
+            .get(guid)
+            .map(|v| v.iter().map(|x| (**x).clone()).collect())
+            .unwrap_or_default())
     }
 }
 

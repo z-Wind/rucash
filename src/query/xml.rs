@@ -25,9 +25,10 @@ use transaction::Transaction;
 type AccountMap = Arc<HashMap<String, Account>>;
 type CommodityMap = Arc<HashMap<String, Commodity>>;
 type PriceMap = Arc<HashMap<String, Price>>;
-type SplitMap = Arc<HashMap<String, Split>>;
+type SplitMap = Arc<HashMap<String, Arc<Split>>>;
 type TransactionMap = Arc<HashMap<String, Transaction>>;
-type AccountSplitsMap = Arc<HashMap<String, Vec<Split>>>;
+type AccountSplitsMap = Arc<HashMap<String, Vec<Arc<Split>>>>;
+type TransactionSplitsMap = Arc<HashMap<String, Vec<Arc<Split>>>>;
 
 #[derive(Debug, Clone)]
 pub struct XMLQuery {
@@ -41,6 +42,7 @@ pub struct XMLQuery {
     transactions: Arc<Mutex<TransactionMap>>,
 
     account_splits: Arc<Mutex<AccountSplitsMap>>,
+    transaction_splits: Arc<Mutex<TransactionSplitsMap>>,
 }
 
 impl XMLQuery {
@@ -53,7 +55,7 @@ impl XMLQuery {
         let accounts = Self::parse_account_map(&doc)?;
         let commodities = Self::parse_commodity_map(&doc)?;
         let prices = Self::parse_price_map(&doc)?;
-        let (splits, account_splits) = Self::parse_split_map(&doc)?;
+        let (splits, account_splits, transaction_splits) = Self::parse_split_map(&doc)?;
         let transactions = Self::parse_transaction_map(&doc)?;
 
         let query = Self {
@@ -67,6 +69,7 @@ impl XMLQuery {
             transactions: Arc::new(Mutex::new(transactions)),
 
             account_splits: Arc::new(Mutex::new(account_splits)),
+            transaction_splits: Arc::new(Mutex::new(transaction_splits)),
         };
 
         doc.root_element()
@@ -164,8 +167,12 @@ impl XMLQuery {
         Ok(Arc::new(prices))
     }
 
-    fn parse_split_map(doc: &Document) -> Result<(SplitMap, AccountSplitsMap), Error> {
+    fn parse_split_map(
+        doc: &Document,
+    ) -> Result<(SplitMap, AccountSplitsMap, TransactionSplitsMap), Error> {
         let mut splits = HashMap::new();
+        let mut account_splits: HashMap<String, Vec<Arc<Split>>> = HashMap::new();
+        let mut transactiont_splits: HashMap<String, Vec<Arc<Split>>> = HashMap::new();
 
         for transaction in doc
             .root_element()
@@ -193,21 +200,26 @@ impl XMLQuery {
                 .children()
                 .filter(|n| n.has_tag_name("split"))
             {
-                let split = Split::try_from(tx_guid.clone(), split)?;
-                splits.insert(split.guid.clone(), split);
+                let split = Arc::new(Split::try_from(tx_guid.clone(), split)?);
+                splits.insert(split.guid.clone(), split.clone());
+
+                account_splits
+                    .entry(split.account_guid.clone())
+                    .or_default()
+                    .push(split.clone());
+
+                transactiont_splits
+                    .entry(tx_guid.clone())
+                    .or_default()
+                    .push(split);
             }
         }
 
-        let mut account_splits: HashMap<String, Vec<Split>> = HashMap::new();
-
-        for split in splits.values() {
-            account_splits
-                .entry(split.account_guid.clone())
-                .or_default()
-                .push(split.clone());
-        }
-
-        Ok((Arc::new(splits), Arc::new(account_splits)))
+        Ok((
+            Arc::new(splits),
+            Arc::new(account_splits),
+            Arc::new(transactiont_splits),
+        ))
     }
 
     fn parse_transaction_map(doc: &Document) -> Result<TransactionMap, Error> {
@@ -262,6 +274,7 @@ impl XMLQuery {
             (
                 *self.splits.lock().unwrap(),
                 *self.account_splits.lock().unwrap(),
+                *self.transaction_splits.lock().unwrap(),
             ) = Self::parse_split_map(&doc)?;
         }
         {
