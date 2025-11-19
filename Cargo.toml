@@ -17,8 +17,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-# sqlx = { version = "0.8", optional = true }
-sqlx = { git = "https://github.com/launchbadge/sqlx.git", optional = true }
+sqlx = { version = "0.9.0-alpha.1", optional = true }
+# sqlx = { git = "https://github.com/launchbadge/sqlx.git", optional = true }
 chrono = "0.4"
 rust_decimal = { version = "1.39", optional = true }
 roxmltree = { version = "0.21", optional = true }
