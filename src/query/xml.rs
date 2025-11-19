@@ -22,13 +22,20 @@ use price::Price;
 use split::Split;
 use transaction::Transaction;
 
-type AccountMap = Arc<HashMap<String, Account>>;
-type CommodityMap = Arc<HashMap<String, Commodity>>;
-type PriceMap = Arc<HashMap<String, Price>>;
+type AccountMap = Arc<HashMap<String, Arc<Account>>>;
+type AccountsnMap = Arc<HashMap<String, Vec<Arc<Account>>>>;
+
+type CommodityMap = Arc<HashMap<String, Arc<Commodity>>>;
+type CommoditiesMap = Arc<HashMap<String, Vec<Arc<Commodity>>>>;
+
+type PriceMap = Arc<HashMap<String, Arc<Price>>>;
+type PricesMap = Arc<HashMap<String, Vec<Arc<Price>>>>;
+
 type SplitMap = Arc<HashMap<String, Arc<Split>>>;
-type TransactionMap = Arc<HashMap<String, Transaction>>;
-type AccountSplitsMap = Arc<HashMap<String, Vec<Arc<Split>>>>;
-type TransactionSplitsMap = Arc<HashMap<String, Vec<Arc<Split>>>>;
+type SplitsMap = Arc<HashMap<String, Vec<Arc<Split>>>>;
+
+type TransactionMap = Arc<HashMap<String, Arc<Transaction>>>;
+type TransactionsMap = Arc<HashMap<String, Vec<Arc<Transaction>>>>;
 
 #[derive(Debug, Clone)]
 pub struct XMLQuery {
@@ -36,13 +43,23 @@ pub struct XMLQuery {
     file_modified_time: Arc<Mutex<SystemTime>>,
 
     accounts: Arc<Mutex<AccountMap>>,
-    commodities: Arc<Mutex<CommodityMap>>,
-    prices: Arc<Mutex<PriceMap>>,
-    splits: Arc<Mutex<SplitMap>>,
-    transactions: Arc<Mutex<TransactionMap>>,
+    commodity_accounts: Arc<Mutex<AccountsnMap>>,
+    same_parent_accounts: Arc<Mutex<AccountsnMap>>,
+    name_accounts: Arc<Mutex<AccountsnMap>>,
 
-    account_splits: Arc<Mutex<AccountSplitsMap>>,
-    transaction_splits: Arc<Mutex<TransactionSplitsMap>>,
+    commodities: Arc<Mutex<CommodityMap>>,
+    namespace_commodities: Arc<Mutex<CommoditiesMap>>,
+
+    prices: Arc<Mutex<PriceMap>>,
+    commodity_prices: Arc<Mutex<PricesMap>>,
+    currency_prices: Arc<Mutex<PricesMap>>,
+
+    splits: Arc<Mutex<SplitMap>>,
+    account_splits: Arc<Mutex<SplitsMap>>,
+    transaction_splits: Arc<Mutex<SplitsMap>>,
+
+    transactions: Arc<Mutex<TransactionMap>>,
+    currency_transactions: Arc<Mutex<TransactionsMap>>,
 }
 
 impl XMLQuery {
@@ -52,24 +69,35 @@ impl XMLQuery {
         let data = Self::gnucash_data(&path)?;
         let doc = Document::parse(&data)?;
 
-        let accounts = Self::parse_account_map(&doc)?;
-        let commodities = Self::parse_commodity_map(&doc)?;
-        let prices = Self::parse_price_map(&doc)?;
+        let (accounts, commodity_accounts, same_parent_accounts, name_accounts) =
+            Self::parse_account_map(&doc)?;
+        let (commodities, namespace_commodities) = Self::parse_commodity_map(&doc)?;
+        let (prices, commodity_prices, currency_prices) = Self::parse_price_map(&doc)?;
         let (splits, account_splits, transaction_splits) = Self::parse_split_map(&doc)?;
-        let transactions = Self::parse_transaction_map(&doc)?;
+        let (transactions, currency_transactions) = Self::parse_transaction_map(&doc)?;
 
         let query = Self {
             file_modified_time: Arc::new(Mutex::new(path.metadata()?.modified()?)),
             file_path: Arc::new(path),
 
             accounts: Arc::new(Mutex::new(accounts)),
-            commodities: Arc::new(Mutex::new(commodities)),
-            prices: Arc::new(Mutex::new(prices)),
-            splits: Arc::new(Mutex::new(splits)),
-            transactions: Arc::new(Mutex::new(transactions)),
+            commodity_accounts: Arc::new(Mutex::new(commodity_accounts)),
+            same_parent_accounts: Arc::new(Mutex::new(same_parent_accounts)),
+            name_accounts: Arc::new(Mutex::new(name_accounts)),
 
+            commodities: Arc::new(Mutex::new(commodities)),
+            namespace_commodities: Arc::new(Mutex::new(namespace_commodities)),
+
+            prices: Arc::new(Mutex::new(prices)),
+            commodity_prices: Arc::new(Mutex::new(commodity_prices)),
+            currency_prices: Arc::new(Mutex::new(currency_prices)),
+
+            splits: Arc::new(Mutex::new(splits)),
             account_splits: Arc::new(Mutex::new(account_splits)),
             transaction_splits: Arc::new(Mutex::new(transaction_splits)),
+
+            transactions: Arc::new(Mutex::new(transactions)),
+            currency_transactions: Arc::new(Mutex::new(currency_transactions)),
         };
 
         doc.root_element()
@@ -89,49 +117,76 @@ impl XMLQuery {
         Ok(data)
     }
 
-    fn parse_account_map(doc: &Document) -> Result<AccountMap, Error> {
-        let accounts = doc
+    fn parse_account_map(
+        doc: &Document,
+    ) -> Result<(AccountMap, AccountsnMap, AccountsnMap, AccountsnMap), Error> {
+        let mut account_map = HashMap::new();
+        let mut commodity_accounts_map: HashMap<String, Vec<Arc<Account>>> = HashMap::new();
+        let mut same_parent_accounts_map: HashMap<String, Vec<Arc<Account>>> = HashMap::new();
+        let mut name_accounts_map: HashMap<String, Vec<Arc<Account>>> = HashMap::new();
+
+        for n in doc
             .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
             .expect("must exist book")
             .children()
             .filter(|n| n.has_tag_name("account"))
-            .map(|n| {
-                let result = Account::try_from(n);
+        {
+            let account = Arc::new(Account::try_from(n)?);
 
-                result.map(|a| (a.guid.clone(), a))
-            })
-            .collect::<Result<HashMap<_, _>, _>>()?;
+            account_map.insert(account.guid.clone(), account.clone());
 
-        Ok(Arc::new(accounts))
+            commodity_accounts_map
+                .entry(account.commodity_guid.clone().unwrap_or_default())
+                .or_default()
+                .push(account.clone());
+
+            same_parent_accounts_map
+                .entry(account.parent_guid.clone().unwrap_or_default())
+                .or_default()
+                .push(account.clone());
+
+            name_accounts_map
+                .entry(account.name.clone())
+                .or_default()
+                .push(account);
+        }
+
+        Ok((
+            Arc::new(account_map),
+            Arc::new(commodity_accounts_map),
+            Arc::new(same_parent_accounts_map),
+            Arc::new(name_accounts_map),
+        ))
     }
 
-    fn parse_commodity_map(doc: &Document) -> Result<CommodityMap, Error> {
+    fn parse_commodity_map(doc: &Document) -> Result<(CommodityMap, CommoditiesMap), Error> {
         let book = doc
             .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
             .expect("must exist book");
 
-        let mut commodities: HashMap<String, Commodity> = book
-            .children()
-            .filter(|n| n.has_tag_name("commodity"))
-            .map(|n| {
-                let result = Commodity::try_from(n);
-                result.map(|c| (c.guid.clone(), c))
-            })
-            .collect::<Result<_, _>>()?;
+        let mut commodity_map = HashMap::new();
+        let mut namespace_commodities: HashMap<String, Vec<Arc<Commodity>>> = HashMap::new();
+
+        for n in book.children().filter(|n| n.has_tag_name("commodity")) {
+            let commodity = Arc::new(Commodity::try_from(n)?);
+
+            commodity_map.insert(commodity.guid.clone(), commodity.clone());
+        }
 
         if let Some(pricedb) = book.children().find(|n| n.has_tag_name("pricedb")) {
             for price in pricedb.children().filter(|n| n.has_tag_name("price")) {
                 for child in price.children() {
                     match child.tag_name().name() {
                         "commodity" | "currency" => {
-                            let commodity = Commodity::try_from(child)?;
-                            commodities
+                            let commodity = Arc::new(Commodity::try_from(child)?);
+
+                            commodity_map
                                 .entry(commodity.guid.clone())
-                                .or_insert(commodity);
+                                .or_insert(commodity.clone());
                         }
 
                         _ => {}
@@ -140,39 +195,57 @@ impl XMLQuery {
             }
         }
 
-        Ok(Arc::new(commodities))
+        for c in commodity_map.values() {
+            namespace_commodities
+                .entry(c.namespace.clone())
+                .or_default()
+                .push(c.clone());
+        }
+
+        Ok((Arc::new(commodity_map), Arc::new(namespace_commodities)))
     }
 
-    fn parse_price_map(doc: &Document) -> Result<PriceMap, Error> {
-        let prices = doc
+    fn parse_price_map(doc: &Document) -> Result<(PriceMap, PricesMap, PricesMap), Error> {
+        let mut price_map = HashMap::new();
+        let mut commodity_prices: HashMap<String, Vec<Arc<Price>>> = HashMap::new();
+        let mut currency_prices: HashMap<String, Vec<Arc<Price>>> = HashMap::new();
+
+        if let Some(n) = doc
             .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
             .expect("must exist book")
             .children()
             .find(|n| n.has_tag_name("pricedb"))
-            .map_or_else(
-                || Ok(HashMap::new()),
-                |n| {
-                    n.children()
-                        .filter(|n| n.has_tag_name("price"))
-                        .map(|n| {
-                            let result = Price::try_from(n);
-                            result.map(|p| (p.guid.clone(), p))
-                        })
-                        .collect()
-                },
-            )?;
+        {
+            for price in n.children().filter(|n| n.has_tag_name("price")) {
+                let price = Arc::new(Price::try_from(price)?);
 
-        Ok(Arc::new(prices))
+                price_map.entry(price.guid.clone()).or_insert(price.clone());
+
+                commodity_prices
+                    .entry(price.commodity_guid.clone())
+                    .or_default()
+                    .push(price.clone());
+
+                currency_prices
+                    .entry(price.currency_guid.clone())
+                    .or_default()
+                    .push(price);
+            }
+        }
+
+        Ok((
+            Arc::new(price_map),
+            Arc::new(commodity_prices),
+            Arc::new(currency_prices),
+        ))
     }
 
-    fn parse_split_map(
-        doc: &Document,
-    ) -> Result<(SplitMap, AccountSplitsMap, TransactionSplitsMap), Error> {
-        let mut splits = HashMap::new();
-        let mut account_splits: HashMap<String, Vec<Arc<Split>>> = HashMap::new();
-        let mut transactiont_splits: HashMap<String, Vec<Arc<Split>>> = HashMap::new();
+    fn parse_split_map(doc: &Document) -> Result<(SplitMap, SplitsMap, SplitsMap), Error> {
+        let mut split_map = HashMap::new();
+        let mut account_splits_map: HashMap<String, Vec<Arc<Split>>> = HashMap::new();
+        let mut transactiont_splits_map: HashMap<String, Vec<Arc<Split>>> = HashMap::new();
 
         for transaction in doc
             .root_element()
@@ -201,14 +274,14 @@ impl XMLQuery {
                 .filter(|n| n.has_tag_name("split"))
             {
                 let split = Arc::new(Split::try_from(tx_guid.clone(), split)?);
-                splits.insert(split.guid.clone(), split.clone());
+                split_map.insert(split.guid.clone(), split.clone());
 
-                account_splits
+                account_splits_map
                     .entry(split.account_guid.clone())
                     .or_default()
                     .push(split.clone());
 
-                transactiont_splits
+                transactiont_splits_map
                     .entry(tx_guid.clone())
                     .or_default()
                     .push(split);
@@ -216,27 +289,38 @@ impl XMLQuery {
         }
 
         Ok((
-            Arc::new(splits),
-            Arc::new(account_splits),
-            Arc::new(transactiont_splits),
+            Arc::new(split_map),
+            Arc::new(account_splits_map),
+            Arc::new(transactiont_splits_map),
         ))
     }
 
-    fn parse_transaction_map(doc: &Document) -> Result<TransactionMap, Error> {
-        let transactions = doc
+    fn parse_transaction_map(doc: &Document) -> Result<(TransactionMap, TransactionsMap), Error> {
+        let mut transaction_map = HashMap::new();
+        let mut currency_transactions_map: HashMap<String, Vec<Arc<Transaction>>> = HashMap::new();
+
+        for n in doc
             .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
             .expect("must exist book")
             .children()
             .filter(|n| n.has_tag_name("transaction"))
-            .map(|n| {
-                let result = Transaction::try_from(n);
-                result.map(|t| (t.guid.clone(), t))
-            })
-            .collect::<Result<HashMap<_, _>, _>>()?;
+        {
+            let transaction = Arc::new(Transaction::try_from(n)?);
 
-        Ok(Arc::new(transactions))
+            transaction_map.insert(transaction.guid.clone(), transaction.clone());
+
+            currency_transactions_map
+                .entry(transaction.currency_guid.clone())
+                .or_default()
+                .push(transaction);
+        }
+
+        Ok((
+            Arc::new(transaction_map),
+            Arc::new(currency_transactions_map),
+        ))
     }
 
     fn is_file_unchanged(&self) -> Result<bool, Error> {
@@ -262,13 +346,25 @@ impl XMLQuery {
         let doc = Document::parse(&data)?;
 
         {
-            *self.accounts.lock().unwrap() = Self::parse_account_map(&doc)?;
+            (
+                *self.accounts.lock().unwrap(),
+                *self.commodity_accounts.lock().unwrap(),
+                *self.same_parent_accounts.lock().unwrap(),
+                *self.name_accounts.lock().unwrap(),
+            ) = Self::parse_account_map(&doc)?;
         }
         {
-            *self.commodities.lock().unwrap() = Self::parse_commodity_map(&doc)?;
+            (
+                *self.commodities.lock().unwrap(),
+                *self.namespace_commodities.lock().unwrap(),
+            ) = Self::parse_commodity_map(&doc)?;
         }
         {
-            *self.prices.lock().unwrap() = Self::parse_price_map(&doc)?;
+            (
+                *self.prices.lock().unwrap(),
+                *self.commodity_prices.lock().unwrap(),
+                *self.currency_prices.lock().unwrap(),
+            ) = Self::parse_price_map(&doc)?;
         }
         {
             (
@@ -278,7 +374,10 @@ impl XMLQuery {
             ) = Self::parse_split_map(&doc)?;
         }
         {
-            *self.transactions.lock().unwrap() = Self::parse_transaction_map(&doc)?;
+            (
+                *self.transactions.lock().unwrap(),
+                *self.currency_transactions.lock().unwrap(),
+            ) = Self::parse_transaction_map(&doc)?;
         }
 
         Ok(())

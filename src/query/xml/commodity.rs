@@ -1,8 +1,6 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use roxmltree::Node;
-use std::collections::HashMap;
-use std::sync::Arc;
 
 use super::XMLQuery;
 use crate::error::Error;
@@ -22,9 +20,14 @@ pub struct Commodity {
 }
 
 impl XMLQuery {
-    fn commodity_map(&self) -> Result<Arc<HashMap<String, Commodity>>, Error> {
+    fn commodity_map(&self) -> Result<super::CommodityMap, Error> {
         self.update_cache()?;
         Ok(self.commodities.lock().unwrap().clone())
+    }
+
+    fn namespace_commodities_map(&self) -> Result<super::CommoditiesMap, Error> {
+        self.update_cache()?;
+        Ok(self.namespace_commodities.lock().unwrap().clone())
     }
 }
 
@@ -121,23 +124,22 @@ impl CommodityQ for XMLQuery {
     async fn all(&self) -> Result<Vec<Self::C>, Error> {
         let map = self.commodity_map()?;
 
-        Ok(map.values().cloned().collect())
+        Ok(map.values().map(|x| (**x).clone()).collect())
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::C>, Error> {
         let map = self.commodity_map()?;
 
-        Ok(map.get(guid).into_iter().cloned().collect())
+        Ok(map.get(guid).map(|x| (**x).clone()).into_iter().collect())
     }
 
     async fn namespace(&self, namespace: &str) -> Result<Vec<Self::C>, Error> {
-        let map = self.commodity_map()?;
+        let map = self.namespace_commodities_map()?;
 
         Ok(map
-            .values()
-            .filter(|x| x.namespace == namespace)
-            .cloned()
-            .collect())
+            .get(namespace)
+            .map(|v| v.iter().map(|x| (**x).clone()).collect())
+            .unwrap_or_default())
     }
 }
 

@@ -31,12 +31,12 @@ impl XMLQuery {
         Ok(self.splits.lock().unwrap().clone())
     }
 
-    fn account_splits_map(&self) -> Result<super::AccountSplitsMap, Error> {
+    fn account_splits_map(&self) -> Result<super::SplitsMap, Error> {
         self.update_cache()?;
         Ok(self.account_splits.lock().unwrap().clone())
     }
 
-    fn transaction_splits_map(&self) -> Result<super::AccountSplitsMap, Error> {
+    fn transaction_splits_map(&self) -> Result<super::SplitsMap, Error> {
         self.update_cache()?;
         Ok(self.transaction_splits.lock().unwrap().clone())
     }

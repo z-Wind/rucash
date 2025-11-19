@@ -1,8 +1,5 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
-use std::collections::HashMap;
-use std::sync::Arc;
-
 use roxmltree::Node;
 
 use super::XMLQuery;
@@ -26,9 +23,24 @@ pub struct Account {
 }
 
 impl XMLQuery {
-    fn account_map(&self) -> Result<Arc<HashMap<String, Account>>, Error> {
+    fn account_map(&self) -> Result<super::AccountMap, Error> {
         self.update_cache()?;
         Ok(self.accounts.lock().unwrap().clone())
+    }
+
+    fn commodity_accounts_map(&self) -> Result<super::AccountsnMap, Error> {
+        self.update_cache()?;
+        Ok(self.commodity_accounts.lock().unwrap().clone())
+    }
+
+    fn same_parent_accounts_map(&self) -> Result<super::AccountsnMap, Error> {
+        self.update_cache()?;
+        Ok(self.same_parent_accounts.lock().unwrap().clone())
+    }
+
+    fn name_accounts_map(&self) -> Result<super::AccountsnMap, Error> {
+        self.update_cache()?;
+        Ok(self.name_accounts.lock().unwrap().clone())
     }
 }
 
@@ -145,39 +157,40 @@ impl AccountQ for XMLQuery {
     async fn all(&self) -> Result<Vec<Self::A>, Error> {
         let map = self.account_map()?;
 
-        Ok(map.values().cloned().collect())
+        Ok(map.values().map(|x| (**x).clone()).collect())
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
         let map = self.account_map()?;
 
-        Ok(map.get(guid).into_iter().cloned().collect())
+        Ok(map.get(guid).into_iter().map(|x| (**x).clone()).collect())
     }
 
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        let map = self.account_map()?;
+        let map = self.commodity_accounts_map()?;
 
         Ok(map
-            .values()
-            .filter(|x| x.commodity_guid.as_ref().is_some_and(|id| id == guid))
-            .cloned()
-            .collect())
+            .get(guid)
+            .map(|v| v.iter().map(|x| (**x).clone()).collect())
+            .unwrap_or_default())
     }
 
     async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        let map = self.account_map()?;
+        let map = self.same_parent_accounts_map()?;
 
         Ok(map
-            .values()
-            .filter(|x| x.parent_guid.as_ref().is_some_and(|id| id == guid))
-            .cloned()
-            .collect())
+            .get(guid)
+            .map(|v| v.iter().map(|x| (**x).clone()).collect())
+            .unwrap_or_default())
     }
 
     async fn name(&self, name: &str) -> Result<Vec<Self::A>, Error> {
-        let map = self.account_map()?;
+        let map = self.name_accounts_map()?;
 
-        Ok(map.values().filter(|x| x.name == name).cloned().collect())
+        Ok(map
+            .get(name)
+            .map(|v| v.iter().map(|x| (**x).clone()).collect())
+            .unwrap_or_default())
     }
 
     async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::A>, Error> {
@@ -186,7 +199,7 @@ impl AccountQ for XMLQuery {
         Ok(map
             .values()
             .filter(|x| x.name.to_lowercase().contains(&name.to_lowercase()))
-            .cloned()
+            .map(|x| (**x).clone())
             .collect())
     }
 }

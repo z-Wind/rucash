@@ -2,8 +2,6 @@
 
 use chrono::NaiveDateTime;
 use roxmltree::Node;
-use std::collections::HashMap;
-use std::sync::Arc;
 
 use super::XMLQuery;
 use crate::error::Error;
@@ -20,9 +18,14 @@ pub struct Transaction {
 }
 
 impl XMLQuery {
-    fn transaction_map(&self) -> Result<Arc<HashMap<String, Transaction>>, Error> {
+    fn transaction_map(&self) -> Result<super::TransactionMap, Error> {
         self.update_cache()?;
         Ok(self.transactions.lock().unwrap().clone())
+    }
+
+    fn currency_transactions_map(&self) -> Result<super::TransactionsMap, Error> {
+        self.update_cache()?;
+        Ok(self.currency_transactions.lock().unwrap().clone())
     }
 }
 
@@ -113,23 +116,22 @@ impl TransactionQ for XMLQuery {
     async fn all(&self) -> Result<Vec<Self::T>, Error> {
         let map = self.transaction_map()?;
 
-        Ok(map.values().cloned().collect())
+        Ok(map.values().map(|x| (**x).clone()).collect())
     }
 
     async fn guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
         let map = self.transaction_map()?;
 
-        Ok(map.get(guid).into_iter().cloned().collect())
+        Ok(map.get(guid).map(|x| (**x).clone()).into_iter().collect())
     }
 
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
-        let map = self.transaction_map()?;
+        let map = self.currency_transactions_map()?;
 
         Ok(map
-            .values()
-            .filter(|x| x.currency_guid == guid)
-            .cloned()
-            .collect())
+            .get(guid)
+            .map(|v| v.iter().map(|x| (**x).clone()).collect())
+            .unwrap_or_default())
     }
 }
 
