@@ -103,7 +103,7 @@ impl XMLQuery {
         doc.root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
-            .ok_or(Error::NoBook(query.file_path.display().to_string()))?;
+            .ok_or_else(|| Error::NoBook(query.file_path.display().to_string()))?;
 
         Ok(query)
     }
@@ -260,14 +260,14 @@ impl XMLQuery {
                 .find(|n| n.has_tag_name("id"))
                 .and_then(|n| n.text())
                 .map(std::string::ToString::to_string)
-                .ok_or(Error::XMLFromElement {
+                .ok_or_else(|| Error::XMLFromElement {
                     model: "Split no tx_guid".to_string(),
                 })?;
 
             for split in transaction
                 .children()
                 .find(|n| n.has_tag_name("splits"))
-                .ok_or(Error::XMLFromElement {
+                .ok_or_else(|| Error::XMLFromElement {
                     model: "Split no child splits".to_string(),
                 })?
                 .children()

@@ -44,7 +44,7 @@ impl TryFrom<Node<'_, '_>> for Commodity {
                 "id" => {
                     commodity.guid = child
                         .text()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Commodity guid".to_string(),
                         })?
                         .to_string();
@@ -53,7 +53,7 @@ impl TryFrom<Node<'_, '_>> for Commodity {
                 "space" => {
                     commodity.namespace = child
                         .text()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Commodity namespacee".to_string(),
                         })?
                         .to_string();

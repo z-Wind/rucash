@@ -48,18 +48,20 @@ impl Exchange {
             HashMap::new();
 
         for p in prices {
-            let commodity = commodities_map
-                .get(&p.commodity_guid)
-                .ok_or(Error::GuidNotFound {
-                    model: "Commodity".to_string(),
-                    guid: p.commodity_guid.clone(),
-                })?;
-            let currency = commodities_map
-                .get(&p.currency_guid)
-                .ok_or(Error::GuidNotFound {
-                    model: "Commodity".to_string(),
-                    guid: p.currency_guid.clone(),
-                })?;
+            let commodity =
+                commodities_map
+                    .get(&p.commodity_guid)
+                    .ok_or_else(|| Error::GuidNotFound {
+                        model: "Commodity".to_string(),
+                        guid: p.commodity_guid.clone(),
+                    })?;
+            let currency =
+                commodities_map
+                    .get(&p.currency_guid)
+                    .ok_or_else(|| Error::GuidNotFound {
+                        model: "Commodity".to_string(),
+                        guid: p.currency_guid.clone(),
+                    })?;
 
             if p.value.is_zero() {
                 println!(

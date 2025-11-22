@@ -39,7 +39,7 @@ impl TryFrom<Node<'_, '_>> for Transaction {
                 "id" => {
                     transaction.guid = child
                         .text()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Transaction guid".to_string(),
                         })?
                         .to_string();
@@ -50,7 +50,7 @@ impl TryFrom<Node<'_, '_>> for Transaction {
                         .find(|n| n.has_tag_name("id"))
                         .and_then(|n| n.text())
                         .map(std::string::ToString::to_string)
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Transaction currency_guid".to_string(),
                         })?;
                 }

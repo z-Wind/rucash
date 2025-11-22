@@ -53,7 +53,7 @@ impl TryFrom<Node<'_, '_>> for Account {
                 "name" => {
                     account.name = child
                         .text()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Account name".to_string(),
                         })?
                         .to_string();
@@ -61,7 +61,7 @@ impl TryFrom<Node<'_, '_>> for Account {
                 "id" => {
                     account.guid = child
                         .text()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Account guid".to_string(),
                         })?
                         .to_string();
@@ -69,7 +69,7 @@ impl TryFrom<Node<'_, '_>> for Account {
                 "type" => {
                     account.account_type = child
                         .text()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Account type".to_string(),
                         })?
                         .to_string();

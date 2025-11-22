@@ -54,7 +54,7 @@ impl Split {
                 "id" => {
                     split.guid = child
                         .text()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Split guid".to_string(),
                         })?
                         .to_string();
@@ -62,7 +62,7 @@ impl Split {
                 "account" => {
                     split.account_guid = child
                         .text()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Split account_guid".to_string(),
                         })?
                         .to_string();
@@ -90,43 +90,39 @@ impl Split {
                         .transpose()?;
                 }
                 "value" => {
-                    let mut splits =
-                        child
-                            .text()
-                            .map(|s| s.split('/'))
-                            .ok_or(Error::XMLFromElement {
-                                model: "Split value".to_string(),
-                            })?;
+                    let mut splits = child.text().map(|s| s.split('/')).ok_or_else(|| {
+                        Error::XMLFromElement {
+                            model: "Split value".to_string(),
+                        }
+                    })?;
                     split.value_num = splits
                         .next()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Split value value_num".to_string(),
                         })?
                         .parse()?;
                     split.value_denom = splits
                         .next()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Split value value_denom".to_string(),
                         })?
                         .parse()?;
                 }
                 "quantity" => {
-                    let mut splits =
-                        child
-                            .text()
-                            .map(|s| s.split('/'))
-                            .ok_or(Error::XMLFromElement {
-                                model: "Split quantity".to_string(),
-                            })?;
+                    let mut splits = child.text().map(|s| s.split('/')).ok_or_else(|| {
+                        Error::XMLFromElement {
+                            model: "Split quantity".to_string(),
+                        }
+                    })?;
                     split.quantity_num = splits
                         .next()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Split quantity quantity_num".to_string(),
                         })?
                         .parse()?;
                     split.quantity_denom = splits
                         .next()
-                        .ok_or(Error::XMLFromElement {
+                        .ok_or_else(|| Error::XMLFromElement {
                             model: "Split quantity quantity_denom".to_string(),
                         })?
                         .parse()?;
