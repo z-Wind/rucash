@@ -20,13 +20,14 @@ rustdoc-args = ["--cfg", "docsrs"]
 sqlx = { version = "0.9.0-alpha.1", optional = true }
 # sqlx = { git = "https://github.com/launchbadge/sqlx.git", optional = true }
 chrono = "0.4"
-rust_decimal = { version = "1.39", optional = true }
+rust_decimal = { version = "1.40", optional = true }
 roxmltree = { version = "0.21", optional = true }
 itertools = "0.14"
 flate2 = "1.1"
-tokio = { version = "1.48", features = ["sync"] }
+tokio = { version = "1.49", features = ["sync"] }
 num-traits = "0.2"
 thiserror = "2.0"
+# Pin rusqlite to 0.37 for SQLx compatibility
 rusqlite = { version = "0.37", features = [
     "bundled",
     "chrono",
@@ -37,10 +38,10 @@ name = "rucash"
 crate-type = ["cdylib", "rlib"]
 
 [dev-dependencies]
-criterion = { version = "0.7", features = ["async_tokio"] }
+criterion = { version = "0.8", features = ["async_tokio"] }
 float-cmp = "0.10"
 pretty_assertions = "1.4"
-tokio = { version = "1.48", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.49", features = ["rt-multi-thread", "macros"] }
 
 [features]
 default = []
