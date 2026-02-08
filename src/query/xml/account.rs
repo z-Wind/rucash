@@ -1,6 +1,7 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use roxmltree::Node;
+use tracing::instrument;
 
 use super::XMLQuery;
 use crate::error::Error;
@@ -154,63 +155,100 @@ impl AccountT for Account {
 impl AccountQ for XMLQuery {
     type A = Account;
 
+    #[instrument(skip(self))]
     async fn all(&self) -> Result<Vec<Self::A>, Error> {
-        let map = self.account_map()?;
+        tracing::debug!("fetching all accounts from xml");
+        let map = self
+            .account_map()
+            .inspect_err(|e| tracing::error!("failed to get account map: {e}"))?;
 
-        Ok(map.values().map(|x| (**x).clone()).collect())
+        let result: Vec<_> = map.values().map(|x| (**x).clone()).collect();
+        tracing::info!(count = result.len(), "accounts fetched from xml");
+        Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        let map = self.account_map()?;
+        tracing::debug!("fetching account by guid from xml");
+        let map = self
+            .account_map()
+            .inspect_err(|e| tracing::error!("failed to get account map: {e}"))?;
 
-        Ok(map.get(guid).into_iter().map(|x| (**x).clone()).collect())
+        let result: Vec<_> = map.get(guid).into_iter().map(|x| (**x).clone()).collect();
+        tracing::debug!(count = result.len(), "accounts found by guid");
+        Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        let map = self.commodity_accounts_map()?;
+        tracing::debug!("fetching accounts by commodity_guid from xml");
+        let map = self
+            .commodity_accounts_map()
+            .inspect_err(|e| tracing::error!("failed to get commodity accounts map: {e}"))?;
 
-        Ok(map
+        let result: Vec<_> = map
             .get(guid)
             .map(|v| v.iter().map(|x| (**x).clone()).collect())
-            .unwrap_or_default())
+            .unwrap_or_default();
+        tracing::debug!(count = result.len(), "accounts found by commodity_guid");
+        Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        let map = self.same_parent_accounts_map()?;
+        tracing::debug!("fetching accounts by parent_guid from xml");
+        let map = self
+            .same_parent_accounts_map()
+            .inspect_err(|e| tracing::error!("failed to get parent accounts map: {e}"))?;
 
-        Ok(map
+        let result: Vec<_> = map
             .get(guid)
             .map(|v| v.iter().map(|x| (**x).clone()).collect())
-            .unwrap_or_default())
+            .unwrap_or_default();
+        tracing::debug!(count = result.len(), "accounts found by parent_guid");
+        Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn name(&self, name: &str) -> Result<Vec<Self::A>, Error> {
-        let map = self.name_accounts_map()?;
+        tracing::debug!("fetching accounts by name from xml");
+        let map = self
+            .name_accounts_map()
+            .inspect_err(|e| tracing::error!("failed to get name accounts map: {e}"))?;
 
-        Ok(map
+        let result: Vec<_> = map
             .get(name)
             .map(|v| v.iter().map(|x| (**x).clone()).collect())
-            .unwrap_or_default())
+            .unwrap_or_default();
+        tracing::debug!(count = result.len(), "accounts found by name");
+        Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::A>, Error> {
-        let map = self.account_map()?;
+        tracing::debug!("searching accounts with name pattern from xml");
+        let map = self
+            .account_map()
+            .inspect_err(|e| tracing::error!("failed to get account map: {e}"))?;
 
-        Ok(map
+        let result: Vec<_> = map
             .values()
             .filter(|x| x.name.to_lowercase().contains(&name.to_lowercase()))
             .map(|x| (**x).clone())
-            .collect())
+            .collect();
+        tracing::debug!(count = result.len(), "accounts found matching name pattern");
+        Ok(result)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use pretty_assertions::assert_eq;
     use roxmltree::Document;
+    use test_log::test;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     static Q: OnceCell<XMLQuery> = OnceCell::const_new();
     async fn setup() -> &'static XMLQuery {
@@ -220,7 +258,7 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             XMLQuery::new(path).unwrap()
         })
         .await
@@ -303,7 +341,7 @@ mod tests {
         assert_eq!(account.placeholder, true);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_account() {
         let query = setup().await;
         let result = query
@@ -325,14 +363,14 @@ mod tests {
         assert_eq!(result.placeholder(), true);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_all() {
         let query = setup().await;
         let result = query.all().await.unwrap();
         assert_eq!(result.len(), 20);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_guid() {
         let query = setup().await;
         let result = query
@@ -343,14 +381,14 @@ mod tests {
         assert_eq!(result[0].name, "Asset");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_commodity_guid() {
         let query = setup().await;
         let result = query.commodity_guid("EUR").await.unwrap();
         assert_eq!(result.len(), 14);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_parent_guid() {
         let query = setup().await;
         let result = query
@@ -360,14 +398,14 @@ mod tests {
         assert_eq!(result.len(), 3);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_name() {
         let query = setup().await;
         let result = query.name("Asset").await.unwrap();
         assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_contains_name_ignore_case() {
         let query = setup().await;
         let result = query.contains_name_ignore_case("AS").await.unwrap();

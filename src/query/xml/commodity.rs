@@ -1,6 +1,7 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use roxmltree::Node;
+use tracing::instrument;
 
 use super::XMLQuery;
 use crate::error::Error;
@@ -121,20 +122,32 @@ impl CommodityT for Commodity {
 impl CommodityQ for XMLQuery {
     type C = Commodity;
 
+    #[instrument(skip(self))]
     async fn all(&self) -> Result<Vec<Self::C>, Error> {
-        let map = self.commodity_map()?;
+        tracing::debug!("fetching all commodities from xml");
+        let map = self
+            .commodity_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map.values().map(|x| (**x).clone()).collect())
     }
 
+    #[instrument(skip(self))]
     async fn guid(&self, guid: &str) -> Result<Vec<Self::C>, Error> {
-        let map = self.commodity_map()?;
+        tracing::debug!("fetching commodities by guid from xml");
+        let map = self
+            .commodity_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map.get(guid).map(|x| (**x).clone()).into_iter().collect())
     }
 
+    #[instrument(skip(self))]
     async fn namespace(&self, namespace: &str) -> Result<Vec<Self::C>, Error> {
-        let map = self.namespace_commodities_map()?;
+        tracing::debug!("fetching commodities by namespace from xml");
+        let map = self
+            .namespace_commodities_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map
             .get(namespace)
@@ -145,11 +158,12 @@ impl CommodityQ for XMLQuery {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use pretty_assertions::assert_eq;
     use roxmltree::Document;
+    use test_log::test;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     static Q: OnceCell<XMLQuery> = OnceCell::const_new();
     async fn setup() -> &'static XMLQuery {
@@ -159,7 +173,7 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             XMLQuery::new(path).unwrap()
         })
         .await
@@ -227,7 +241,7 @@ mod tests {
         assert_eq!(commodity.quote_tz, None);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_commodity() {
         let query = setup().await;
         let result = query.guid("EUR").await.unwrap();
@@ -244,21 +258,21 @@ mod tests {
         assert_eq!(result.quote_tz(), "");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_all() {
         let query = setup().await;
         let result = query.all().await.unwrap();
         assert_eq!(result.len(), 6);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_guid() {
         let query = setup().await;
         let result = query.guid("EUR").await.unwrap();
         assert_eq!(result[0].guid, "EUR");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_namespace() {
         let query = setup().await;
         let result = query.namespace("CURRENCY").await.unwrap();

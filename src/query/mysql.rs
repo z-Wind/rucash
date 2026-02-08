@@ -4,6 +4,8 @@ pub(crate) mod price;
 pub(crate) mod split;
 pub(crate) mod transaction;
 
+use tracing::instrument;
+
 use super::Query;
 use crate::error::Error;
 
@@ -36,12 +38,16 @@ impl MySQLQuery {
     /// ```text
     /// mysql://root:password@localhost/db
     /// ```
+    #[instrument]
     pub async fn new(uri: &str) -> Result<Self, Error> {
+        tracing::debug!("connecting to mysql database");
         let pool = sqlx::mysql::MySqlPoolOptions::new()
             .max_connections(MAX_CONNECTIONS)
             .connect(uri)
-            .await?;
+            .await
+            .inspect_err(|e| tracing::error!("failed to connect to mysql: {e}"))?;
 
+        tracing::info!("mysql connection pool established");
         Ok(Self { pool })
     }
 }
@@ -50,13 +56,15 @@ impl Query for MySQLQuery {}
 
 #[cfg(test)]
 mod tests {
+    use test_log::test;
+
     use super::*;
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_new() {
         let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
 
-        println!("work_dir: {:?}", std::env::current_dir());
+        tracing::info!("work_dir: {:?}", std::env::current_dir());
         MySQLQuery::new(&format!("{uri}?mode=ro")).await.unwrap();
     }
 }

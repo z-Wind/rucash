@@ -6,8 +6,10 @@ mod sqlite;
 mod xml;
 
 mod consistency {
-    use super::*;
     use pretty_assertions::assert_eq;
+    use test_log::test;
+
+    use super::*;
 
     async fn setup_sqlite() -> Book<SQLiteQuery> {
         let query = SQLiteQuery::new(&sqlite::uri()).unwrap();
@@ -36,13 +38,13 @@ mod consistency {
         matching == a.len() && matching == b.len()
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn accounts_consistency() {
         fn cmp<QA: rucash::Query, QB: rucash::Query>(
             a: &rucash::model::Account<QA>,
             b: &rucash::model::Account<QB>,
         ) -> bool {
-            // println!("a:{}\nb:{}\n\n", a.guid, b.guid);
+            tracing::debug!("a:{}\nb:{}\n\n", a.guid, b.guid);
             assert_eq!(a.guid, b.guid);
             assert_eq!(a.name, b.name);
             assert_eq!(a.r#type, b.r#type);
@@ -70,11 +72,11 @@ mod consistency {
         let mut v_xml = setup_xml().await.accounts().await.unwrap();
         v_xml.sort_by_key(|x| x.guid.clone());
 
-        println!("vec_match(&v_sqlite, &v_postgresql)");
+        tracing::info!("vec_match(&v_sqlite, &v_postgresql)");
         assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
-        println!("vec_match(&v_sqlite, &v_mysql)");
+        tracing::info!("vec_match(&v_sqlite, &v_mysql)");
         assert!(vec_match(&v_sqlite, &v_mysql, cmp));
-        println!("vec_match(&v_sqlite, &v_xml)");
+        tracing::info!("vec_match(&v_sqlite, &v_xml)");
         assert!(vec_match(
             &v_sqlite
                 .into_iter()
@@ -85,7 +87,7 @@ mod consistency {
         ));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn splits_consistency() {
         fn cmp<QA: rucash::Query, QB: rucash::Query>(
             a: &rucash::model::Split<QA>,
@@ -117,15 +119,15 @@ mod consistency {
         let mut v_xml = setup_xml().await.splits().await.unwrap();
         v_xml.sort_by_key(|x| x.guid.clone());
 
-        println!("vec_match(&v_sqlite, &v_postgresql)");
+        tracing::info!("vec_match(&v_sqlite, &v_postgresql)");
         assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
-        println!("vec_match(&v_sqlite, &v_mysql)");
+        tracing::info!("vec_match(&v_sqlite, &v_mysql)");
         assert!(vec_match(&v_sqlite, &v_mysql, cmp));
-        println!("vec_match(&v_sqlite, &v_xml)");
+        tracing::info!("vec_match(&v_sqlite, &v_xml)");
         assert!(vec_match(&v_sqlite, &v_xml, cmp));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn transactions_consistency() {
         fn cmp<QA: rucash::Query, QB: rucash::Query>(
             a: &rucash::model::Transaction<QA>,
@@ -154,15 +156,15 @@ mod consistency {
         let mut v_xml = setup_xml().await.transactions().await.unwrap();
         v_xml.sort_by_key(|x| x.guid.clone());
 
-        println!("vec_match(&v_sqlite, &v_postgresql)");
+        tracing::info!("vec_match(&v_sqlite, &v_postgresql)");
         assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
-        println!("vec_match(&v_sqlite, &v_mysql)");
+        tracing::info!("vec_match(&v_sqlite, &v_mysql)");
         assert!(vec_match(&v_sqlite, &v_mysql, cmp));
-        println!("vec_match(&v_sqlite, &v_xml)");
+        tracing::info!("vec_match(&v_sqlite, &v_xml)");
         assert!(vec_match(&v_sqlite, &v_xml, cmp));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn prices_consistency() {
         fn cmp<QA: rucash::Query, QB: rucash::Query>(
             a: &rucash::model::Price<QA>,
@@ -193,21 +195,21 @@ mod consistency {
         let mut v_xml = setup_xml().await.prices().await.unwrap();
         v_xml.sort_by_key(|x| x.guid.clone());
 
-        println!("vec_match(&v_sqlite, &v_postgresql)");
+        tracing::info!("vec_match(&v_sqlite, &v_postgresql)");
         assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
-        println!("vec_match(&v_sqlite, &v_mysql)");
+        tracing::info!("vec_match(&v_sqlite, &v_mysql)");
         assert!(vec_match(&v_sqlite, &v_mysql, cmp));
-        println!("vec_match(&v_sqlite, &v_xml)");
+        tracing::info!("vec_match(&v_sqlite, &v_xml)");
         assert!(vec_match(&v_sqlite, &v_xml, cmp));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn commodities_consistency() {
         fn cmp<QA: rucash::Query, QB: rucash::Query>(
             a: &rucash::model::Commodity<QA>,
             b: &rucash::model::Commodity<QB>,
         ) -> bool {
-            println!("a:{}\nb:{}\n\n", a.guid, b.guid);
+            tracing::info!("a:{}\nb:{}\n\n", a.guid, b.guid);
             // xml guid 會是 USD 之類的
             // assert_eq!(a.guid, b.guid);
             assert_eq!(a.namespace, b.namespace);
@@ -237,11 +239,11 @@ mod consistency {
         let mut v_xml = setup_xml().await.commodities().await.unwrap();
         v_xml.sort_by_key(|x| x.mnemonic.clone());
 
-        println!("vec_match(&v_sqlite, &v_postgresql)");
+        tracing::info!("vec_match(&v_sqlite, &v_postgresql)");
         assert!(vec_match(&v_sqlite, &v_postgresql, cmp));
-        println!("vec_match(&v_sqlite, &v_mysql)");
+        tracing::info!("vec_match(&v_sqlite, &v_mysql)");
         assert!(vec_match(&v_sqlite, &v_mysql, cmp));
-        println!("vec_match(&v_sqlite, &v_xml)");
+        tracing::info!("vec_match(&v_sqlite, &v_xml)");
         assert!(vec_match(
             &v_sqlite,
             &v_xml

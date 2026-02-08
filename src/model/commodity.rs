@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use tracing::instrument;
+
 use crate::book::Book;
 use crate::error::Error;
 use crate::model::{Account, Price, Transaction};
@@ -43,73 +45,125 @@ where
         }
     }
 
+    #[instrument(skip(self), fields(commodity_guid = %self.guid, commodity_mnemonic = %self.mnemonic))]
     pub async fn accounts(&self) -> Result<Vec<Account<Q>>, Error> {
-        let accounts = AccountQ::commodity_guid(&*self.query, &self.guid).await?;
-        Ok(accounts
+        tracing::debug!("fetching accounts for commodity");
+        let accounts = AccountQ::commodity_guid(&*self.query, &self.guid)
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch accounts: {e}"))?;
+        let result: Vec<_> = accounts
             .into_iter()
             .map(|x| Account::from_with_query(&x, self.query.clone()))
-            .collect())
+            .collect();
+        tracing::info!(count = result.len(), "accounts fetched for commodity");
+        Ok(result)
     }
 
+    #[instrument(skip(self), fields(commodity_guid = %self.guid, commodity_mnemonic = %self.mnemonic))]
     pub async fn transactions(&self) -> Result<Vec<Transaction<Q>>, Error> {
-        let transactions = TransactionQ::currency_guid(&*self.query, &self.guid).await?;
-        Ok(transactions
+        tracing::debug!("fetching transactions for commodity");
+        let transactions = TransactionQ::currency_guid(&*self.query, &self.guid)
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch transactions: {e}"))?;
+        let result: Vec<_> = transactions
             .into_iter()
             .map(|x| Transaction::from_with_query(&x, self.query.clone()))
-            .collect())
+            .collect();
+        tracing::info!(count = result.len(), "transactions fetched for commodity");
+        Ok(result)
     }
 
+    #[instrument(skip(self), fields(commodity_guid = %self.guid))]
     pub async fn as_commodity_prices(&self) -> Result<Vec<Price<Q>>, Error> {
-        let prices = PriceQ::commodity_guid(&*self.query, &self.guid).await?;
-        Ok(prices
+        tracing::debug!("fetching prices where this is the commodity");
+        let prices = PriceQ::commodity_guid(&*self.query, &self.guid)
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch prices: {e}"))?;
+        let result: Vec<_> = prices
             .into_iter()
             .map(|x| Price::from_with_query(&x, self.query.clone()))
-            .collect())
+            .collect();
+        tracing::info!(count = result.len(), "commodity prices fetched");
+        Ok(result)
     }
 
+    #[instrument(skip(self), fields(commodity_guid = %self.guid))]
     pub async fn as_currency_prices(&self) -> Result<Vec<Price<Q>>, Error> {
-        let prices = PriceQ::currency_guid(&*self.query, &self.guid).await?;
-        Ok(prices
+        tracing::debug!("fetching prices where this is the currency");
+        let prices = PriceQ::currency_guid(&*self.query, &self.guid)
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch prices: {e}"))?;
+        let result: Vec<_> = prices
             .into_iter()
             .map(|x| Price::from_with_query(&x, self.query.clone()))
-            .collect())
+            .collect();
+        tracing::info!(count = result.len(), "currency prices fetched");
+        Ok(result)
     }
 
+    #[instrument(skip(self), fields(commodity_guid = %self.guid))]
     pub async fn as_commodity_or_currency_prices(&self) -> Result<Vec<Price<Q>>, Error> {
-        let prices = PriceQ::commodity_or_currency_guid(&*self.query, &self.guid).await?;
-        Ok(prices
+        tracing::debug!("fetching prices where this is commodity or currency");
+        let prices = PriceQ::commodity_or_currency_guid(&*self.query, &self.guid)
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch prices: {e}"))?;
+        let result: Vec<_> = prices
             .into_iter()
             .map(|x| Price::from_with_query(&x, self.query.clone()))
-            .collect())
+            .collect();
+        tracing::info!(count = result.len(), "all related prices fetched");
+        Ok(result)
     }
 
+    #[instrument(skip(self, currency, book), fields(
+        from_mnemonic = %self.mnemonic,
+        to_mnemonic = %currency.mnemonic
+    ))]
     pub async fn sell(&self, currency: &Self, book: &Book<Q>) -> Option<crate::Num> {
-        // println!("{} to {}", self.mnemonic, currency.mnemonic);
-        book.exchange(self, currency).await
+        tracing::debug!("selling commodity to currency");
+        let result = book.exchange(self, currency).await;
+        if result.is_some() {
+            tracing::info!(?result, "sell exchange rate found");
+        } else {
+            tracing::warn!("no sell exchange rate available");
+        }
+        result
     }
 
+    #[instrument(skip(self, commodity, book), fields(
+        buying_mnemonic = %commodity.mnemonic,
+        with_mnemonic = %self.mnemonic
+    ))]
     pub async fn buy(&self, commodity: &Self, book: &Book<Q>) -> Option<crate::Num> {
-        commodity.sell(self, book).await
+        tracing::debug!("buying commodity with currency");
+        let result = commodity.sell(self, book).await;
+        if result.is_some() {
+            tracing::info!(?result, "buy exchange rate found");
+        } else {
+            tracing::warn!("no buy exchange rate available");
+        }
+        result
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
     #[cfg(feature = "decimal")]
     use rust_decimal::Decimal;
 
+    use super::*;
+
     #[cfg(feature = "sqlite")]
     mod sqlite {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::SQLiteQuery;
         use crate::query::sqlite::commodity::Commodity as CommodityBase;
+
+        use super::*;
 
         #[allow(clippy::unused_async)]
         async fn setup() -> SQLiteQuery {
@@ -118,11 +172,11 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             SQLiteQuery::new(uri).unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup().await);
             let item = CommodityBase {
@@ -150,7 +204,7 @@ mod tests {
             assert_eq!(result.quote_tz, "quote_tz");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_accounts() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -165,7 +219,7 @@ mod tests {
             assert_eq!(accounts.len(), 14);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_transactions() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -180,7 +234,7 @@ mod tests {
             assert_eq!(transactions.len(), 11);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_commodity_prices() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -195,7 +249,7 @@ mod tests {
             assert_eq!(prices.len(), 1);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_currency_prices() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -210,7 +264,7 @@ mod tests {
             assert_eq!(prices.len(), 2);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_commodity_or_currency_prices() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -225,7 +279,7 @@ mod tests {
             assert_eq!(prices.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_rate_direct() {
             // ADF => AED
             let query = setup().await;
@@ -288,7 +342,7 @@ mod tests {
             assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_rate_indirect() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -322,19 +376,20 @@ mod tests {
 
     #[cfg(feature = "mysql")]
     mod mysql {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::MySQLQuery;
         use crate::query::mysql::commodity::Commodity as CommodityBase;
+
+        use super::*;
 
         async fn setup() -> MySQLQuery {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
             MySQLQuery::new(uri).await.unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup().await);
             let item = CommodityBase {
@@ -362,7 +417,7 @@ mod tests {
             assert_eq!(result.quote_tz, "quote_tz");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_accounts() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -377,7 +432,7 @@ mod tests {
             assert_eq!(accounts.len(), 14);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_transactions() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -392,7 +447,7 @@ mod tests {
             assert_eq!(transactions.len(), 11);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_commodity_prices() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -407,7 +462,7 @@ mod tests {
             assert_eq!(prices.len(), 1);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_currency_prices() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -422,7 +477,7 @@ mod tests {
             assert_eq!(prices.len(), 2);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_commodity_or_currency_prices() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -437,7 +492,7 @@ mod tests {
             assert_eq!(prices.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_rate_direct() {
             // ADF => AED
             let query = setup().await;
@@ -500,7 +555,7 @@ mod tests {
             assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_rate_indirect() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -534,19 +589,20 @@ mod tests {
 
     #[cfg(feature = "postgresql")]
     mod postgresql {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::PostgreSQLQuery;
         use crate::query::postgresql::commodity::Commodity as CommodityBase;
+
+        use super::*;
 
         async fn setup() -> PostgreSQLQuery {
             let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
             PostgreSQLQuery::new(uri).await.unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup().await);
             let item = CommodityBase {
@@ -574,7 +630,7 @@ mod tests {
             assert_eq!(result.quote_tz, "quote_tz");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_accounts() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -589,7 +645,7 @@ mod tests {
             assert_eq!(accounts.len(), 14);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_transactions() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -604,7 +660,7 @@ mod tests {
             assert_eq!(transactions.len(), 11);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_commodity_prices() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -619,7 +675,7 @@ mod tests {
             assert_eq!(prices.len(), 1);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_currency_prices() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -634,7 +690,7 @@ mod tests {
             assert_eq!(prices.len(), 2);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_commodity_or_currency_prices() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -649,7 +705,7 @@ mod tests {
             assert_eq!(prices.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_rate_direct() {
             // ADF => AED
             let query = setup().await;
@@ -712,7 +768,7 @@ mod tests {
             assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_rate_indirect() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -746,12 +802,13 @@ mod tests {
 
     #[cfg(feature = "xml")]
     mod xml {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::XMLQuery;
         use crate::query::xml::commodity::Commodity as CommodityBase;
+
+        use super::*;
 
         fn setup() -> XMLQuery {
             let path: &str = &format!(
@@ -759,11 +816,11 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             XMLQuery::new(path).unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup());
             let item = CommodityBase {
@@ -791,7 +848,7 @@ mod tests {
             assert_eq!(result.quote_tz, "quote_tz");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_accounts() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -806,7 +863,7 @@ mod tests {
             assert_eq!(accounts.len(), 14);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_transactions() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -821,7 +878,7 @@ mod tests {
             assert_eq!(transactions.len(), 11);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_commodity_prices() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -836,7 +893,7 @@ mod tests {
             assert_eq!(prices.len(), 1);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_currency_prices() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -851,7 +908,7 @@ mod tests {
             assert_eq!(prices.len(), 2);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_as_commodity_or_currency_prices() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -866,7 +923,7 @@ mod tests {
             assert_eq!(prices.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_rate_direct() {
             // ADF => AED
             let query = setup();
@@ -929,7 +986,7 @@ mod tests {
             assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_rate_indirect() {
             let query = setup();
             let book = Book::new(query).await.unwrap();

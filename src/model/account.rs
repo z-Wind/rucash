@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use tracing::instrument;
+
 use crate::Book;
 use crate::error::Error;
 use crate::model::{Commodity, Split};
@@ -47,56 +49,89 @@ where
         }
     }
 
+    #[instrument(skip(self), fields(account_guid = %self.guid, account_name = %self.name))]
     pub async fn splits(&self) -> Result<Vec<Split<Q>>, Error> {
-        let splits = SplitQ::account_guid(&*self.query, &self.guid).await?;
-        Ok(splits
+        tracing::debug!("fetching splits for account");
+        let splits = SplitQ::account_guid(&*self.query, &self.guid)
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch splits: {e}"))?;
+        let result: Vec<_> = splits
             .into_iter()
             .map(|x| Split::from_with_query(&x, self.query.clone()))
-            .collect())
+            .collect();
+        tracing::info!(count = result.len(), "splits fetched for account");
+        Ok(result)
     }
 
+    #[instrument(skip(self), fields(account_guid = %self.guid, parent_guid = %self.parent_guid))]
     pub async fn parent(&self) -> Result<Option<Account<Q>>, Error> {
         if self.parent_guid.is_empty() {
+            tracing::debug!("no parent guid, returning None");
             return Ok(None);
         }
 
-        let mut accounts = AccountQ::guid(&*self.query, &self.parent_guid).await?;
+        tracing::debug!("fetching parent account");
+        let mut accounts = AccountQ::guid(&*self.query, &self.parent_guid)
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch parent account: {e}"))?;
 
         match accounts.pop() {
-            None => Ok(None),
+            None => {
+                tracing::warn!("parent account not found");
+                Ok(None)
+            }
             Some(x) if accounts.is_empty() => {
+                tracing::info!("parent account found");
                 Ok(Some(Account::from_with_query(&x, self.query.clone())))
             }
-            _ => Err(Error::GuidMultipleFound {
-                model: "Account".to_string(),
-                guid: self.parent_guid.clone(),
-            }),
+            _ => {
+                tracing::error!("multiple parent accounts found for guid");
+                Err(Error::GuidMultipleFound {
+                    model: "Account".to_string(),
+                    guid: self.parent_guid.clone(),
+                })
+            }
         }
     }
 
+    #[instrument(skip(self), fields(account_guid = %self.guid))]
     pub async fn children(&self) -> Result<Vec<Account<Q>>, Error> {
-        let accounts = AccountQ::parent_guid(&*self.query, &self.guid).await?;
-        Ok(accounts
+        tracing::debug!("fetching children accounts");
+        let accounts = AccountQ::parent_guid(&*self.query, &self.guid)
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch children accounts: {e}"))?;
+        let result: Vec<_> = accounts
             .into_iter()
             .map(|x| Account::from_with_query(&x, self.query.clone()))
-            .collect())
+            .collect();
+        tracing::info!(count = result.len(), "children accounts fetched");
+        Ok(result)
     }
 
+    #[instrument(skip(self), fields(commodity_guid = %self.commodity_guid))]
     pub async fn commodity(&self) -> Result<Commodity<Q>, Error> {
         if self.commodity_guid.is_empty() {
+            tracing::error!("commodity guid is empty");
             return Err(Error::GuidNotFound {
                 model: "Commodity".to_string(),
                 guid: self.commodity_guid.clone(),
             });
         }
 
-        let mut commodities = CommodityQ::guid(&*self.query, &self.commodity_guid).await?;
+        tracing::debug!("fetching commodity for account");
+        let mut commodities = CommodityQ::guid(&*self.query, &self.commodity_guid)
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch commodity: {e}"))?;
         match commodities.pop() {
-            None => Err(Error::GuidNotFound {
-                model: "Commodity".to_string(),
-                guid: self.commodity_guid.clone(),
-            }),
+            None => {
+                tracing::error!("commodity not found");
+                Err(Error::GuidNotFound {
+                    model: "Commodity".to_string(),
+                    guid: self.commodity_guid.clone(),
+                })
+            }
             Some(x) if commodities.is_empty() => {
+                tracing::info!("commodity found for account");
                 Ok(Commodity::from_with_query(&x, self.query.clone()))
             }
             _ => Err(Error::GuidMultipleFound {
@@ -106,68 +141,124 @@ where
         }
     }
 
+    #[instrument(skip(self, currency, book), fields(
+        account_guid = %self.guid,
+        account_name = %self.name,
+        currency_mnemonic = %currency.mnemonic
+    ))]
     async fn balance_into_currency<'a>(
         &'a self,
         currency: &'a Commodity<Q>,
         book: &'a Book<Q>,
     ) -> Result<crate::Num, Error> {
-        let mut net: crate::Num = self.splits().await?.iter().map(|s| s.quantity).sum();
-        let commodity = self.commodity().await?;
+        tracing::debug!("calculating balance into currency");
+        let splits = self
+            .splits()
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch splits: {e}"))?;
+        let mut net: crate::Num = splits.iter().map(|s| s.quantity).sum();
+        tracing::debug!(
+            ?net,
+            split_count = splits.len(),
+            "calculated net from splits"
+        );
 
-        for child in self.children().await? {
-            let child_net = Box::pin(child.balance_into_currency(&commodity, book)).await?;
+        let commodity = self
+            .commodity()
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch commodity: {e}"))?;
+
+        let children = self
+            .children()
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch children: {e}"))?;
+        tracing::debug!(
+            children_count = children.len(),
+            "processing children balances"
+        );
+
+        for child in children {
+            let child_net = Box::pin(child.balance_into_currency(&commodity, book))
+                .await
+                .inspect_err(|e| tracing::error!(child_account = %child.name, "failed to calculate child balance: {e}"))?;
             net += child_net;
         }
 
         let rate = commodity.sell(currency, book).await.unwrap_or_else(|| {
+            tracing::error!(
+                commodity = %commodity.mnemonic,
+                currency = %currency.mnemonic,
+                "no exchange rate available"
+            );
             panic!(
                 "must have rate {} to {}",
                 commodity.mnemonic, currency.mnemonic
             )
         });
-        // dbg!((
-        //     &commodity.mnemonic,
-        //     &currency.mnemonic,
-        //     rate,
-        //     &self.name,
-        //     net
-        // ));
 
-        Ok(net * rate)
+        let result = net * rate;
+        tracing::info!(?result, ?rate, "balance calculated in currency");
+        Ok(result)
     }
 
+    #[instrument(skip(self, book), fields(account_guid = %self.guid, account_name = %self.name))]
     pub async fn balance(&self, book: &Book<Q>) -> Result<crate::Num, Error> {
-        let mut net: crate::Num = self.splits().await?.iter().map(|s| s.quantity).sum();
+        tracing::debug!("calculating account balance");
+        let splits = self
+            .splits()
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch splits: {e}"))?;
+        let mut net: crate::Num = splits.iter().map(|s| s.quantity).sum();
+        tracing::debug!(
+            ?net,
+            split_count = splits.len(),
+            "calculated net from splits"
+        );
 
-        let commodity = self.commodity().await?;
+        let commodity = self
+            .commodity()
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch commodity: {e}"))?;
 
-        for child in self.children().await? {
-            let child_net = child.balance_into_currency(&commodity, book).await?;
+        let children = self
+            .children()
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch children: {e}"))?;
+        tracing::debug!(
+            children_count = children.len(),
+            "processing children balances"
+        );
+
+        for child in children {
+            let child_net = child.balance_into_currency(&commodity, book)
+                .await
+                .inspect_err(|e| tracing::error!(child_account = %child.name, "failed to calculate child balance: {e}"))?;
             net += child_net;
         }
-        // dbg!((&self.name, net));
 
+        tracing::info!(?net, "account balance calculated");
         Ok(net)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
     #[cfg(feature = "decimal")]
     use rust_decimal::Decimal;
 
+    use super::*;
+
     #[cfg(feature = "sqlite")]
     mod sqlite {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::SQLiteQuery;
         use crate::query::sqlite::account::Account as AccountBase;
+
+        use super::*;
 
         #[allow(clippy::unused_async)]
         async fn setup() -> SQLiteQuery {
@@ -176,11 +267,11 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             SQLiteQuery::new(uri).unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup().await);
             let item = AccountBase {
@@ -212,7 +303,7 @@ mod tests {
             assert_eq!(result.placeholder, true);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_splits() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -225,7 +316,7 @@ mod tests {
             assert_eq!(splits.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_parent() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -238,7 +329,7 @@ mod tests {
             assert_eq!(parent.name, "Current");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_no_parent() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -248,11 +339,11 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let parent = account.parent().await.unwrap();
-            dbg!(&parent);
+            tracing::debug!(?parent);
             assert!(parent.is_none());
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_children() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -265,7 +356,7 @@ mod tests {
             assert_eq!(children.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_children2() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -297,7 +388,7 @@ mod tests {
             );
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_commodity() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -310,7 +401,7 @@ mod tests {
             assert_eq!(commodity.mnemonic, "EUR");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_balance_into_currency() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -340,7 +431,7 @@ mod tests {
             );
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_balance() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -359,19 +450,20 @@ mod tests {
 
     #[cfg(feature = "mysql")]
     mod mysql {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::MySQLQuery;
         use crate::query::mysql::account::Account as AccountBase;
+
+        use super::*;
 
         async fn setup() -> MySQLQuery {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
             MySQLQuery::new(uri).await.unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup().await);
             let item = AccountBase {
@@ -403,7 +495,7 @@ mod tests {
             assert_eq!(result.placeholder, true);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_splits() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -416,7 +508,7 @@ mod tests {
             assert_eq!(splits.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_parent() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -429,7 +521,7 @@ mod tests {
             assert_eq!(parent.name, "Current");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_no_parent() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -439,11 +531,11 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let parent = account.parent().await.unwrap();
-            dbg!(&parent);
+            tracing::debug!(?parent);
             assert!(parent.is_none());
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_children() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -456,7 +548,7 @@ mod tests {
             assert_eq!(children.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_children2() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -488,7 +580,7 @@ mod tests {
             );
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_commodity() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -501,7 +593,7 @@ mod tests {
             assert_eq!(commodity.mnemonic, "EUR");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_balance_into_currency() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -531,7 +623,7 @@ mod tests {
             );
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_balance() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -550,19 +642,20 @@ mod tests {
 
     #[cfg(feature = "postgresql")]
     mod postgresql {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::PostgreSQLQuery;
         use crate::query::postgresql::account::Account as AccountBase;
+
+        use super::*;
 
         async fn setup() -> PostgreSQLQuery {
             let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
             PostgreSQLQuery::new(uri).await.unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup().await);
             let item = AccountBase {
@@ -594,7 +687,7 @@ mod tests {
             assert_eq!(result.placeholder, true);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_splits() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -607,7 +700,7 @@ mod tests {
             assert_eq!(splits.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_parent() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -620,7 +713,7 @@ mod tests {
             assert_eq!(parent.name, "Current");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_no_parent() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -630,11 +723,11 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let parent = account.parent().await.unwrap();
-            dbg!(&parent);
+            tracing::debug!(?parent);
             assert!(parent.is_none());
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_children() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -647,7 +740,7 @@ mod tests {
             assert_eq!(children.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_children2() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -679,7 +772,7 @@ mod tests {
             );
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_commodity() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -692,7 +785,7 @@ mod tests {
             assert_eq!(commodity.mnemonic, "EUR");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_balance_into_currency() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -722,7 +815,7 @@ mod tests {
             );
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_balance() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -741,12 +834,13 @@ mod tests {
 
     #[cfg(feature = "xml")]
     mod xml {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::XMLQuery;
         use crate::query::xml::account::Account as AccountBase;
+
+        use super::*;
 
         fn setup() -> XMLQuery {
             let path: &str = &format!(
@@ -754,11 +848,11 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             XMLQuery::new(path).unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup());
             let item = AccountBase {
@@ -790,7 +884,7 @@ mod tests {
             assert_eq!(result.placeholder, true);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_splits() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -803,7 +897,7 @@ mod tests {
             assert_eq!(splits.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_parent() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -816,7 +910,7 @@ mod tests {
             assert_eq!(parent.name, "Current");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_no_parent() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -826,11 +920,11 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let parent = account.parent().await.unwrap();
-            dbg!(&parent);
+            tracing::debug!(?parent);
             assert!(parent.is_none());
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_children() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -843,7 +937,7 @@ mod tests {
             assert_eq!(children.len(), 3);
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_children2() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -875,7 +969,7 @@ mod tests {
             );
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_commodity() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -888,7 +982,7 @@ mod tests {
             assert_eq!(commodity.mnemonic, "EUR");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_balance_into_currency() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -918,7 +1012,7 @@ mod tests {
             );
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_balance() {
             let query = setup();
             let book = Book::new(query).await.unwrap();

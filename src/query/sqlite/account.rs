@@ -2,6 +2,7 @@
 // ref: https://wiki.gnucash.org/wiki/SQL
 
 use rusqlite::Row;
+use tracing::instrument;
 
 use super::SQLiteQuery;
 use crate::error::Error;
@@ -98,75 +99,118 @@ FROM accounts
 impl AccountQ for SQLiteQuery {
     type A = Account;
 
+    #[instrument(skip(self))]
     async fn all(&self) -> Result<Vec<Self::A>, Error> {
+        tracing::debug!("fetching all accounts from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(SEL)?;
+        let mut stmt = conn
+            .prepare(SEL)
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([])?
+            .query([])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::info!(count = result.len(), "accounts fetched from sqlite");
         Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+        tracing::debug!("fetching account by guid from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE guid = ?"))?;
+        let mut stmt = conn
+            .prepare(&format!("{SEL}\nWHERE guid = ?"))
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([guid])?
+            .query([guid])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::debug!(count = result.len(), "accounts found by guid");
         Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+        tracing::debug!("fetching accounts by commodity_guid from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE commodity_guid = ?"))?;
+        let mut stmt = conn
+            .prepare(&format!("{SEL}\nWHERE commodity_guid = ?"))
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([guid])?
+            .query([guid])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::debug!(count = result.len(), "accounts found by commodity_guid");
         Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+        tracing::debug!("fetching accounts by parent_guid from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE parent_guid = ?"))?;
+        let mut stmt = conn
+            .prepare(&format!("{SEL}\nWHERE parent_guid = ?"))
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([guid])?
+            .query([guid])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::debug!(count = result.len(), "accounts found by parent_guid");
         Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn name(&self, name: &str) -> Result<Vec<Self::A>, Error> {
+        tracing::debug!("fetching accounts by name from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE name = ?"))?;
+        let mut stmt = conn
+            .prepare(&format!("{SEL}\nWHERE name = ?"))
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([name])?
+            .query([name])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::debug!(count = result.len(), "accounts found by name");
         Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::A>, Error> {
+        tracing::debug!("searching accounts with name pattern from sqlite");
         let name = format!("%{name}%");
 
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE name LIKE ?"))?;
+        let mut stmt = conn
+            .prepare(&format!("{SEL}\nWHERE name LIKE ?"))
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([name])?
+            .query([name])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::debug!(count = result.len(), "accounts found matching name pattern");
         Ok(result)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use pretty_assertions::assert_eq;
+    use test_log::test;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     #[cfg(feature = "schema")]
     // test schemas on compile time
@@ -200,13 +244,13 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             SQLiteQuery::new(uri).unwrap()
         })
         .await
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_account() {
         let query = setup().await;
         let result = query
@@ -228,14 +272,14 @@ mod tests {
         assert_eq!(result.placeholder(), true);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_all() {
         let query = setup().await;
         let result = query.all().await.unwrap();
         assert_eq!(result.len(), 21);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_guid() {
         let query = setup().await;
         let result = query
@@ -246,7 +290,7 @@ mod tests {
         assert_eq!(result[0].name, "Asset");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_commodity_guid() {
         let query = setup().await;
         let result = query
@@ -256,7 +300,7 @@ mod tests {
         assert_eq!(result.len(), 14);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_parent_guid() {
         let query = setup().await;
         let result = query
@@ -266,14 +310,14 @@ mod tests {
         assert_eq!(result.len(), 3);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_name() {
         let query = setup().await;
         let result = query.name("Asset").await.unwrap();
         assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_contains_name_ignore_case() {
         let query = setup().await;
         let result = query.contains_name_ignore_case("AS").await.unwrap();

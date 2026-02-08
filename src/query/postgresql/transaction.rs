@@ -3,6 +3,7 @@
 
 use chrono::NaiveDateTime;
 use sqlx::AssertSqlSafe;
+use tracing::instrument;
 
 use crate::error::Error;
 use crate::query::postgresql::PostgreSQLQuery;
@@ -54,36 +55,46 @@ FROM transactions
 impl TransactionQ for PostgreSQLQuery {
     type T = Transaction;
 
+    #[instrument(skip(self))]
     async fn all(&self) -> Result<Vec<Self::T>, Error> {
+        tracing::debug!("fetching all transactions from postgresql");
         sqlx::query_as(SEL)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
 
+    #[instrument(skip(self))]
     async fn guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
+        tracing::debug!("fetching transactions by guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = $1")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
 
+    #[instrument(skip(self))]
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
+        tracing::debug!("fetching transactions by currency_guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE currency_guid = $1")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use pretty_assertions::assert_eq;
+    use test_log::test;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     #[cfg(feature = "schema")]
     // test schemas on compile time
@@ -109,7 +120,7 @@ mod tests {
         Q.get_or_init(|| async {
             let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             PostgreSQLQuery::new(&format!("{uri}?mode=ro"))
                 .await
                 .unwrap()
@@ -117,7 +128,7 @@ mod tests {
         .await
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_transaction() {
         let query = setup().await;
         let result = query
@@ -140,14 +151,14 @@ mod tests {
         assert_eq!(result.description(), "income 1");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_all() {
         let query = setup().await;
         let result = query.all().await.unwrap();
         assert_eq!(result.len(), 11);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_by_guid() {
         let query = setup().await;
         let result = query
@@ -166,7 +177,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_currency_guid() {
         let query = setup().await;
         let result = query

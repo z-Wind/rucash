@@ -5,6 +5,7 @@ use chrono::NaiveDateTime;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
 use sqlx::AssertSqlSafe;
+use tracing::instrument;
 
 use crate::error::Error;
 use crate::query::postgresql::PostgreSQLQuery;
@@ -70,34 +71,48 @@ FROM prices
 impl PriceQ for PostgreSQLQuery {
     type P = Price;
 
+    #[instrument(skip(self))]
     async fn all(&self) -> Result<Vec<Self::P>, Error> {
+        tracing::debug!("fetching all prices from postgresql");
         sqlx::query_as(SEL)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
+    #[instrument(skip(self))]
     async fn guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+        tracing::debug!("fetching prices by guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = $1")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
+    #[instrument(skip(self))]
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+        tracing::debug!("fetching prices by commodity_guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE commodity_guid = $1")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
+    #[instrument(skip(self))]
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+        tracing::debug!("fetching prices by currency_guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE currency_guid = $1")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
+    #[instrument(skip(self))]
     async fn commodity_or_currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+        tracing::debug!("fetching prices by commodity or currency guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!(
             "{SEL}\nWHERE commodity_guid = $1 OR currency_guid = $1"
         )))
@@ -105,18 +120,20 @@ impl PriceQ for PostgreSQLQuery {
         .bind(guid)
         .fetch_all(&self.pool)
         .await
+        .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
         .map_err(std::convert::Into::into)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
     use pretty_assertions::assert_eq;
+    use test_log::test;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     #[cfg(feature = "schema")]
     // test schemas on compile time
@@ -144,7 +161,7 @@ mod tests {
         Q.get_or_init(|| async {
             let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             PostgreSQLQuery::new(&format!("{uri}?mode=ro"))
                 .await
                 .unwrap()
@@ -152,7 +169,7 @@ mod tests {
         .await
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_price() {
         let query = setup().await;
         let result = query
@@ -176,14 +193,14 @@ mod tests {
         assert_eq!(result.value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_all() {
         let query = setup().await;
         let result = query.all().await.unwrap();
         assert_eq!(result.len(), 5);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_guid() {
         let query = setup().await;
         let result = query
@@ -197,7 +214,7 @@ mod tests {
         assert_eq!(result[0].value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn commodity_guid() {
         let query = setup().await;
         let result = query
@@ -211,7 +228,7 @@ mod tests {
         assert_eq!(result[0].value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn currency_guid() {
         let query = setup().await;
         let result = query
@@ -225,7 +242,7 @@ mod tests {
         assert_eq!(result[0].value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn commodity_or_currency_guid() {
         let query = setup().await;
         let result = query

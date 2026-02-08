@@ -11,23 +11,25 @@ pub fn uri() -> String {
 }
 
 mod book {
-    use super::*;
     use pretty_assertions::assert_eq;
+    use test_log::test;
 
-    #[tokio::test]
+    use super::*;
+
+    #[test(tokio::test)]
     async fn new() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         Book::new(query).await.unwrap();
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     #[should_panic]
     async fn new_fail() {
         let query = MySQLQuery::new("mysql://user@localhost").await.unwrap();
         Book::new(query).await.unwrap();
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn accounts() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -35,7 +37,7 @@ mod book {
         assert_eq!(accounts.len(), 21);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn accounts_filter() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -48,7 +50,7 @@ mod book {
         assert_eq!(accounts.count(), 3);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn accounts_contains_name_ignore_case() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -56,7 +58,7 @@ mod book {
         assert_eq!(accounts.len(), 3);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn account_contains_name_ignore_case() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -68,7 +70,7 @@ mod book {
         assert_eq!(account.name, "NASDAQ");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn splits() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -76,7 +78,7 @@ mod book {
         assert_eq!(splits.len(), 25);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn transactions() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -84,7 +86,7 @@ mod book {
         assert_eq!(transactions.len(), 11);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn prices() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -92,7 +94,7 @@ mod book {
         assert_eq!(prices.len(), 5);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn commodities() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -100,7 +102,7 @@ mod book {
         assert_eq!(commodities.len(), 5);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn currencies() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -109,9 +111,12 @@ mod book {
     }
 }
 mod account {
-    use super::*;
     use pretty_assertions::assert_eq;
-    #[tokio::test]
+    use test_log::test;
+
+    use super::*;
+
+    #[test(tokio::test)]
     async fn property() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -136,7 +141,7 @@ mod account {
         assert_eq!(account.placeholder, true);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn balance() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -153,7 +158,7 @@ mod account {
         #[cfg(feature = "decimal")]
         assert_eq!(account.balance(&book).await.unwrap(), Decimal::new(4590, 0));
     }
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn balance_diff_currency() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -173,7 +178,7 @@ mod account {
             Decimal::new(246953, 1)
         );
     }
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn splits() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -186,7 +191,7 @@ mod account {
         assert_eq!(splits.len(), 3);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn parent() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -199,7 +204,7 @@ mod account {
         assert_eq!(parent.name, "Current");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn no_parent() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -212,7 +217,7 @@ mod account {
         assert!(parent.is_none());
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn children() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -225,7 +230,7 @@ mod account {
         assert_eq!(children.len(), 3);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn commodity() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -240,9 +245,12 @@ mod account {
 }
 
 mod split {
-    use super::*;
     use pretty_assertions::assert_eq;
-    #[tokio::test]
+    use test_log::test;
+
+    use super::*;
+
+    #[test(tokio::test)]
     async fn property() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -274,7 +282,7 @@ mod split {
 
         assert_eq!(split.lot_guid, "");
     }
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn transaction() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -289,7 +297,7 @@ mod split {
         assert_eq!(transaction.description, "income 1");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn account() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -306,9 +314,12 @@ mod split {
 }
 
 mod transaction {
-    use super::*;
     use pretty_assertions::assert_eq;
-    #[tokio::test]
+    use test_log::test;
+
+    use super::*;
+
+    #[test(tokio::test)]
     async fn property() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -337,7 +348,7 @@ mod transaction {
         assert_eq!(transaction.description, "income 1");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn currency() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -352,7 +363,7 @@ mod transaction {
         assert_eq!(currency.fullname, "Euro");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn splits() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -369,9 +380,12 @@ mod transaction {
 }
 
 mod price {
-    use super::*;
     use pretty_assertions::assert_eq;
-    #[tokio::test]
+    use test_log::test;
+
+    use super::*;
+
+    #[test(tokio::test)]
     async fn property() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -399,7 +413,7 @@ mod price {
         assert_eq!(price.value, Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn commodity() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -414,7 +428,7 @@ mod price {
         assert_eq!(commodity.fullname, "Andorran Franc");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn currency() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -431,11 +445,12 @@ mod price {
 }
 
 mod commodity {
+    use pretty_assertions::assert_eq;
+    use test_log::test;
+
     use super::*;
 
-    use pretty_assertions::assert_eq;
-
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn property() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -458,7 +473,7 @@ mod commodity {
         assert_eq!(commodity.quote_tz, "");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn accounts() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -473,7 +488,7 @@ mod commodity {
         assert_eq!(accounts.len(), 14);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn transactions() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -488,7 +503,7 @@ mod commodity {
         assert_eq!(transactions.len(), 11);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn as_commodity_prices() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -503,7 +518,7 @@ mod commodity {
         assert_eq!(prices.len(), 1);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn as_currency_prices() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -518,7 +533,7 @@ mod commodity {
         assert_eq!(prices.len(), 2);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn as_commodity_or_currency_prices() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();
@@ -533,7 +548,7 @@ mod commodity {
         assert_eq!(prices.len(), 3);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn rate_direct() {
         // ADF => AED
         let query = MySQLQuery::new(&uri()).await.unwrap();
@@ -596,7 +611,7 @@ mod commodity {
         assert_eq!(rate, Decimal::new(9, 0) / Decimal::new(10, 0));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn rate_indirect() {
         let query = MySQLQuery::new(&uri()).await.unwrap();
         let book = Book::new(query).await.unwrap();

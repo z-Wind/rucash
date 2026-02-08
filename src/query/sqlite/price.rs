@@ -5,6 +5,7 @@ use chrono::NaiveDateTime;
 use rusqlite::Row;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
+use tracing::instrument;
 
 use super::SQLiteQuery;
 use crate::error::Error;
@@ -87,63 +88,106 @@ FROM prices
 impl PriceQ for SQLiteQuery {
     type P = Price;
 
+    #[instrument(skip(self))]
     async fn all(&self) -> Result<Vec<Self::P>, Error> {
+        tracing::debug!("fetching all prices from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(SEL)?;
+        let mut stmt = conn
+            .prepare(SEL)
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([])?
+            .query([])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Price::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::info!(count = result.len(), "prices fetched from sqlite");
         Ok(result)
     }
+
+    #[instrument(skip(self))]
     async fn guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+        tracing::debug!("fetching price by guid from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE guid = ?"))?;
+        let mut stmt = conn
+            .prepare(&format!("{SEL}\nWHERE guid = ?"))
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([guid])?
+            .query([guid])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Price::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::debug!(count = result.len(), "prices found by guid");
         Ok(result)
     }
+
+    #[instrument(skip(self))]
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+        tracing::debug!("fetching prices by commodity_guid from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE commodity_guid = ?"))?;
+        let mut stmt = conn
+            .prepare(&format!("{SEL}\nWHERE commodity_guid = ?"))
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([guid])?
+            .query([guid])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Price::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::debug!(count = result.len(), "prices found by commodity_guid");
         Ok(result)
     }
+
+    #[instrument(skip(self))]
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+        tracing::debug!("fetching prices by currency_guid from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE currency_guid = ?"))?;
+        let mut stmt = conn
+            .prepare(&format!("{SEL}\nWHERE currency_guid = ?"))
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([guid])?
+            .query([guid])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Price::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::debug!(count = result.len(), "prices found by currency_guid");
         Ok(result)
     }
+
+    #[instrument(skip(self))]
     async fn commodity_or_currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+        tracing::debug!("fetching prices by commodity or currency guid from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!(
-            "{SEL}\nWHERE commodity_guid = ? OR currency_guid = ?"
-        ))?;
+        let mut stmt = conn
+            .prepare(&format!(
+                "{SEL}\nWHERE commodity_guid = ? OR currency_guid = ?"
+            ))
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([guid, guid])?
+            .query([guid, guid])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Price::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::debug!(
+            count = result.len(),
+            "prices found by commodity or currency guid"
+        );
         Ok(result)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
     use pretty_assertions::assert_eq;
+    use test_log::test;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     #[cfg(feature = "schema")]
     // test schemas on compile time
@@ -174,13 +218,13 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             SQLiteQuery::new(uri).unwrap()
         })
         .await
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_price() {
         let query = setup().await;
         let result = query
@@ -204,14 +248,14 @@ mod tests {
         assert_eq!(result.value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_all() {
         let query = setup().await;
         let result = query.all().await.unwrap();
         assert_eq!(result.len(), 5);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_guid() {
         let query = setup().await;
         let result = query
@@ -225,7 +269,7 @@ mod tests {
         assert_eq!(result[0].value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn commodity_guid() {
         let query = setup().await;
         let result = query
@@ -239,7 +283,7 @@ mod tests {
         assert_eq!(result[0].value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn currency_guid() {
         let query = setup().await;
         let result = query
@@ -253,7 +297,7 @@ mod tests {
         assert_eq!(result[0].value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn commodity_or_currency_guid() {
         let query = setup().await;
         let result = query

@@ -4,6 +4,7 @@ use chrono::{DateTime, NaiveDateTime};
 use roxmltree::Node;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
+use tracing::instrument;
 
 use super::XMLQuery;
 use crate::error::Error;
@@ -191,20 +192,32 @@ impl SplitT for Split {
 impl SplitQ for XMLQuery {
     type S = Split;
 
+    #[instrument(skip(self))]
     async fn all(&self) -> Result<Vec<Self::S>, Error> {
-        let map = self.split_map()?;
+        tracing::debug!("fetching all splits from xml");
+        let map = self
+            .split_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map.values().map(|x| (**x).clone()).collect())
     }
 
+    #[instrument(skip(self))]
     async fn guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        let map = self.split_map()?;
+        tracing::debug!("fetching splits by guid from xml");
+        let map = self
+            .split_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map.get(guid).map(|x| (**x).clone()).into_iter().collect())
     }
 
+    #[instrument(skip(self))]
     async fn account_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        let map = self.account_splits_map()?;
+        tracing::debug!("fetching splits by account_guid from xml");
+        let map = self
+            .account_splits_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map
             .get(guid)
@@ -212,8 +225,12 @@ impl SplitQ for XMLQuery {
             .unwrap_or_default())
     }
 
+    #[instrument(skip(self))]
     async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        let map = self.transaction_splits_map()?;
+        tracing::debug!("fetching splits by tx_guid from xml");
+        let map = self
+            .transaction_splits_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map
             .get(guid)
@@ -224,13 +241,14 @@ impl SplitQ for XMLQuery {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
     use pretty_assertions::assert_eq;
     use roxmltree::Document;
+    use test_log::test;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     static Q: OnceCell<XMLQuery> = OnceCell::const_new();
     async fn setup() -> &'static XMLQuery {
@@ -240,7 +258,7 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             XMLQuery::new(path).unwrap()
         })
         .await
@@ -322,7 +340,7 @@ mod tests {
         assert_eq!(split.lot_guid, None);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_split() {
         let query = setup().await;
         let result = query
@@ -349,14 +367,14 @@ mod tests {
         assert_eq!(result.quantity(), Decimal::new(150, 0));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_all() {
         let query = setup().await;
         let result = query.all().await.unwrap();
         assert_eq!(result.len(), 25);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_guid() {
         let query = setup().await;
         let result = query
@@ -370,7 +388,7 @@ mod tests {
         assert_eq!(result[0].value(), Decimal::new(150, 0));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_account_guid() {
         let query = setup().await;
         let result = query
@@ -380,7 +398,7 @@ mod tests {
         assert_eq!(result.len(), 3);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_tx_guid() {
         let query = setup().await;
         let result = query

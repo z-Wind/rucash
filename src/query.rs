@@ -192,13 +192,13 @@ pub trait TransactionT {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
     #[cfg(feature = "decimal")]
     use rust_decimal::Decimal;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     #[cfg(feature = "sqlite")]
     mod sqlite {
@@ -214,25 +214,26 @@ mod tests {
                     env!("CARGO_MANIFEST_DIR")
                 );
 
-                println!("work_dir: {:?}", std::env::current_dir());
+                tracing::info!("work_dir: {:?}", std::env::current_dir());
                 SQLiteQuery::new(uri).unwrap()
             })
             .await
         }
 
         mod query {
+            use pretty_assertions::assert_eq;
+            use test_log::test;
+
             use super::*;
 
-            use pretty_assertions::assert_eq;
-
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_accounts() {
                 let query = setup().await;
                 let result = query.accounts().await.unwrap();
                 assert_eq!(result.len(), 21);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_accounts_contains_name() {
                 let query = setup().await;
                 let result = query
@@ -242,35 +243,35 @@ mod tests {
                 assert_eq!(result.len(), 3);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_splits() {
                 let query = setup().await;
                 let result = query.splits().await.unwrap();
                 assert_eq!(result.len(), 25);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_transactions() {
                 let query = setup().await;
                 let result = query.transactions().await.unwrap();
                 assert_eq!(result.len(), 11);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_prices() {
                 let query = setup().await;
                 let result = query.prices().await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_commodities() {
                 let query = setup().await;
                 let result = query.commodities().await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_currencies() {
                 let query = setup().await;
                 let result = query.currencies().await.unwrap();
@@ -278,16 +279,18 @@ mod tests {
             }
         }
         mod account_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = AccountQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 21);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -296,7 +299,7 @@ mod tests {
                 assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_commodity_guid() {
                 let query = setup().await;
                 let result = AccountQ::commodity_guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -311,7 +314,7 @@ mod tests {
                 );
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_parent_guid() {
                 let query = setup().await;
                 let result = AccountQ::parent_guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -320,14 +323,14 @@ mod tests {
                 assert_eq!(result[0].guid, "3bc319753945b6dba3e1928abed49e35");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_name() {
                 let query = setup().await;
                 let result = AccountQ::name(query, "Asset").await.unwrap();
                 assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_contains_name_ignore_case() {
                 let query = setup().await;
                 let result = AccountQ::contains_name_ignore_case(query, "aS")
@@ -337,16 +340,18 @@ mod tests {
             }
         }
         mod commodity_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = CommodityQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -355,7 +360,7 @@ mod tests {
                 assert_eq!(result[0].fullname.as_ref().unwrap(), "Euro");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_namespace() {
                 let query = setup().await;
                 let result = CommodityQ::namespace(query, "CURRENCY").await.unwrap();
@@ -363,16 +368,18 @@ mod tests {
             }
         }
         mod price_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = PriceQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
@@ -385,7 +392,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn commodity_guid() {
                 let query = setup().await;
                 let result = PriceQ::commodity_guid(query, "d821d6776fde9f7c2d01b67876406fd3")
@@ -398,7 +405,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn currency_guid() {
                 let query = setup().await;
                 let result = PriceQ::currency_guid(query, "5f586908098232e67edb1371408bfaa8")
@@ -411,7 +418,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn commodity_or_currency_guid() {
                 let query = setup().await;
                 let result =
@@ -422,16 +429,18 @@ mod tests {
             }
         }
         mod split_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = SplitQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 25);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
@@ -444,7 +453,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(150, 0));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_account_guid() {
                 let query = setup().await;
                 let result = SplitQ::account_guid(query, "93fc043c3062aaa1297b30e543d2cd0d")
@@ -453,7 +462,7 @@ mod tests {
                 assert_eq!(result.len(), 3);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_tx_guid() {
                 let query = setup().await;
                 let result = SplitQ::tx_guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -463,16 +472,18 @@ mod tests {
             }
         }
         mod transaction_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = TransactionQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 11);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_by_guid() {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -492,7 +503,7 @@ mod tests {
                 );
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_currency_guid() {
                 let query = setup().await;
                 let result = TransactionQ::currency_guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -503,9 +514,11 @@ mod tests {
             }
         }
         mod account_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -527,9 +540,11 @@ mod tests {
             }
         }
         mod commodity_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -549,9 +564,11 @@ mod tests {
             }
         }
         mod price_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
@@ -576,9 +593,11 @@ mod tests {
             }
         }
         mod split_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
@@ -605,9 +624,11 @@ mod tests {
             }
         }
         mod transaction_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -635,9 +656,9 @@ mod tests {
 
     #[cfg(feature = "mysql")]
     mod mysql {
-        use super::*;
-
         use crate::MySQLQuery;
+
+        use super::*;
 
         static Q: OnceCell<MySQLQuery> = OnceCell::const_new();
         async fn setup() -> &'static MySQLQuery {
@@ -649,18 +670,19 @@ mod tests {
         }
 
         mod query {
+            use pretty_assertions::assert_eq;
+            use test_log::test;
+
             use super::*;
 
-            use pretty_assertions::assert_eq;
-
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_accounts() {
                 let query = setup().await;
                 let result = query.accounts().await.unwrap();
                 assert_eq!(result.len(), 21);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_accounts_contains_name() {
                 let query = setup().await;
                 let result = query
@@ -670,35 +692,35 @@ mod tests {
                 assert_eq!(result.len(), 3);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_splits() {
                 let query = setup().await;
                 let result = query.splits().await.unwrap();
                 assert_eq!(result.len(), 25);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_transactions() {
                 let query = setup().await;
                 let result = query.transactions().await.unwrap();
                 assert_eq!(result.len(), 11);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_prices() {
                 let query = setup().await;
                 let result = query.prices().await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_commodities() {
                 let query = setup().await;
                 let result = query.commodities().await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_currencies() {
                 let query = setup().await;
                 let result = query.currencies().await.unwrap();
@@ -706,16 +728,18 @@ mod tests {
             }
         }
         mod account_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = AccountQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 21);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -724,7 +748,7 @@ mod tests {
                 assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_commodity_guid() {
                 let query = setup().await;
                 let result = AccountQ::commodity_guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -739,7 +763,7 @@ mod tests {
                 );
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_parent_guid() {
                 let query = setup().await;
                 let result = AccountQ::parent_guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -754,14 +778,14 @@ mod tests {
                 );
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_name() {
                 let query = setup().await;
                 let result = AccountQ::name(query, "Asset").await.unwrap();
                 assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_contains_name_ignore_case() {
                 let query = setup().await;
                 let result = AccountQ::contains_name_ignore_case(query, "aS")
@@ -771,16 +795,18 @@ mod tests {
             }
         }
         mod commodity_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = CommodityQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -789,7 +815,7 @@ mod tests {
                 assert_eq!(result[0].fullname.as_ref().unwrap(), "Euro");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_namespace() {
                 let query = setup().await;
                 let result = CommodityQ::namespace(query, "CURRENCY").await.unwrap();
@@ -797,16 +823,18 @@ mod tests {
             }
         }
         mod price_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = PriceQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
@@ -819,7 +847,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn commodity_guid() {
                 let query = setup().await;
                 let result = PriceQ::commodity_guid(query, "d821d6776fde9f7c2d01b67876406fd3")
@@ -832,7 +860,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn currency_guid() {
                 let query = setup().await;
                 let result = PriceQ::currency_guid(query, "5f586908098232e67edb1371408bfaa8")
@@ -845,7 +873,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn commodity_or_currency_guid() {
                 let query = setup().await;
                 let result =
@@ -856,16 +884,18 @@ mod tests {
             }
         }
         mod split_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = SplitQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 25);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
@@ -878,7 +908,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(150, 0));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_account_guid() {
                 let query = setup().await;
                 let result = SplitQ::account_guid(query, "93fc043c3062aaa1297b30e543d2cd0d")
@@ -887,7 +917,7 @@ mod tests {
                 assert_eq!(result.len(), 3);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_tx_guid() {
                 let query = setup().await;
                 let result = SplitQ::tx_guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -897,16 +927,18 @@ mod tests {
             }
         }
         mod transaction_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = TransactionQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 11);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_by_guid() {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -926,7 +958,7 @@ mod tests {
                 );
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_currency_guid() {
                 let query = setup().await;
                 let result = TransactionQ::currency_guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -937,9 +969,11 @@ mod tests {
             }
         }
         mod account_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -961,9 +995,11 @@ mod tests {
             }
         }
         mod commodity_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -983,9 +1019,11 @@ mod tests {
             }
         }
         mod price_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
@@ -1010,9 +1048,11 @@ mod tests {
             }
         }
         mod split_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
@@ -1039,9 +1079,11 @@ mod tests {
             }
         }
         mod transaction_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -1069,9 +1111,9 @@ mod tests {
 
     #[cfg(feature = "postgresql")]
     mod postgresql {
-        use super::*;
-
         use crate::PostgreSQLQuery;
+
+        use super::*;
 
         static Q: OnceCell<PostgreSQLQuery> = OnceCell::const_new();
         async fn setup() -> &'static PostgreSQLQuery {
@@ -1083,18 +1125,19 @@ mod tests {
         }
 
         mod query {
+            use pretty_assertions::assert_eq;
+            use test_log::test;
+
             use super::*;
 
-            use pretty_assertions::assert_eq;
-
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_accounts() {
                 let query = setup().await;
                 let result = query.accounts().await.unwrap();
                 assert_eq!(result.len(), 21);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_accounts_contains_name() {
                 let query = setup().await;
                 let result = query
@@ -1104,35 +1147,35 @@ mod tests {
                 assert_eq!(result.len(), 3);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_splits() {
                 let query = setup().await;
                 let result = query.splits().await.unwrap();
                 assert_eq!(result.len(), 25);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_transactions() {
                 let query = setup().await;
                 let result = query.transactions().await.unwrap();
                 assert_eq!(result.len(), 11);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_prices() {
                 let query = setup().await;
                 let result = query.prices().await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_commodities() {
                 let query = setup().await;
                 let result = query.commodities().await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_currencies() {
                 let query = setup().await;
                 let result = query.currencies().await.unwrap();
@@ -1140,16 +1183,18 @@ mod tests {
             }
         }
         mod account_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = AccountQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 21);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -1158,7 +1203,7 @@ mod tests {
                 assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_commodity_guid() {
                 let query = setup().await;
                 let result = AccountQ::commodity_guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -1173,7 +1218,7 @@ mod tests {
                 );
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_parent_guid() {
                 let query = setup().await;
                 let result = AccountQ::parent_guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -1188,14 +1233,14 @@ mod tests {
                 );
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_name() {
                 let query = setup().await;
                 let result = AccountQ::name(query, "Asset").await.unwrap();
                 assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_contains_name_ignore_case() {
                 let query = setup().await;
                 let result = AccountQ::contains_name_ignore_case(query, "aS")
@@ -1205,16 +1250,18 @@ mod tests {
             }
         }
         mod commodity_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = CommodityQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -1223,7 +1270,7 @@ mod tests {
                 assert_eq!(result[0].fullname.as_ref().unwrap(), "Euro");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_namespace() {
                 let query = setup().await;
                 let result = CommodityQ::namespace(query, "CURRENCY").await.unwrap();
@@ -1231,16 +1278,18 @@ mod tests {
             }
         }
         mod price_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = PriceQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
@@ -1253,7 +1302,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn commodity_guid() {
                 let query = setup().await;
                 let result = PriceQ::commodity_guid(query, "d821d6776fde9f7c2d01b67876406fd3")
@@ -1266,7 +1315,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn currency_guid() {
                 let query = setup().await;
                 let result = PriceQ::currency_guid(query, "5f586908098232e67edb1371408bfaa8")
@@ -1279,7 +1328,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn commodity_or_currency_guid() {
                 let query = setup().await;
                 let result =
@@ -1290,16 +1339,18 @@ mod tests {
             }
         }
         mod split_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = SplitQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 25);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
@@ -1312,7 +1363,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(150, 0));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_account_guid() {
                 let query = setup().await;
                 let result = SplitQ::account_guid(query, "93fc043c3062aaa1297b30e543d2cd0d")
@@ -1321,7 +1372,7 @@ mod tests {
                 assert_eq!(result.len(), 3);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_tx_guid() {
                 let query = setup().await;
                 let result = SplitQ::tx_guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -1331,16 +1382,18 @@ mod tests {
             }
         }
         mod transaction_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = TransactionQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 11);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_by_guid() {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -1360,7 +1413,7 @@ mod tests {
                 );
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_currency_guid() {
                 let query = setup().await;
                 let result = TransactionQ::currency_guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -1371,9 +1424,11 @@ mod tests {
             }
         }
         mod account_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -1395,9 +1450,11 @@ mod tests {
             }
         }
         mod commodity_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
@@ -1417,9 +1474,11 @@ mod tests {
             }
         }
         mod price_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
@@ -1444,9 +1503,11 @@ mod tests {
             }
         }
         mod split_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
@@ -1473,9 +1534,11 @@ mod tests {
             }
         }
         mod transaction_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -1503,9 +1566,9 @@ mod tests {
 
     #[cfg(feature = "xml")]
     mod xml {
-        use super::*;
-
         use crate::XMLQuery;
+
+        use super::*;
 
         static Q: OnceCell<XMLQuery> = OnceCell::const_new();
         async fn setup() -> &'static XMLQuery {
@@ -1515,25 +1578,26 @@ mod tests {
                     env!("CARGO_MANIFEST_DIR")
                 );
 
-                println!("work_dir: {:?}", std::env::current_dir());
+                tracing::info!("work_dir: {:?}", std::env::current_dir());
                 XMLQuery::new(path).unwrap()
             })
             .await
         }
 
         mod query {
+            use pretty_assertions::assert_eq;
+            use test_log::test;
+
             use super::*;
 
-            use pretty_assertions::assert_eq;
-
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_accounts() {
                 let query = setup().await;
                 let result = query.accounts().await.unwrap();
                 assert_eq!(result.len(), 20);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_accounts_contains_name() {
                 let query = setup().await;
                 let result = query
@@ -1543,35 +1607,35 @@ mod tests {
                 assert_eq!(result.len(), 3);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_splits() {
                 let query = setup().await;
                 let result = query.splits().await.unwrap();
                 assert_eq!(result.len(), 25);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_transactions() {
                 let query = setup().await;
                 let result = query.transactions().await.unwrap();
                 assert_eq!(result.len(), 11);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_prices() {
                 let query = setup().await;
                 let result = query.prices().await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_commodities() {
                 let query = setup().await;
                 let result = query.commodities().await.unwrap();
                 assert_eq!(result.len(), 6);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_currencies() {
                 let query = setup().await;
                 let result = query.currencies().await.unwrap();
@@ -1579,16 +1643,18 @@ mod tests {
             }
         }
         mod account_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = AccountQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 20);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -1597,7 +1663,7 @@ mod tests {
                 assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_commodity_guid() {
                 let query = setup().await;
                 let result = AccountQ::commodity_guid(query, "EUR").await.unwrap();
@@ -1610,7 +1676,7 @@ mod tests {
                 );
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_parent_guid() {
                 let query = setup().await;
                 let result = AccountQ::parent_guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -1625,14 +1691,14 @@ mod tests {
                 );
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_name() {
                 let query = setup().await;
                 let result = AccountQ::name(query, "Asset").await.unwrap();
                 assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_contains_name_ignore_case() {
                 let query = setup().await;
                 let result = AccountQ::contains_name_ignore_case(query, "aS")
@@ -1642,23 +1708,25 @@ mod tests {
             }
         }
         mod commodity_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = CommodityQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 6);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "FOO").await.unwrap();
                 assert_eq!(result[0].fullname.as_ref().unwrap(), "Foo Inc");
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_namespace() {
                 let query = setup().await;
                 let result = CommodityQ::namespace(query, "CURRENCY").await.unwrap();
@@ -1666,16 +1734,18 @@ mod tests {
             }
         }
         mod price_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = PriceQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 5);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
@@ -1688,7 +1758,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn commodity_guid() {
                 let query = setup().await;
                 let result = PriceQ::commodity_guid(query, "ADF").await.unwrap();
@@ -1699,7 +1769,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn currency_guid() {
                 let query = setup().await;
                 let result: Vec<_> = PriceQ::currency_guid(query, "AED")
@@ -1715,7 +1785,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(15, 1));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn commodity_or_currency_guid() {
                 let query = setup().await;
                 let result = PriceQ::commodity_or_currency_guid(query, "AED")
@@ -1725,16 +1795,18 @@ mod tests {
             }
         }
         mod split_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = SplitQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 25);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
@@ -1747,7 +1819,7 @@ mod tests {
                 assert_eq!(result[0].value(), Decimal::new(150, 0));
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_account_guid() {
                 let query = setup().await;
                 let result = SplitQ::account_guid(query, "93fc043c3062aaa1297b30e543d2cd0d")
@@ -1756,7 +1828,7 @@ mod tests {
                 assert_eq!(result.len(), 3);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_tx_guid() {
                 let query = setup().await;
                 let result = SplitQ::tx_guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -1766,16 +1838,18 @@ mod tests {
             }
         }
         mod transaction_q {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_all() {
                 let query = setup().await;
                 let result = TransactionQ::all(query).await.unwrap();
                 assert_eq!(result.len(), 11);
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_by_guid() {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
@@ -1795,7 +1869,7 @@ mod tests {
                 );
             }
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_currency_guid() {
                 let query = setup().await;
                 let result = TransactionQ::currency_guid(query, "EUR").await.unwrap();
@@ -1804,9 +1878,11 @@ mod tests {
             }
         }
         mod account_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
@@ -1828,9 +1904,11 @@ mod tests {
             }
         }
         mod commodity_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "EUR").await.unwrap();
@@ -1848,9 +1926,11 @@ mod tests {
             }
         }
         mod price_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
@@ -1875,9 +1955,11 @@ mod tests {
             }
         }
         mod split_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
@@ -1904,9 +1986,11 @@ mod tests {
             }
         }
         mod transaction_t {
+            use test_log::test;
+
             use super::*;
 
-            #[tokio::test]
+            #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")

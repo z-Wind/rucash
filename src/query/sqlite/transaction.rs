@@ -3,6 +3,7 @@
 
 use chrono::NaiveDateTime;
 use rusqlite::Row;
+use tracing::instrument;
 
 use super::SQLiteQuery;
 use crate::error::Error;
@@ -69,43 +70,65 @@ FROM transactions
 impl TransactionQ for SQLiteQuery {
     type T = Transaction;
 
+    #[instrument(skip(self))]
     async fn all(&self) -> Result<Vec<Self::T>, Error> {
+        tracing::debug!("fetching all transactions from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(SEL)?;
+        let mut stmt = conn
+            .prepare(SEL)
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([])?
+            .query([])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Transaction::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::info!(count = result.len(), "transactions fetched from sqlite");
         Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
+        tracing::debug!("fetching transaction by guid from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE guid = ?"))?;
+        let mut stmt = conn
+            .prepare(&format!("{SEL}\nWHERE guid = ?"))
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([guid])?
+            .query([guid])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Transaction::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::debug!(count = result.len(), "transactions found by guid");
         Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
+        tracing::debug!("fetching transactions by currency_guid from sqlite");
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!("{SEL}\nWHERE currency_guid = ?"))?;
+        let mut stmt = conn
+            .prepare(&format!("{SEL}\nWHERE currency_guid = ?"))
+            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
         let result = stmt
-            .query([guid])?
+            .query([guid])
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
             .mapped(|row| Transaction::try_from(row))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
+        tracing::debug!(count = result.len(), "transactions found by currency_guid");
         Ok(result)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use pretty_assertions::assert_eq;
+    use test_log::test;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     #[cfg(feature = "schema")]
     // test schemas on compile time
@@ -134,13 +157,13 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             SQLiteQuery::new(uri).unwrap()
         })
         .await
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_transaction() {
         let query = setup().await;
         let result = query
@@ -163,14 +186,14 @@ mod tests {
         assert_eq!(result.description(), "income 1");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_all() {
         let query = setup().await;
         let result = query.all().await.unwrap();
         assert_eq!(result.len(), 11);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_by_guid() {
         let query = setup().await;
         let result = query
@@ -189,7 +212,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_currency_guid() {
         let query = setup().await;
         let result = query

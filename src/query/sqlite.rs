@@ -6,6 +6,7 @@ pub(crate) mod transaction;
 
 use rusqlite::{Connection, OpenFlags};
 use std::sync::{Arc, Mutex};
+use tracing::instrument;
 
 use super::Query;
 use crate::error::Error;
@@ -24,15 +25,19 @@ impl SQLiteQuery {
     /// `file::memory:` | Open an in-memory database. |
     /// `path-to-db/data.db` | Open the file `data.db` |
     /// `file:/path-to-db/data.db` | Open the file `data.db` |
+    #[instrument]
     pub fn new(uri: &str) -> Result<Self, Error> {
+        tracing::debug!("opening sqlite database");
         let conn = Connection::open_with_flags(
             uri,
             OpenFlags::SQLITE_OPEN_READ_ONLY
                 | OpenFlags::SQLITE_OPEN_URI
                 | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )?;
+        )
+        .inspect_err(|e| tracing::error!("failed to open sqlite connection: {e}"))?;
         let conn = Arc::new(Mutex::new(conn));
 
+        tracing::info!("sqlite connection established");
         Ok(Self { conn })
     }
 }
@@ -41,6 +46,8 @@ impl Query for SQLiteQuery {}
 
 #[cfg(test)]
 mod tests {
+    use test_log::test;
+
     use super::*;
 
     #[test]
@@ -50,7 +57,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR")
         );
 
-        println!("work_dir: {:?}", std::env::current_dir());
+        tracing::info!("work_dir: {:?}", std::env::current_dir());
         SQLiteQuery::new(uri).unwrap();
     }
 }

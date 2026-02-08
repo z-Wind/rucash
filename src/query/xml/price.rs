@@ -4,6 +4,7 @@ use chrono::NaiveDateTime;
 use roxmltree::Node;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
+use tracing::instrument;
 
 use super::XMLQuery;
 use crate::error::Error;
@@ -150,20 +151,32 @@ impl PriceT for Price {
 impl PriceQ for XMLQuery {
     type P = Price;
 
+    #[instrument(skip(self))]
     async fn all(&self) -> Result<Vec<Self::P>, Error> {
-        let map = self.price_map()?;
+        tracing::debug!("fetching all prices from xml");
+        let map = self
+            .price_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map.values().map(|x| (**x).clone()).collect())
     }
 
+    #[instrument(skip(self))]
     async fn guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        let map = self.price_map()?;
+        tracing::debug!("fetching prices by guid from xml");
+        let map = self
+            .price_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map.get(guid).map(|x| (**x).clone()).into_iter().collect())
     }
 
+    #[instrument(skip(self))]
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        let map = self.commodity_prices_map()?;
+        tracing::debug!("fetching prices by commodity_guid from xml");
+        let map = self
+            .commodity_prices_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map
             .get(guid)
@@ -171,8 +184,12 @@ impl PriceQ for XMLQuery {
             .unwrap_or_default())
     }
 
+    #[instrument(skip(self))]
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        let map = self.currency_prices_map()?;
+        tracing::debug!("fetching prices by currency_guid from xml");
+        let map = self
+            .currency_prices_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map
             .get(guid)
@@ -180,15 +197,21 @@ impl PriceQ for XMLQuery {
             .unwrap_or_default())
     }
 
+    #[instrument(skip(self))]
     async fn commodity_or_currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
-        let map = self.commodity_prices_map()?;
+        tracing::debug!("fetching prices by commodity or currency guid from xml");
+        let map = self
+            .commodity_prices_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         let mut prices_commodity: Vec<Price> = map
             .get(guid)
             .map(|v| v.iter().map(|x| (**x).clone()).collect())
             .unwrap_or_default();
 
-        let map = self.currency_prices_map()?;
+        let map = self
+            .currency_prices_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         let mut prices_currency: Vec<Price> = map
             .get(guid)
@@ -203,13 +226,14 @@ impl PriceQ for XMLQuery {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
     use pretty_assertions::assert_eq;
     use roxmltree::Document;
+    use test_log::test;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     static Q: OnceCell<XMLQuery> = OnceCell::const_new();
     async fn setup() -> &'static XMLQuery {
@@ -219,7 +243,7 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             XMLQuery::new(path).unwrap()
         })
         .await
@@ -300,7 +324,7 @@ mod tests {
         assert_eq!(Decimal::new(15, 1), price.value());
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_price() {
         let query = setup().await;
         let result = query
@@ -324,14 +348,14 @@ mod tests {
         assert_eq!(result.value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_all() {
         let query = setup().await;
         let result = query.all().await.unwrap();
         assert_eq!(result.len(), 5);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_guid() {
         let query = setup().await;
         let result = query
@@ -345,7 +369,7 @@ mod tests {
         assert_eq!(result[0].value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn commodity_guid() {
         let query = setup().await;
         let result = query.commodity_guid("ADF").await.unwrap();
@@ -356,7 +380,7 @@ mod tests {
         assert_eq!(result[0].value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn currency_guid() {
         let query = setup().await;
         let result: Vec<_> = query
@@ -373,7 +397,7 @@ mod tests {
         assert_eq!(result[0].value(), Decimal::new(15, 1));
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn commodity_or_currency_guid() {
         let query = setup().await;
         let result = query.commodity_or_currency_guid("AED").await.unwrap();

@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
+use tracing::instrument;
 
 use super::Query;
 use crate::error::Error;
@@ -64,17 +65,49 @@ pub struct XMLQuery {
 
 impl XMLQuery {
     /// read gnucash xml file in gzip
+    #[instrument]
     pub fn new(path: &str) -> Result<Self, Error> {
-        let path = PathBuf::from_str(path)?;
-        let data = Self::gnucash_data(&path)?;
-        let doc = Document::parse(&data)?;
+        tracing::debug!("opening gnucash xml file");
+        let path = PathBuf::from_str(path)
+            .inspect_err(|e| tracing::error!("failed to parse path: {e}"))?;
 
+        tracing::debug!("reading gnucash data from file");
+        let data = Self::gnucash_data(&path)
+            .inspect_err(|e| tracing::error!("failed to read gnucash data: {e}"))?;
+
+        tracing::debug!("parsing xml document");
+        let doc = Document::parse(&data)
+            .inspect_err(|e| tracing::error!("failed to parse xml document: {e}"))?;
+
+        tracing::debug!("parsing accounts");
         let (accounts, commodity_accounts, same_parent_accounts, name_accounts) =
-            Self::parse_account_map(&doc)?;
-        let (commodities, namespace_commodities) = Self::parse_commodity_map(&doc)?;
-        let (prices, commodity_prices, currency_prices) = Self::parse_price_map(&doc)?;
-        let (splits, account_splits, transaction_splits) = Self::parse_split_map(&doc)?;
-        let (transactions, currency_transactions) = Self::parse_transaction_map(&doc)?;
+            Self::parse_account_map(&doc)
+                .inspect_err(|e| tracing::error!("failed to parse account map: {e}"))?;
+
+        tracing::debug!("parsing commodities");
+        let (commodities, namespace_commodities) = Self::parse_commodity_map(&doc)
+            .inspect_err(|e| tracing::error!("failed to parse commodity map: {e}"))?;
+
+        tracing::debug!("parsing prices");
+        let (prices, commodity_prices, currency_prices) = Self::parse_price_map(&doc)
+            .inspect_err(|e| tracing::error!("failed to parse price map: {e}"))?;
+
+        tracing::debug!("parsing splits");
+        let (splits, account_splits, transaction_splits) = Self::parse_split_map(&doc)
+            .inspect_err(|e| tracing::error!("failed to parse split map: {e}"))?;
+
+        tracing::debug!("parsing transactions");
+        let (transactions, currency_transactions) = Self::parse_transaction_map(&doc)
+            .inspect_err(|e| tracing::error!("failed to parse transaction map: {e}"))?;
+
+        tracing::info!(
+            account_count = accounts.len(),
+            commodity_count = commodities.len(),
+            price_count = prices.len(),
+            split_count = splits.len(),
+            transaction_count = transactions.len(),
+            "xml data parsed successfully"
+        );
 
         let query = Self {
             file_modified_time: Arc::new(Mutex::new(path.metadata()?.modified()?)),
@@ -105,15 +138,23 @@ impl XMLQuery {
             .find(|n| n.has_tag_name("book"))
             .ok_or_else(|| Error::NoBook(query.file_path.display().to_string()))?;
 
+        tracing::info!("xml query initialized successfully");
         Ok(query)
     }
 
+    #[instrument(skip(file_path), fields(path = %file_path.display()))]
     fn gnucash_data(file_path: &Path) -> Result<String, Error> {
-        let f = File::open(file_path)?;
+        tracing::debug!("opening gzip file");
+        let f =
+            File::open(file_path).inspect_err(|e| tracing::error!("failed to open file: {e}"))?;
         let mut d = GzDecoder::new(f);
         let mut data = String::new();
-        d.read_to_string(&mut data)?;
 
+        tracing::debug!("decompressing gzip data");
+        d.read_to_string(&mut data)
+            .inspect_err(|e| tracing::error!("failed to decompress data: {e}"))?;
+
+        tracing::debug!(size = data.len(), "gnucash data loaded");
         Ok(data)
     }
 
@@ -388,27 +429,29 @@ impl Query for XMLQuery {}
 
 #[cfg(test)]
 mod tests {
+    use test_log::test;
+
     use super::*;
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_new() {
         let path: &str = &format!(
             "{}/tests/db/xml/complex_sample.gnucash",
             env!("CARGO_MANIFEST_DIR")
         );
 
-        println!("work_dir: {:?}", std::env::current_dir());
+        tracing::info!("work_dir: {:?}", std::env::current_dir());
         XMLQuery::new(path).unwrap();
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_is_file_unchanged() {
         let path: &str = &format!(
             "{}/tests/db/xml/complex_sample.gnucash",
             env!("CARGO_MANIFEST_DIR")
         );
 
-        println!("work_dir: {:?}", std::env::current_dir());
+        tracing::info!("work_dir: {:?}", std::env::current_dir());
         let query = XMLQuery::new(path).unwrap();
 
         assert!(query.is_file_unchanged().unwrap());

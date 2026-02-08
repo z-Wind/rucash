@@ -2,6 +2,7 @@
 
 use chrono::NaiveDateTime;
 use roxmltree::Node;
+use tracing::instrument;
 
 use super::XMLQuery;
 use crate::error::Error;
@@ -113,20 +114,32 @@ impl TransactionT for Transaction {
 impl TransactionQ for XMLQuery {
     type T = Transaction;
 
+    #[instrument(skip(self))]
     async fn all(&self) -> Result<Vec<Self::T>, Error> {
-        let map = self.transaction_map()?;
+        tracing::debug!("fetching all transactions from xml");
+        let map = self
+            .transaction_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map.values().map(|x| (**x).clone()).collect())
     }
 
+    #[instrument(skip(self))]
     async fn guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
-        let map = self.transaction_map()?;
+        tracing::debug!("fetching transactions by guid from xml");
+        let map = self
+            .transaction_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map.get(guid).map(|x| (**x).clone()).into_iter().collect())
     }
 
+    #[instrument(skip(self))]
     async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
-        let map = self.currency_transactions_map()?;
+        tracing::debug!("fetching transactions by currency_guid from xml");
+        let map = self
+            .currency_transactions_map()
+            .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
         Ok(map
             .get(guid)
@@ -137,11 +150,12 @@ impl TransactionQ for XMLQuery {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use pretty_assertions::assert_eq;
     use roxmltree::Document;
+    use test_log::test;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     static Q: OnceCell<XMLQuery> = OnceCell::const_new();
     async fn setup() -> &'static XMLQuery {
@@ -151,7 +165,7 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             XMLQuery::new(path).unwrap()
         })
         .await
@@ -255,7 +269,7 @@ mod tests {
         assert_eq!(transaction.description.as_ref().unwrap(), "income 1");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_transaction() {
         let query = setup().await;
         let result = query
@@ -278,14 +292,14 @@ mod tests {
         assert_eq!(result.description(), "income 1");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_all() {
         let query = setup().await;
         let result = query.all().await.unwrap();
         assert_eq!(result.len(), 11);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_by_guid() {
         let query = setup().await;
         let result = query
@@ -304,7 +318,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_currency_guid() {
         let query = setup().await;
         let result = query.currency_guid("EUR").await.unwrap();

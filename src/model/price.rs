@@ -1,5 +1,6 @@
 use chrono::NaiveDateTime;
 use std::sync::Arc;
+use tracing::instrument;
 
 use crate::error::Error;
 use crate::model::Commodity;
@@ -39,61 +40,85 @@ where
         }
     }
 
+    #[instrument(skip(self), fields(price_guid = %self.guid, commodity_guid = %self.commodity_guid))]
     pub async fn commodity(&self) -> Result<Commodity<Q>, Error> {
         if self.commodity_guid.is_empty() {
+            tracing::error!("commodity guid is empty");
             return Err(Error::GuidNotFound {
                 model: "Commodity".to_string(),
                 guid: self.commodity_guid.clone(),
             });
         }
 
-        let mut commodities = CommodityQ::guid(&*self.query, &self.commodity_guid).await?;
+        tracing::debug!("fetching commodity for price");
+        let mut commodities = CommodityQ::guid(&*self.query, &self.commodity_guid)
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch commodity: {e}"))?;
         match commodities.pop() {
-            None => Err(Error::GuidNotFound {
-                model: "Commodity".to_string(),
-                guid: self.commodity_guid.clone(),
-            }),
+            None => {
+                tracing::error!("commodity not found");
+                Err(Error::GuidNotFound {
+                    model: "Commodity".to_string(),
+                    guid: self.commodity_guid.clone(),
+                })
+            }
             Some(x) if commodities.is_empty() => {
+                tracing::info!("commodity found for price");
                 Ok(Commodity::from_with_query(&x, self.query.clone()))
             }
-            _ => Err(Error::GuidMultipleFound {
-                model: "Commodity".to_string(),
-                guid: self.commodity_guid.clone(),
-            }),
+            _ => {
+                tracing::error!("multiple commodities found for guid");
+                Err(Error::GuidMultipleFound {
+                    model: "Commodity".to_string(),
+                    guid: self.commodity_guid.clone(),
+                })
+            }
         }
     }
 
+    #[instrument(skip(self), fields(price_guid = %self.guid, currency_guid = %self.currency_guid))]
     pub async fn currency(&self) -> Result<Commodity<Q>, Error> {
         if self.currency_guid.is_empty() {
+            tracing::error!("currency guid is empty");
             return Err(Error::GuidNotFound {
                 model: "Commodity".to_string(),
                 guid: self.currency_guid.clone(),
             });
         }
 
-        let mut currencies = CommodityQ::guid(&*self.query, &self.currency_guid).await?;
+        tracing::debug!("fetching currency for price");
+        let mut currencies = CommodityQ::guid(&*self.query, &self.currency_guid)
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch currency: {e}"))?;
 
         match currencies.pop() {
-            None => Err(Error::GuidNotFound {
-                model: "Commodity".to_string(),
-                guid: self.currency_guid.clone(),
-            }),
+            None => {
+                tracing::error!("currency not found");
+                Err(Error::GuidNotFound {
+                    model: "Commodity".to_string(),
+                    guid: self.currency_guid.clone(),
+                })
+            }
             Some(x) if currencies.is_empty() => {
+                tracing::info!("currency found for price");
                 Ok(Commodity::from_with_query(&x, self.query.clone()))
             }
-            _ => Err(Error::GuidMultipleFound {
-                model: "Commodity".to_string(),
-                guid: self.currency_guid.clone(),
-            }),
+            _ => {
+                tracing::error!("multiple currencies found for guid");
+                Err(Error::GuidMultipleFound {
+                    model: "Commodity".to_string(),
+                    guid: self.currency_guid.clone(),
+                })
+            }
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use crate::Book;
+
+    use super::*;
 
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
@@ -102,12 +127,13 @@ mod tests {
 
     #[cfg(feature = "sqlite")]
     mod sqlite {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::SQLiteQuery;
         use crate::query::sqlite::price::Price as PriceBase;
+
+        use super::*;
 
         #[allow(clippy::unused_async)]
         async fn setup() -> SQLiteQuery {
@@ -116,11 +142,11 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             SQLiteQuery::new(uri).unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup().await);
             let item = PriceBase {
@@ -152,7 +178,7 @@ mod tests {
             assert_eq!(result.value, Decimal::new(100, 0));
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn commodity() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -167,7 +193,7 @@ mod tests {
             assert_eq!(commodity.fullname, "Andorran Franc");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn currency() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -185,19 +211,20 @@ mod tests {
 
     #[cfg(feature = "mysql")]
     mod mysql {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::MySQLQuery;
         use crate::query::mysql::price::Price as PriceBase;
+
+        use super::*;
 
         async fn setup() -> MySQLQuery {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
             MySQLQuery::new(uri).await.unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup().await);
             let item = PriceBase {
@@ -229,7 +256,7 @@ mod tests {
             assert_eq!(result.value, Decimal::new(100, 0));
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn commodity() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -244,7 +271,7 @@ mod tests {
             assert_eq!(commodity.fullname, "Andorran Franc");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn currency() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -262,19 +289,20 @@ mod tests {
 
     #[cfg(feature = "postgresql")]
     mod postgresql {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::PostgreSQLQuery;
         use crate::query::postgresql::price::Price as PriceBase;
+
+        use super::*;
 
         async fn setup() -> PostgreSQLQuery {
             let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
             PostgreSQLQuery::new(uri).await.unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup().await);
             let item = PriceBase {
@@ -306,7 +334,7 @@ mod tests {
             assert_eq!(result.value, Decimal::new(100, 0));
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn commodity() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -321,7 +349,7 @@ mod tests {
             assert_eq!(commodity.fullname, "Andorran Franc");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn currency() {
             let query = setup().await;
             let book = Book::new(query).await.unwrap();
@@ -339,12 +367,13 @@ mod tests {
 
     #[cfg(feature = "xml")]
     mod xml {
-        use super::*;
-
         use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::XMLQuery;
         use crate::query::xml::price::Price as PriceBase;
+
+        use super::*;
 
         fn setup() -> XMLQuery {
             let path: &str = &format!(
@@ -352,11 +381,11 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             XMLQuery::new(path).unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn test_from_with_query() {
             let query = Arc::new(setup());
             let item = PriceBase {
@@ -388,7 +417,7 @@ mod tests {
             assert_eq!(result.value, Decimal::new(100, 0));
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn commodity() {
             let query = setup();
             let book = Book::new(query).await.unwrap();
@@ -403,7 +432,7 @@ mod tests {
             assert_eq!(commodity.fullname, "");
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         async fn currency() {
             let query = setup();
             let book = Book::new(query).await.unwrap();

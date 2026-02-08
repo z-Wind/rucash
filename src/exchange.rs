@@ -3,10 +3,13 @@ use chrono::NaiveDateTime;
 use num_traits::Zero;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
+use tracing::instrument;
 
 use crate::error::Error;
 use crate::model::{Commodity, Price};
 use crate::query::{CommodityQ, PriceQ, Query};
+
+type Graph = HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>>;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Exchange {
@@ -14,35 +17,47 @@ pub(crate) struct Exchange {
 }
 
 impl Exchange {
+    #[instrument(skip(query))]
     pub(crate) async fn new<Q>(query: Arc<Q>) -> Result<Self, Error>
     where
         Q: Query,
     {
-        Ok(Self {
-            graph: Self::new_graph(query.clone()).await?,
-        })
+        tracing::debug!("creating new exchange instance");
+        let graph = Self::new_graph(query.clone())
+            .await
+            .inspect_err(|e| tracing::error!("failed to create exchange graph: {e}"))?;
+        tracing::info!(nodes = graph.len(), "exchange graph created successfully");
+        Ok(Self { graph })
     }
 
-    async fn new_graph<Q>(
-        query: Arc<Q>,
-    ) -> Result<HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>>, Error>
+    #[instrument(skip(query))]
+    async fn new_graph<Q>(query: Arc<Q>) -> Result<Graph, Error>
     where
         Q: Query,
     {
+        tracing::debug!("building exchange graph from prices and commodities");
+
         let prices: Vec<Price<Q>> = PriceQ::all(&*query)
-            .await?
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch prices: {e}"))?
             .into_iter()
             .map(|x| Price::from_with_query(&x, query.clone()))
             .collect();
+        tracing::debug!(price_count = prices.len(), "prices loaded");
 
         let commodities_map: HashMap<String, String> = CommodityQ::all(&*query)
-            .await?
+            .await
+            .inspect_err(|e| tracing::error!("failed to fetch commodities: {e}"))?
             .into_iter()
             .map(|x| {
                 let c = Commodity::from_with_query(&x, query.clone());
                 (c.guid.clone(), c.mnemonic.clone())
             })
             .collect();
+        tracing::debug!(
+            commodity_count = commodities_map.len(),
+            "commodities loaded"
+        );
 
         let mut graph: HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>> =
             HashMap::new();
@@ -64,9 +79,11 @@ impl Exchange {
                     })?;
 
             if p.value.is_zero() {
-                println!(
-                    "Warning: ignore {} {commodity}/{currency} in exchange graph, because the value is zero.",
-                    p.datetime
+                tracing::warn!(
+                    datetime = %p.datetime,
+                    commodity = commodity,
+                    currency = currency,
+                    "ignoring price with zero value in exchange graph"
                 );
                 continue;
             }
@@ -77,6 +94,13 @@ impl Exchange {
                 .entry(currency.clone())
                 .and_modify(|e| {
                     if e.1 < p.datetime {
+                        tracing::debug!(
+                            commodity = commodity,
+                            currency = currency,
+                            old_date = %e.1,
+                            new_date = %p.datetime,
+                            "updating price to newer entry"
+                        );
                         *e = (p.value, p.datetime);
                     }
                 })
@@ -94,9 +118,18 @@ impl Exchange {
                 .or_insert((num_traits::one::<crate::Num>() / p.value, p.datetime));
         }
 
+        tracing::info!(
+            graph_nodes = graph.len(),
+            total_edges = graph.values().map(HashMap::len).sum::<usize>(),
+            "exchange graph built successfully"
+        );
         Ok(graph)
     }
 
+    #[instrument(skip(self, commodity, currency), fields(
+        commodity = %commodity.mnemonic,
+        currency = %currency.mnemonic
+    ))]
     pub(crate) fn cal<Q>(
         &self,
         commodity: &Commodity<Q>,
@@ -108,9 +141,11 @@ impl Exchange {
         let commodity = &commodity.mnemonic;
         let currency = &currency.mnemonic;
         if commodity == currency {
+            tracing::debug!("same commodity and currency, returning 1.0");
             return Some(num_traits::one());
         }
 
+        tracing::debug!("searching for exchange path using BFS");
         let mut visited: HashSet<(&str, &str)> = HashSet::new();
         let mut queue: VecDeque<(&str, crate::Num, chrono::NaiveDateTime)> = VecDeque::new();
         queue.push_back((
@@ -135,55 +170,60 @@ impl Exchange {
                         visited.insert((c, k));
                         visited.insert((k, c));
 
-                        // println!("{} to {} = {:?}", c, k, v);
+                        tracing::trace!(from = c, to = k, rate = ?v.0, date = %v.1, "exploring edge");
                         queue.push_back((k, r * v.0, date.min(v.1)));
                     }
                 }
             }
-            // queue.iter().for_each(|x| println!("queue:{:?}", x));
-            // println!("==============================");
-            // println!("");
             if done {
-                return Some(
-                    queue
-                        .into_iter()
-                        .filter(|x| x.0 == currency)
-                        .max_by_key(|x| x.2)
-                        .map(|x| x.1)
-                        .expect("must match"),
-                );
+                let result = queue
+                    .into_iter()
+                    .filter(|x| x.0 == currency)
+                    .max_by_key(|x| x.2)
+                    .map(|x| x.1)
+                    .expect("must match");
+                tracing::info!(?result, "exchange path found");
+                return Some(result);
             }
         }
 
+        tracing::warn!("no exchange path found between commodities");
         None
     }
 
+    #[instrument(skip(self, query))]
     pub(crate) async fn update<Q>(&mut self, query: Arc<Q>) -> Result<(), Error>
     where
         Q: Query,
     {
-        self.graph = Self::new_graph(query).await?;
+        tracing::debug!("updating exchange graph");
+        self.graph = Self::new_graph(query)
+            .await
+            .inspect_err(|e| tracing::error!("failed to rebuild exchange graph: {e}"))?;
+        tracing::info!("exchange graph updated successfully");
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::Book;
-
     #[cfg(not(feature = "decimal"))]
     use float_cmp::assert_approx_eq;
     #[cfg(feature = "decimal")]
     use rust_decimal::Decimal;
 
+    use crate::Book;
+
+    use super::*;
+
     #[cfg(feature = "sqlite")]
     mod sqlite {
-        use super::*;
+        use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::SQLiteQuery;
 
-        use pretty_assertions::assert_eq;
+        use super::*;
 
         #[allow(clippy::unused_async)]
         async fn setup() -> SQLiteQuery {
@@ -192,11 +232,11 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             SQLiteQuery::new(uri).unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         #[allow(clippy::too_many_lines)]
         async fn test_exchange() {
             let query = setup().await;
@@ -377,10 +417,12 @@ mod tests {
 
     #[cfg(feature = "mysql")]
     mod mysql {
-        use super::*;
+        use pretty_assertions::assert_eq;
+        use test_log::test;
+
         use crate::MySQLQuery;
 
-        use pretty_assertions::assert_eq;
+        use super::*;
 
         async fn setup() -> MySQLQuery {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
@@ -389,7 +431,7 @@ mod tests {
                 .unwrap_or_else(|e| panic!("{e} uri:{uri:?}"))
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         #[allow(clippy::too_many_lines)]
         async fn test_exchange() {
             let query = setup().await;
@@ -570,11 +612,12 @@ mod tests {
 
     #[cfg(feature = "postgresql")]
     mod postgresql {
-        use super::*;
+        use pretty_assertions::assert_eq;
+        use test_log::test;
 
         use crate::PostgreSQLQuery;
 
-        use pretty_assertions::assert_eq;
+        use super::*;
 
         async fn setup() -> PostgreSQLQuery {
             let uri = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
@@ -583,7 +626,7 @@ mod tests {
                 .unwrap_or_else(|e| panic!("{e} uri:{uri:?}"))
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         #[allow(clippy::too_many_lines)]
         async fn test_exchange() {
             let query = setup().await;
@@ -764,10 +807,12 @@ mod tests {
 
     #[cfg(feature = "xml")]
     mod xml {
-        use super::*;
+        use pretty_assertions::assert_eq;
+        use test_log::test;
+
         use crate::XMLQuery;
 
-        use pretty_assertions::assert_eq;
+        use super::*;
 
         fn setup() -> XMLQuery {
             let path: &str = &format!(
@@ -775,11 +820,11 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             XMLQuery::new(path).unwrap()
         }
 
-        #[tokio::test]
+        #[test(tokio::test)]
         #[allow(clippy::too_many_lines)]
         async fn test_exchange() {
             let query = setup();

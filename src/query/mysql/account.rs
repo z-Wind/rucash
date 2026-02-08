@@ -2,6 +2,7 @@
 // ref: https://wiki.gnucash.org/wiki/SQL
 
 use sqlx::AssertSqlSafe;
+use tracing::instrument;
 
 use crate::error::Error;
 use crate::query::mysql::MySQLQuery;
@@ -78,34 +79,46 @@ FROM accounts
 impl AccountQ for MySQLQuery {
     type A = Account;
 
+    #[instrument(skip(self))]
     async fn all(&self) -> Result<Vec<Self::A>, Error> {
+        tracing::debug!("fetching all accounts from mysql");
         sqlx::query_as(SEL)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
 
+    #[instrument(skip(self))]
     async fn guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+        tracing::debug!("fetching accounts by guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
 
+    #[instrument(skip(self))]
     async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+        tracing::debug!("fetching accounts by commodity_guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE commodity_guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
 
+    #[instrument(skip(self))]
     async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+        tracing::debug!("fetching accounts by parent_guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE parent_guid = ?")))
             .bind(guid)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
 
@@ -114,25 +127,31 @@ impl AccountQ for MySQLQuery {
             .bind(name)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
 
+    #[instrument(skip(self))]
     async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::A>, Error> {
+        tracing::debug!("searching accounts with name pattern from mysql");
         let name = format!("%{name}%");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE name LIKE ?")))
             .bind(name)
             .fetch_all(&self.pool)
             .await
+            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use test_log::test;
 
     use pretty_assertions::assert_eq;
     use tokio::sync::OnceCell;
+
+    use super::*;
 
     #[cfg(feature = "schema")]
     // test schemas on compile time
@@ -163,13 +182,13 @@ mod tests {
         Q.get_or_init(|| async {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
 
-            println!("work_dir: {:?}", std::env::current_dir());
+            tracing::info!("work_dir: {:?}", std::env::current_dir());
             MySQLQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
         })
         .await
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_account() {
         let query = setup().await;
         let result = query
@@ -191,14 +210,14 @@ mod tests {
         assert_eq!(result.placeholder(), true);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_all() {
         let query = setup().await;
         let result = query.all().await.unwrap();
         assert_eq!(result.len(), 21);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_guid() {
         let query = setup().await;
         let result = query
@@ -209,7 +228,7 @@ mod tests {
         assert_eq!(result[0].name, "Asset");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_commodity_guid() {
         let query = setup().await;
         let result = query
@@ -219,7 +238,7 @@ mod tests {
         assert_eq!(result.len(), 14);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_parent_guid() {
         let query = setup().await;
         let result = query
@@ -229,14 +248,14 @@ mod tests {
         assert_eq!(result.len(), 3);
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_name() {
         let query = setup().await;
         let result = query.name("Asset").await.unwrap();
         assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
     }
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_contains_name_ignore_case() {
         let query = setup().await;
         let result = query.contains_name_ignore_case("AS").await.unwrap();

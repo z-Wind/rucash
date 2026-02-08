@@ -4,6 +4,8 @@ pub(crate) mod price;
 pub(crate) mod split;
 pub(crate) mod transaction;
 
+use tracing::instrument;
+
 use super::Query;
 use crate::error::Error;
 
@@ -51,12 +53,16 @@ impl PostgreSQLQuery {
     /// postgresql://user:secret@localhost
     /// postgresql://localhost?dbname=mydb&user=postgres&password=postgres
     /// ```
+    #[instrument]
     pub async fn new(uri: &str) -> Result<Self, Error> {
+        tracing::debug!("connecting to postgresql database");
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(MAX_CONNECTIONS)
             .connect(uri)
-            .await?;
+            .await
+            .inspect_err(|e| tracing::error!("failed to connect to postgresql: {e}"))?;
 
+        tracing::info!("postgresql connection pool established");
         Ok(Self { pool })
     }
 }
@@ -65,13 +71,15 @@ impl Query for PostgreSQLQuery {}
 
 #[cfg(test)]
 mod tests {
+    use test_log::test;
+
     use super::*;
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_new() {
         let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
 
-        println!("work_dir: {:?}", std::env::current_dir());
+        tracing::info!("work_dir: {:?}", std::env::current_dir());
         PostgreSQLQuery::new(uri).await.unwrap();
     }
 }
