@@ -54,24 +54,27 @@ impl TryFrom<Node<'_, '_>> for Account {
                 "name" => {
                     account.name = child
                         .text()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Account name".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Account".to_string(),
+                            field: "name".to_string(),
                         })?
                         .to_string();
                 }
                 "id" => {
                     account.guid = child
                         .text()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Account guid".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Account".to_string(),
+                            field: "guid".to_string(),
                         })?
                         .to_string();
                 }
                 "type" => {
                     account.account_type = child
                         .text()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Account type".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Account".to_string(),
+                            field: "type".to_string(),
                         })?
                         .to_string();
                 }

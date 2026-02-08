@@ -13,8 +13,8 @@ pub struct Transaction {
     pub guid: String,
     pub currency_guid: String,
     pub num: String,
-    pub post_date: Option<NaiveDateTime>,
-    pub enter_date: Option<NaiveDateTime>,
+    pub post_date: NaiveDateTime,
+    pub enter_date: NaiveDateTime,
     pub description: Option<String>,
 }
 
@@ -40,8 +40,9 @@ impl TryFrom<Node<'_, '_>> for Transaction {
                 "id" => {
                     transaction.guid = child
                         .text()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Transaction guid".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Transaction".to_string(),
+                            field: "guid".to_string(),
                         })?
                         .to_string();
                 }
@@ -51,8 +52,9 @@ impl TryFrom<Node<'_, '_>> for Transaction {
                         .find(|n| n.has_tag_name("id"))
                         .and_then(|n| n.text())
                         .map(std::string::ToString::to_string)
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Transaction currency_guid".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Transaction".to_string(),
+                            field: "currency_guid".to_string(),
                         })?;
                 }
                 "num" => {
@@ -62,20 +64,28 @@ impl TryFrom<Node<'_, '_>> for Transaction {
                         .unwrap_or_default();
                 }
                 "date-posted" => {
-                    transaction.post_date = child
+                    let date = child
                         .children()
                         .find(|n| n.has_tag_name("date"))
                         .and_then(|n| n.text())
-                        .map(|x| chrono::NaiveDateTime::parse_from_str(x, "%Y-%m-%d %H:%M:%S%z"))
-                        .transpose()?;
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Transaction".to_string(),
+                            field: "post_date".to_string(),
+                        })?;
+                    transaction.post_date =
+                        chrono::NaiveDateTime::parse_from_str(date, "%Y-%m-%d %H:%M:%S%z")?;
                 }
                 "date-entered" => {
-                    transaction.enter_date = child
+                    let date = child
                         .children()
                         .find(|n| n.has_tag_name("date"))
                         .and_then(|n| n.text())
-                        .map(|x| chrono::NaiveDateTime::parse_from_str(x, "%Y-%m-%d %H:%M:%S%z"))
-                        .transpose()?;
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Transaction".to_string(),
+                            field: "enter_date".to_string(),
+                        })?;
+                    transaction.enter_date =
+                        chrono::NaiveDateTime::parse_from_str(date, "%Y-%m-%d %H:%M:%S%z")?;
                 }
                 "description" => {
                     transaction.description = child.text().map(std::string::ToString::to_string);
@@ -100,11 +110,10 @@ impl TransactionT for Transaction {
         self.num.clone()
     }
     fn post_datetime(&self) -> NaiveDateTime {
-        self.post_date.expect("transaction post_date should exist")
+        self.post_date
     }
     fn enter_datetime(&self) -> NaiveDateTime {
         self.enter_date
-            .expect("transaction enter_date should exist")
     }
     fn description(&self) -> String {
         self.description.clone().unwrap_or_default()
@@ -251,8 +260,6 @@ mod tests {
         assert_eq!(
             transaction
                 .post_date
-                .as_ref()
-                .unwrap()
                 .format("%Y-%m-%d %H:%M:%S")
                 .to_string(),
             "2014-12-24 10:59:00"
@@ -260,8 +267,6 @@ mod tests {
         assert_eq!(
             transaction
                 .enter_date
-                .as_ref()
-                .unwrap()
                 .format("%Y-%m-%d %H:%M:%S")
                 .to_string(),
             "2014-12-25 10:08:15"
@@ -308,12 +313,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            result[0].post_date.unwrap(),
+            result[0].post_date,
             NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
         );
 
         assert_eq!(
-            result[0].enter_date.unwrap(),
+            result[0].enter_date,
             NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S").unwrap()
         );
     }

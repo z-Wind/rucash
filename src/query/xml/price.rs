@@ -48,8 +48,9 @@ impl TryFrom<Node<'_, '_>> for Price {
                 "id" => {
                     price.guid = child
                         .text()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Price guid".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Price".to_string(),
+                            field: "guid".to_string(),
                         })?
                         .to_string();
                 }
@@ -59,8 +60,9 @@ impl TryFrom<Node<'_, '_>> for Price {
                         .find(|n| n.has_tag_name("id"))
                         .and_then(|n| n.text())
                         .map(std::string::ToString::to_string)
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Price commodity_guid".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Price".to_string(),
+                            field: "commodity_guid".to_string(),
                         })?;
                 }
                 "currency" => {
@@ -69,8 +71,9 @@ impl TryFrom<Node<'_, '_>> for Price {
                         .find(|n| n.has_tag_name("id"))
                         .and_then(|n| n.text())
                         .map(std::string::ToString::to_string)
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Price currency_guid".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Price".to_string(),
+                            field: "currency_guid".to_string(),
                         })?;
                 }
                 "time" => {
@@ -79,8 +82,9 @@ impl TryFrom<Node<'_, '_>> for Price {
                         .find(|n| n.has_tag_name("date"))
                         .and_then(|n| n.text())
                         .map(|x| chrono::NaiveDateTime::parse_from_str(x, "%Y-%m-%d %H:%M:%S%z"))
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Price time".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Price".to_string(),
+                            field: "time".to_string(),
                         })??;
                 }
                 "source" => {
@@ -91,20 +95,23 @@ impl TryFrom<Node<'_, '_>> for Price {
                 }
                 "value" => {
                     let mut splits = child.text().map(|s| s.split('/')).ok_or_else(|| {
-                        Error::XMLFromElement {
-                            model: "Price value".to_string(),
+                        Error::XMLMissingField {
+                            model: "Price".to_string(),
+                            field: "value".to_string(),
                         }
                     })?;
                     price.value_num = splits
                         .next()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Price value value_num".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Price".to_string(),
+                            field: "value_num".to_string(),
                         })?
                         .parse()?;
                     price.value_denom = splits
                         .next()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Price value value_denom".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Price".to_string(),
+                            field: "value_denom".to_string(),
                         })?
                         .parse()?;
                 }

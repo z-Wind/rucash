@@ -128,12 +128,12 @@ mod tests {
                     "2014-12-24 10:59:00",
                     "%Y-%m-%d %H:%M:%S",
                 )
-                .ok(),
+                .unwrap(),
                 enter_date: NaiveDateTime::parse_from_str(
                     "2014-12-24 10:59:00",
                     "%Y-%m-%d %H:%M:%S",
                 )
-                .ok(),
+                .unwrap(),
                 description: Some("source".to_string()),
             };
 
@@ -210,12 +210,12 @@ mod tests {
                     "2014-12-24 10:59:00",
                     "%Y-%m-%d %H:%M:%S",
                 )
-                .ok(),
+                .unwrap(),
                 enter_date: NaiveDateTime::parse_from_str(
                     "2014-12-24 10:59:00",
                     "%Y-%m-%d %H:%M:%S",
                 )
-                .ok(),
+                .unwrap(),
                 description: Some("source".to_string()),
             };
 
@@ -292,12 +292,12 @@ mod tests {
                     "2014-12-24 10:59:00",
                     "%Y-%m-%d %H:%M:%S",
                 )
-                .ok(),
+                .unwrap(),
                 enter_date: NaiveDateTime::parse_from_str(
                     "2014-12-24 10:59:00",
                     "%Y-%m-%d %H:%M:%S",
                 )
-                .ok(),
+                .unwrap(),
                 description: Some("source".to_string()),
             };
 
@@ -379,12 +379,12 @@ mod tests {
                     "2014-12-24 10:59:00",
                     "%Y-%m-%d %H:%M:%S",
                 )
-                .ok(),
+                .unwrap(),
                 enter_date: NaiveDateTime::parse_from_str(
                     "2014-12-24 10:59:00",
                     "%Y-%m-%d %H:%M:%S",
                 )
-                .ok(),
+                .unwrap(),
                 description: Some("source".to_string()),
             };
 

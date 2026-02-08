@@ -14,8 +14,8 @@ pub struct Transaction {
     pub guid: String,
     pub currency_guid: String,
     pub num: String,
-    pub post_date: Option<NaiveDateTime>,
-    pub enter_date: Option<NaiveDateTime>,
+    pub post_date: NaiveDateTime,
+    pub enter_date: NaiveDateTime,
     pub description: Option<String>,
 }
 
@@ -30,11 +30,10 @@ impl TransactionT for Transaction {
         self.num.clone()
     }
     fn post_datetime(&self) -> NaiveDateTime {
-        self.post_date.expect("transaction post_date should exist")
+        self.post_date
     }
     fn enter_datetime(&self) -> NaiveDateTime {
         self.enter_date
-            .expect("transaction enter_date should exist")
     }
     fn description(&self) -> String {
         self.description.clone().unwrap_or_default()
@@ -165,12 +164,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            result[0].post_date.unwrap(),
+            result[0].post_date,
             NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
         );
 
         assert_eq!(
-            result[0].enter_date.unwrap(),
+            result[0].enter_date,
             NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S").unwrap()
         );
     }

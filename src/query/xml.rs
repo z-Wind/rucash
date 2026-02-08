@@ -166,14 +166,13 @@ impl XMLQuery {
         let mut same_parent_accounts_map: HashMap<String, Vec<Arc<Account>>> = HashMap::new();
         let mut name_accounts_map: HashMap<String, Vec<Arc<Account>>> = HashMap::new();
 
-        for n in doc
+        let book = doc
             .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .filter(|n| n.has_tag_name("account"))
-        {
+            .ok_or_else(|| Error::NoBook("Could not find <book> in document".to_string()))?;
+
+        for n in book.children().filter(|n| n.has_tag_name("account")) {
             let account = Arc::new(Account::try_from(n)?);
 
             account_map.insert(account.guid.clone(), account.clone());
@@ -207,7 +206,7 @@ impl XMLQuery {
             .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
-            .expect("must exist book");
+            .ok_or_else(|| Error::NoBook("Could not find <book> in document".to_string()))?;
 
         let mut commodity_map = HashMap::new();
         let mut namespace_commodities: HashMap<String, Vec<Arc<Commodity>>> = HashMap::new();
@@ -251,14 +250,13 @@ impl XMLQuery {
         let mut commodity_prices: HashMap<String, Vec<Arc<Price>>> = HashMap::new();
         let mut currency_prices: HashMap<String, Vec<Arc<Price>>> = HashMap::new();
 
-        if let Some(n) = doc
+        let book = doc
             .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .find(|n| n.has_tag_name("pricedb"))
-        {
+            .ok_or_else(|| Error::NoBook("Could not find <book> in document".to_string()))?;
+
+        if let Some(n) = book.children().find(|n| n.has_tag_name("pricedb")) {
             for price in n.children().filter(|n| n.has_tag_name("price")) {
                 let price = Arc::new(Price::try_from(price)?);
 
@@ -288,28 +286,29 @@ impl XMLQuery {
         let mut account_splits_map: HashMap<String, Vec<Arc<Split>>> = HashMap::new();
         let mut transactiont_splits_map: HashMap<String, Vec<Arc<Split>>> = HashMap::new();
 
-        for transaction in doc
+        let book = doc
             .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .filter(|n| n.has_tag_name("transaction"))
-        {
+            .ok_or_else(|| Error::NoBook("Could not find <book> in document".to_string()))?;
+
+        for transaction in book.children().filter(|n| n.has_tag_name("transaction")) {
             let tx_guid = transaction
                 .children()
                 .find(|n| n.has_tag_name("id"))
                 .and_then(|n| n.text())
                 .map(std::string::ToString::to_string)
-                .ok_or_else(|| Error::XMLFromElement {
-                    model: "Split no tx_guid".to_string(),
+                .ok_or_else(|| Error::XMLMissingField {
+                    model: "Split".to_string(),
+                    field: "tx_guid".to_string(),
                 })?;
 
             for split in transaction
                 .children()
                 .find(|n| n.has_tag_name("splits"))
-                .ok_or_else(|| Error::XMLFromElement {
-                    model: "Split no child splits".to_string(),
+                .ok_or_else(|| Error::XMLMissingField {
+                    model: "Split".to_string(),
+                    field: "splits".to_string(),
                 })?
                 .children()
                 .filter(|n| n.has_tag_name("split"))
@@ -340,14 +339,13 @@ impl XMLQuery {
         let mut transaction_map = HashMap::new();
         let mut currency_transactions_map: HashMap<String, Vec<Arc<Transaction>>> = HashMap::new();
 
-        for n in doc
+        let book = doc
             .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
-            .expect("must exist book")
-            .children()
-            .filter(|n| n.has_tag_name("transaction"))
-        {
+            .ok_or_else(|| Error::NoBook("Could not find <book> in document".to_string()))?;
+
+        for n in book.children().filter(|n| n.has_tag_name("transaction")) {
             let transaction = Arc::new(Transaction::try_from(n)?);
 
             transaction_map.insert(transaction.guid.clone(), transaction.clone());

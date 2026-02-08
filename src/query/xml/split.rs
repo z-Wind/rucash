@@ -55,16 +55,18 @@ impl Split {
                 "id" => {
                     split.guid = child
                         .text()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Split guid".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Split".to_string(),
+                            field: "guid".to_string(),
                         })?
                         .to_string();
                 }
                 "account" => {
                     split.account_guid = child
                         .text()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Split account_guid".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Split".to_string(),
+                            field: "account_guid".to_string(),
                         })?
                         .to_string();
                 }
@@ -92,39 +94,45 @@ impl Split {
                 }
                 "value" => {
                     let mut splits = child.text().map(|s| s.split('/')).ok_or_else(|| {
-                        Error::XMLFromElement {
-                            model: "Split value".to_string(),
+                        Error::XMLMissingField {
+                            model: "Split".to_string(),
+                            field: "value".to_string(),
                         }
                     })?;
                     split.value_num = splits
                         .next()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Split value value_num".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Split".to_string(),
+                            field: "value_num".to_string(),
                         })?
                         .parse()?;
                     split.value_denom = splits
                         .next()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Split value value_denom".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Split".to_string(),
+                            field: "value_denom".to_string(),
                         })?
                         .parse()?;
                 }
                 "quantity" => {
                     let mut splits = child.text().map(|s| s.split('/')).ok_or_else(|| {
-                        Error::XMLFromElement {
-                            model: "Split quantity".to_string(),
+                        Error::XMLMissingField {
+                            model: "Split".to_string(),
+                            field: "quantity".to_string(),
                         }
                     })?;
                     split.quantity_num = splits
                         .next()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Split quantity quantity_num".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Split".to_string(),
+                            field: "quantity_num".to_string(),
                         })?
                         .parse()?;
                     split.quantity_denom = splits
                         .next()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Split quantity quantity_denom".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Split".to_string(),
+                            field: "quantity_denom".to_string(),
                         })?
                         .parse()?;
                 }

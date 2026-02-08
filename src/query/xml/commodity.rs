@@ -45,8 +45,9 @@ impl TryFrom<Node<'_, '_>> for Commodity {
                 "id" => {
                     commodity.guid = child
                         .text()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Commodity guid".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Commodity".to_string(),
+                            field: "guid".to_string(),
                         })?
                         .to_string();
                     commodity.mnemonic = commodity.guid.clone();
@@ -54,8 +55,9 @@ impl TryFrom<Node<'_, '_>> for Commodity {
                 "space" => {
                     commodity.namespace = child
                         .text()
-                        .ok_or_else(|| Error::XMLFromElement {
-                            model: "Commodity namespacee".to_string(),
+                        .ok_or_else(|| Error::XMLMissingField {
+                            model: "Commodity".to_string(),
+                            field: "namespace".to_string(),
                         })?
                         .to_string();
                 }
@@ -66,9 +68,7 @@ impl TryFrom<Node<'_, '_>> for Commodity {
                     commodity.cusip = child.text().map(std::string::ToString::to_string);
                 }
                 "fraction" => {
-                    commodity.fraction = child
-                        .text()
-                        .map_or(100, |x| x.parse().expect("must be i32"));
+                    commodity.fraction = child.text().map(str::parse).transpose()?.unwrap_or(100);
                 }
                 "get_quotes" => {
                     commodity.quote_flag = true;

@@ -43,6 +43,36 @@ impl Exchange {
     where
         Q: Query,
     {
+        /// Helper function to update or insert an edge in the graph.
+        /// It only updates the edge if the new price entry has a more recent timestamp.
+        fn upsert_edge(
+            graph: &mut Graph,
+            from: &str,
+            to: &str,
+            rate: crate::Num,
+            date: NaiveDateTime,
+        ) {
+            graph
+                .entry(from.to_string())
+                .or_default()
+                .entry(to.to_string())
+                .and_modify(|e| {
+                    if e.1 < date {
+                        tracing::debug!(
+                            from = from,
+                            to = to,
+                            old_date = %e.1,
+                            new_date = %date,
+                            old_rate = ?e.0,
+                            new_rate = ?rate,
+                            "updating edge to newer entry"
+                        );
+                        *e = (rate, date);
+                    }
+                })
+                .or_insert((rate, date));
+        }
+
         tracing::debug!("building exchange graph from prices and commodities");
 
         // Fetch all prices and convert them into the internal model
@@ -70,36 +100,6 @@ impl Exchange {
         );
 
         let mut graph: Graph = HashMap::new();
-
-        /// Helper function to update or insert an edge in the graph.
-        /// It only updates the edge if the new price entry has a more recent timestamp.
-        fn upsert_edge(
-            graph: &mut Graph,
-            from: String,
-            to: String,
-            rate: crate::Num,
-            date: NaiveDateTime,
-        ) {
-            graph
-                .entry(from.clone())
-                .or_default()
-                .entry(to.clone())
-                .and_modify(|e| {
-                    if e.1 < date {
-                        tracing::debug!(
-                            from = from,
-                            to = to,
-                            old_date = %e.1,
-                            new_date = %date,
-                            old_rate = ?e.0,
-                            new_rate = ?rate,
-                            "updating edge to newer entry"
-                        );
-                        *e = (rate, date);
-                    }
-                })
-                .or_insert((rate, date));
-        }
 
         for p in prices {
             let commodity =
@@ -129,19 +129,13 @@ impl Exchange {
             }
 
             // Insert forward edge: commodity -> currency
-            upsert_edge(
-                &mut graph,
-                commodity.clone(),
-                currency.clone(),
-                p.value,
-                p.datetime,
-            );
+            upsert_edge(&mut graph, commodity, currency, p.value, p.datetime);
 
             // Insert reverse edge: currency -> commodity (reciprocal rate)
             upsert_edge(
                 &mut graph,
-                currency.clone(),
-                commodity.clone(),
+                currency,
+                commodity,
                 num_traits::one::<crate::Num>() / p.value,
                 p.datetime,
             );
@@ -187,7 +181,7 @@ impl Exchange {
 
         // Seed the heap with the starting commodity
         heap.push(ExchangePath {
-            node: commodity.to_string(),
+            node: commodity.clone(),
             rate: num_traits::one(),
             oldest_edge_date: chrono::NaiveDateTime::MAX,
             hop_count: 0,

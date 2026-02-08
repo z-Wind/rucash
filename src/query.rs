@@ -491,13 +491,13 @@ mod tests {
                     .unwrap();
 
                 assert_eq!(
-                    result[0].post_date.unwrap(),
+                    result[0].post_date,
                     NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
 
                 assert_eq!(
-                    result[0].enter_date.unwrap(),
+                    result[0].enter_date,
                     NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
@@ -946,13 +946,13 @@ mod tests {
                     .unwrap();
 
                 assert_eq!(
-                    result[0].post_date.unwrap(),
+                    result[0].post_date,
                     NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
 
                 assert_eq!(
-                    result[0].enter_date.unwrap(),
+                    result[0].enter_date,
                     NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
@@ -1401,13 +1401,13 @@ mod tests {
                     .unwrap();
 
                 assert_eq!(
-                    result[0].post_date.unwrap(),
+                    result[0].post_date,
                     NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
 
                 assert_eq!(
-                    result[0].enter_date.unwrap(),
+                    result[0].enter_date,
                     NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
@@ -1857,13 +1857,13 @@ mod tests {
                     .unwrap();
 
                 assert_eq!(
-                    result[0].post_date.unwrap(),
+                    result[0].post_date,
                     NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
 
                 assert_eq!(
-                    result[0].enter_date.unwrap(),
+                    result[0].enter_date,
                     NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );

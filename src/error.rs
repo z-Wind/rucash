@@ -26,8 +26,8 @@ pub enum Error {
     #[error("roxmltree error: {0}")]
     XML(#[from] roxmltree::Error),
     #[cfg(feature = "xml")]
-    #[error("XML {model} from element")]
-    XMLFromElement { model: String },
+    #[error("XML Missing required field '{field}' for {model}")]
+    XMLMissingField { model: String, field: String },
     #[cfg(feature = "xml")]
     #[error("Parse int error: {0}")]
     ParseInt(#[from] std::num::ParseIntError),
