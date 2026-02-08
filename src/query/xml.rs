@@ -100,7 +100,7 @@ impl XMLQuery {
         let (transactions, currency_transactions) = Self::parse_transaction_map(&doc)
             .inspect_err(|e| tracing::error!("failed to parse transaction map: {e}"))?;
 
-        tracing::info!(
+        tracing::debug!(
             account_count = accounts.len(),
             commodity_count = commodities.len(),
             price_count = prices.len(),
@@ -438,7 +438,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR")
         );
 
-        tracing::info!("work_dir: {:?}", std::env::current_dir());
+        tracing::debug!("work_dir: {:?}", std::env::current_dir());
         XMLQuery::new(path).unwrap();
     }
 
@@ -449,7 +449,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR")
         );
 
-        tracing::info!("work_dir: {:?}", std::env::current_dir());
+        tracing::debug!("work_dir: {:?}", std::env::current_dir());
         let query = XMLQuery::new(path).unwrap();
 
         assert!(query.is_file_unchanged().unwrap());

@@ -136,7 +136,7 @@ mod tests {
         Q.get_or_init(|| async {
             let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
 
-            tracing::info!("work_dir: {:?}", std::env::current_dir());
+            tracing::debug!("work_dir: {:?}", std::env::current_dir());
             PostgreSQLQuery::new(&format!("{uri}?mode=ro"))
                 .await
                 .unwrap()

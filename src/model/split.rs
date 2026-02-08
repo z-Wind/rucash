@@ -70,7 +70,7 @@ where
                 })
             }
             Some(x) if transactions.is_empty() => {
-                tracing::info!("transaction found for split");
+                tracing::debug!("transaction found for split");
                 Ok(Transaction::from_with_query(&x, self.query.clone()))
             }
             _ => {
@@ -107,7 +107,7 @@ where
                 })
             }
             Some(x) if accounts.is_empty() => {
-                tracing::info!("account found for split");
+                tracing::debug!("account found for split");
                 Ok(Account::from_with_query(&x, self.query.clone()))
             }
             _ => {

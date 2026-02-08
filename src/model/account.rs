@@ -59,7 +59,7 @@ where
             .into_iter()
             .map(|x| Split::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "splits fetched for account");
+        tracing::debug!(count = result.len(), "splits fetched for account");
         Ok(result)
     }
 
@@ -81,7 +81,7 @@ where
                 Ok(None)
             }
             Some(x) if accounts.is_empty() => {
-                tracing::info!("parent account found");
+                tracing::debug!("parent account found");
                 Ok(Some(Account::from_with_query(&x, self.query.clone())))
             }
             _ => {
@@ -104,7 +104,7 @@ where
             .into_iter()
             .map(|x| Account::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "children accounts fetched");
+        tracing::debug!(count = result.len(), "children accounts fetched");
         Ok(result)
     }
 
@@ -131,7 +131,7 @@ where
                 })
             }
             Some(x) if commodities.is_empty() => {
-                tracing::info!("commodity found for account");
+                tracing::debug!("commodity found for account");
                 Ok(Commodity::from_with_query(&x, self.query.clone()))
             }
             _ => Err(Error::GuidMultipleFound {
@@ -197,7 +197,7 @@ where
         });
 
         let result = net * rate;
-        tracing::info!(?result, ?rate, "balance calculated in currency");
+        tracing::debug!(?result, ?rate, "balance calculated in currency");
         Ok(result)
     }
 
@@ -236,7 +236,7 @@ where
             net += child_net;
         }
 
-        tracing::info!(?net, "account balance calculated");
+        tracing::debug!(?net, "account balance calculated");
         Ok(net)
     }
 }

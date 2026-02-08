@@ -119,7 +119,7 @@ mod tests {
         Q.get_or_init(|| async {
             let uri: &str = "mysql://user:secret@localhost/complex_sample.gnucash";
 
-            tracing::info!("work_dir: {:?}", std::env::current_dir());
+            tracing::debug!("work_dir: {:?}", std::env::current_dir());
             MySQLQuery::new(&format!("{uri}?mode=ro")).await.unwrap()
         })
         .await

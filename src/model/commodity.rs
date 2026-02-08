@@ -55,7 +55,7 @@ where
             .into_iter()
             .map(|x| Account::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "accounts fetched for commodity");
+        tracing::debug!(count = result.len(), "accounts fetched for commodity");
         Ok(result)
     }
 
@@ -69,7 +69,7 @@ where
             .into_iter()
             .map(|x| Transaction::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "transactions fetched for commodity");
+        tracing::debug!(count = result.len(), "transactions fetched for commodity");
         Ok(result)
     }
 
@@ -83,7 +83,7 @@ where
             .into_iter()
             .map(|x| Price::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "commodity prices fetched");
+        tracing::debug!(count = result.len(), "commodity prices fetched");
         Ok(result)
     }
 
@@ -97,7 +97,7 @@ where
             .into_iter()
             .map(|x| Price::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "currency prices fetched");
+        tracing::debug!(count = result.len(), "currency prices fetched");
         Ok(result)
     }
 
@@ -111,7 +111,7 @@ where
             .into_iter()
             .map(|x| Price::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "all related prices fetched");
+        tracing::debug!(count = result.len(), "all related prices fetched");
         Ok(result)
     }
 
@@ -123,7 +123,7 @@ where
         tracing::debug!("selling commodity to currency");
         let result = book.exchange(self, currency).await;
         if result.is_some() {
-            tracing::info!(?result, "sell exchange rate found");
+            tracing::debug!(?result, "sell exchange rate found");
         } else {
             tracing::warn!("no sell exchange rate available");
         }
@@ -138,7 +138,7 @@ where
         tracing::debug!("buying commodity with currency");
         let result = commodity.sell(self, book).await;
         if result.is_some() {
-            tracing::info!(?result, "buy exchange rate found");
+            tracing::debug!(?result, "buy exchange rate found");
         } else {
             tracing::warn!("no buy exchange rate available");
         }

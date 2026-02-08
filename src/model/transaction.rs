@@ -62,7 +62,7 @@ where
                 })
             }
             Some(x) if currencies.is_empty() => {
-                tracing::info!("currency found for transaction");
+                tracing::debug!("currency found for transaction");
                 Ok(Commodity::from_with_query(&x, self.query.clone()))
             }
             _ => {
@@ -85,7 +85,7 @@ where
             .into_iter()
             .map(|x| Split::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "splits fetched for transaction");
+        tracing::debug!(count = result.len(), "splits fetched for transaction");
         Ok(result)
     }
 }

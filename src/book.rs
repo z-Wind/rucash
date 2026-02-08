@@ -48,7 +48,7 @@ where
             .into_iter()
             .map(|x| Account::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "accounts fetched successfully");
+        tracing::debug!(count = result.len(), "accounts fetched successfully");
         Ok(result)
     }
 
@@ -67,7 +67,7 @@ where
             .into_iter()
             .map(|x| Account::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "found accounts matching name pattern");
+        tracing::debug!(count = result.len(), "found accounts matching name pattern");
         Ok(result)
     }
 
@@ -83,7 +83,7 @@ where
                 Ok(None)
             }
             Some(x) if accounts.is_empty() => {
-                tracing::info!("found single account matching name: {name}");
+                tracing::debug!("found single account matching name: {name}");
                 Ok(Some(x))
             }
             _ => {
@@ -108,7 +108,7 @@ where
             .into_iter()
             .map(|x| Split::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "splits fetched successfully");
+        tracing::debug!(count = result.len(), "splits fetched successfully");
         Ok(result)
     }
 
@@ -124,7 +124,7 @@ where
             .into_iter()
             .map(|x| Transaction::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "transactions fetched successfully");
+        tracing::debug!(count = result.len(), "transactions fetched successfully");
         Ok(result)
     }
 
@@ -140,7 +140,7 @@ where
             .into_iter()
             .map(|x| Price::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "prices fetched successfully");
+        tracing::debug!(count = result.len(), "prices fetched successfully");
         Ok(result)
     }
 
@@ -156,7 +156,7 @@ where
             .into_iter()
             .map(|x| Commodity::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "commodities fetched successfully");
+        tracing::debug!(count = result.len(), "commodities fetched successfully");
         Ok(result)
     }
 
@@ -172,7 +172,7 @@ where
             .into_iter()
             .map(|x| Commodity::from_with_query(&x, self.query.clone()))
             .collect();
-        tracing::info!(count = result.len(), "currencies fetched successfully");
+        tracing::debug!(count = result.len(), "currencies fetched successfully");
         Ok(result)
     }
 
@@ -189,7 +189,7 @@ where
         let graph = self.exchange_graph.as_ref()?;
         let result = graph.lock().await.cal(commodity, currency);
         if let Some(rate) = result {
-            tracing::info!(?rate, "exchange rate calculated");
+            tracing::debug!(?rate, "exchange rate calculated");
             Some(rate)
         } else {
             tracing::warn!("no exchange rate path found");

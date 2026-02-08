@@ -63,7 +63,7 @@ where
                 })
             }
             Some(x) if commodities.is_empty() => {
-                tracing::info!("commodity found for price");
+                tracing::debug!("commodity found for price");
                 Ok(Commodity::from_with_query(&x, self.query.clone()))
             }
             _ => {
@@ -100,7 +100,7 @@ where
                 })
             }
             Some(x) if currencies.is_empty() => {
-                tracing::info!("currency found for price");
+                tracing::debug!("currency found for price");
                 Ok(Commodity::from_with_query(&x, self.query.clone()))
             }
             _ => {

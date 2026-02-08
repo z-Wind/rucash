@@ -196,7 +196,7 @@ impl Exchange {
         {
             // Goal check
             if &node == currency {
-                tracing::info!(
+                tracing::debug!(
                     ?rate,
                     oldest_edge_date = %oldest_edge_date,
                     hop_count = hop_count,

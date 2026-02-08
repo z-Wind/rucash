@@ -134,7 +134,7 @@ impl SplitQ for SQLiteQuery {
             .mapped(|row| Split::try_from(row))
             .collect::<Result<Vec<_>, _>>()
             .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::info!(count = result.len(), "splits fetched from sqlite");
+        tracing::debug!(count = result.len(), "splits fetched from sqlite");
         Ok(result)
     }
 
@@ -233,7 +233,7 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            tracing::info!("work_dir: {:?}", std::env::current_dir());
+            tracing::debug!("work_dir: {:?}", std::env::current_dir());
             SQLiteQuery::new(uri).unwrap()
         })
         .await

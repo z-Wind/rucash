@@ -266,7 +266,7 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
 
-            tracing::info!("work_dir: {:?}", std::env::current_dir());
+            tracing::debug!("work_dir: {:?}", std::env::current_dir());
             XMLQuery::new(path).unwrap()
         })
         .await
