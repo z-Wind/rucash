@@ -140,8 +140,8 @@ mod tests {
 				guid,
 				currency_guid,
 				num,
-				post_date as "post_date: NaiveDateTime",
-				enter_date as "enter_date: NaiveDateTime",
+				post_date as "post_date!: NaiveDateTime",
+				enter_date as "enter_date!: NaiveDateTime",
 				description
 				FROM transactions
 				"#,
