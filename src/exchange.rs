@@ -1,7 +1,8 @@
 use chrono::NaiveDateTime;
 #[cfg(not(feature = "decimal"))]
 use num_traits::Zero;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -9,14 +10,19 @@ use crate::error::Error;
 use crate::model::{Commodity, Price};
 use crate::query::{CommodityQ, PriceQ, Query};
 
+/// Adjacency list representing the exchange graph.
+/// The structure is: Map<From, Map<To, (Rate, Timestamp)>>
 type Graph = HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>>;
 
+/// The `Exchange` struct manages currency conversions by maintaining a
+/// directed graph of commodity prices and their historical timestamps.
 #[derive(Debug, Clone)]
 pub(crate) struct Exchange {
-    graph: HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>>,
+    graph: Graph,
 }
 
 impl Exchange {
+    /// Creates a new `Exchange` instance by fetching data from the provided query provider.
     #[instrument(skip(query))]
     pub(crate) async fn new<Q>(query: Arc<Q>) -> Result<Self, Error>
     where
@@ -30,6 +36,8 @@ impl Exchange {
         Ok(Self { graph })
     }
 
+    /// Internal logic to build the exchange graph from scratch.
+    /// It fetches all prices and commodities to establish conversion edges.
     #[instrument(skip(query))]
     async fn new_graph<Q>(query: Arc<Q>) -> Result<Graph, Error>
     where
@@ -37,6 +45,7 @@ impl Exchange {
     {
         tracing::debug!("building exchange graph from prices and commodities");
 
+        // Fetch all prices and convert them into the internal model
         let prices: Vec<Price<Q>> = PriceQ::all(&*query)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch prices: {e}"))?
@@ -45,6 +54,7 @@ impl Exchange {
             .collect();
         tracing::debug!(price_count = prices.len(), "prices loaded");
 
+        // Create a lookup map for commodity GUIDs to their mnemonics (e.g., "USD", "BTC")
         let commodities_map: HashMap<String, String> = CommodityQ::all(&*query)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch commodities: {e}"))?
@@ -59,8 +69,37 @@ impl Exchange {
             "commodities loaded"
         );
 
-        let mut graph: HashMap<String, HashMap<String, (crate::Num, NaiveDateTime)>> =
-            HashMap::new();
+        let mut graph: Graph = HashMap::new();
+
+        /// Helper function to update or insert an edge in the graph.
+        /// It only updates the edge if the new price entry has a more recent timestamp.
+        fn upsert_edge(
+            graph: &mut Graph,
+            from: String,
+            to: String,
+            rate: crate::Num,
+            date: NaiveDateTime,
+        ) {
+            graph
+                .entry(from.clone())
+                .or_default()
+                .entry(to.clone())
+                .and_modify(|e| {
+                    if e.1 < date {
+                        tracing::debug!(
+                            from = from,
+                            to = to,
+                            old_date = %e.1,
+                            new_date = %date,
+                            old_rate = ?e.0,
+                            new_rate = ?rate,
+                            "updating edge to newer entry"
+                        );
+                        *e = (rate, date);
+                    }
+                })
+                .or_insert((rate, date));
+        }
 
         for p in prices {
             let commodity =
@@ -78,6 +117,7 @@ impl Exchange {
                         guid: p.currency_guid.clone(),
                     })?;
 
+            // Zero value prices are invalid for exchange calculations
             if p.value.is_zero() {
                 tracing::warn!(
                     datetime = %p.datetime,
@@ -88,34 +128,23 @@ impl Exchange {
                 continue;
             }
 
-            graph
-                .entry(commodity.clone())
-                .or_default()
-                .entry(currency.clone())
-                .and_modify(|e| {
-                    if e.1 < p.datetime {
-                        tracing::debug!(
-                            commodity = commodity,
-                            currency = currency,
-                            old_date = %e.1,
-                            new_date = %p.datetime,
-                            "updating price to newer entry"
-                        );
-                        *e = (p.value, p.datetime);
-                    }
-                })
-                .or_insert((p.value, p.datetime));
+            // Insert forward edge: commodity -> currency
+            upsert_edge(
+                &mut graph,
+                commodity.clone(),
+                currency.clone(),
+                p.value,
+                p.datetime,
+            );
 
-            graph
-                .entry(currency.clone())
-                .or_default()
-                .entry(commodity.clone())
-                .and_modify(|e| {
-                    if e.1 < p.datetime {
-                        *e = (num_traits::one::<crate::Num>() / p.value, p.datetime);
-                    }
-                })
-                .or_insert((num_traits::one::<crate::Num>() / p.value, p.datetime));
+            // Insert reverse edge: currency -> commodity (reciprocal rate)
+            upsert_edge(
+                &mut graph,
+                currency.clone(),
+                commodity.clone(),
+                num_traits::one::<crate::Num>() / p.value,
+                p.datetime,
+            );
         }
 
         tracing::info!(
@@ -126,6 +155,10 @@ impl Exchange {
         Ok(graph)
     }
 
+    /// Calculates the exchange rate from one commodity to another.
+    ///
+    /// It uses a priority-search (Dijkstra-like) approach where it prioritizes
+    /// paths that contain the "freshest" data (most recent `oldest_edge_date`).
     #[instrument(skip(self, commodity, currency), fields(
         commodity = %commodity.mnemonic,
         currency = %currency.mnemonic
@@ -140,50 +173,61 @@ impl Exchange {
     {
         let commodity = &commodity.mnemonic;
         let currency = &currency.mnemonic;
+
+        // Identity case: converting a commodity to itself
         if commodity == currency {
             tracing::debug!("same commodity and currency, returning 1.0");
             return Some(num_traits::one());
         }
 
-        tracing::debug!("searching for exchange path using BFS");
-        let mut visited: HashSet<(&str, &str)> = HashSet::new();
-        let mut queue: VecDeque<(&str, crate::Num, chrono::NaiveDateTime)> = VecDeque::new();
-        queue.push_back((
-            commodity,
-            num_traits::one(),
-            chrono::Local::now().naive_local(),
-        ));
+        tracing::debug!("searching for most reliable exchange path");
 
-        while !queue.is_empty() {
-            let n = queue.len();
-            let mut done = false;
-            for _ in 0..n {
-                let (c, r, date) = queue.pop_front().unwrap();
-                if let Some(map) = self.graph.get(c) {
-                    for (k, v) in map {
-                        if visited.contains(&(c, k)) {
-                            continue;
-                        }
-                        if k == currency {
-                            done = true;
-                        }
-                        visited.insert((c, k));
-                        visited.insert((k, c));
+        let mut visited: HashSet<String> = HashSet::new();
+        let mut heap: BinaryHeap<ExchangePath> = BinaryHeap::new();
 
-                        tracing::trace!(from = c, to = k, rate = ?v.0, date = %v.1, "exploring edge");
-                        queue.push_back((k, r * v.0, date.min(v.1)));
+        // Seed the heap with the starting commodity
+        heap.push(ExchangePath {
+            node: commodity.to_string(),
+            rate: num_traits::one(),
+            oldest_edge_date: chrono::NaiveDateTime::MAX,
+            hop_count: 0,
+        });
+
+        while let Some(ExchangePath {
+            node,
+            rate,
+            oldest_edge_date,
+            hop_count,
+        }) = heap.pop()
+        {
+            // Goal check
+            if &node == currency {
+                tracing::info!(
+                    ?rate,
+                    oldest_edge_date = %oldest_edge_date,
+                    hop_count = hop_count,
+                    "found most reliable exchange path"
+                );
+                return Some(rate);
+            }
+
+            // Skip if already processed
+            if !visited.insert(node.clone()) {
+                continue;
+            }
+
+            // Explore neighbors
+            if let Some(neighbors) = self.graph.get(&node) {
+                for (next, (edge_rate, edge_date)) in neighbors {
+                    if !visited.contains(next) {
+                        heap.push(ExchangePath {
+                            node: next.clone(),
+                            rate: rate * edge_rate,
+                            oldest_edge_date: oldest_edge_date.min(*edge_date),
+                            hop_count: hop_count + 1,
+                        });
                     }
                 }
-            }
-            if done {
-                let result = queue
-                    .into_iter()
-                    .filter(|x| x.0 == currency)
-                    .max_by_key(|x| x.2)
-                    .map(|x| x.1)
-                    .expect("must match");
-                tracing::info!(?result, "exchange path found");
-                return Some(result);
             }
         }
 
@@ -191,6 +235,7 @@ impl Exchange {
         None
     }
 
+    /// Rebuilds the exchange graph with the latest data.
     #[instrument(skip(self, query))]
     pub(crate) async fn update<Q>(&mut self, query: Arc<Q>) -> Result<(), Error>
     where
@@ -202,6 +247,43 @@ impl Exchange {
             .inspect_err(|e| tracing::error!("failed to rebuild exchange graph: {e}"))?;
         tracing::info!("exchange graph updated successfully");
         Ok(())
+    }
+}
+
+/// Represents a potential conversion path in the priority queue.
+#[derive(Debug, Clone)]
+struct ExchangePath {
+    node: String,
+    rate: crate::Num,
+    /// The bottleneck date: the timestamp of the oldest price used in this path.
+    oldest_edge_date: chrono::NaiveDateTime,
+    /// Number of conversions (steps) in the path.
+    hop_count: usize,
+}
+
+/// Custom ordering for the priority queue:
+/// 1. Prefer paths where the `oldest_edge_date` is later (more recent data).
+/// 2. If dates are equal, prefer paths with fewer hops (shorter distance).
+impl Ord for ExchangePath {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.oldest_edge_date.cmp(&other.oldest_edge_date) {
+            Ordering::Equal => other.hop_count.cmp(&self.hop_count),
+            ord => ord,
+        }
+    }
+}
+
+impl PartialOrd for ExchangePath {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Eq for ExchangePath {}
+
+impl PartialEq for ExchangePath {
+    fn eq(&self, other: &Self) -> bool {
+        self.oldest_edge_date == other.oldest_edge_date
     }
 }
 
