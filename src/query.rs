@@ -14,126 +14,141 @@ use crate::error::Error;
 pub trait Query:
     Clone + Sync + Send + AccountQ + CommodityQ + PriceQ + SplitQ + TransactionQ
 {
-    fn accounts(&self) -> impl std::future::Future<Output = Result<Vec<Self::A>, Error>> + Send {
+    fn accounts(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<<Self as AccountQ>::Item>, Error>> + Send
+    {
         async { AccountQ::all(self).await }
     }
     fn accounts_contains_name_ignore_case(
         &self,
         name: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::A>, Error>> + Send {
+    ) -> impl std::future::Future<Output = Result<Vec<<Self as AccountQ>::Item>, Error>> + Send
+    {
         async { AccountQ::contains_name_ignore_case(self, name).await }
     }
-    fn splits(&self) -> impl std::future::Future<Output = Result<Vec<Self::S>, Error>> + Send {
+    fn splits(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<<Self as SplitQ>::Item>, Error>> + Send {
         async { SplitQ::all(self).await }
     }
     fn transactions(
         &self,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::T>, Error>> + Send {
+    ) -> impl std::future::Future<Output = Result<Vec<<Self as TransactionQ>::Item>, Error>> + Send
+    {
         async { TransactionQ::all(self).await }
     }
-    fn prices(&self) -> impl std::future::Future<Output = Result<Vec<Self::P>, Error>> + Send {
+    fn prices(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<<Self as PriceQ>::Item>, Error>> + Send {
         async { PriceQ::all(self).await }
     }
-    fn currencies(&self) -> impl std::future::Future<Output = Result<Vec<Self::C>, Error>> + Send {
+    fn currencies(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<<Self as CommodityQ>::Item>, Error>> + Send
+    {
         async { CommodityQ::namespace(self, "CURRENCY").await }
     }
-    fn commodities(&self) -> impl std::future::Future<Output = Result<Vec<Self::C>, Error>> + Send {
+    fn commodities(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<<Self as CommodityQ>::Item>, Error>> + Send
+    {
         async { CommodityQ::all(self).await }
     }
 }
 
 pub trait AccountQ {
-    type A: AccountT;
+    type Item: AccountT;
 
-    fn all(&self) -> impl std::future::Future<Output = Result<Vec<Self::A>, Error>> + Send;
+    fn all(&self) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::A>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn commodity_guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::A>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn parent_guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::A>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn name(
         &self,
         name: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::A>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn contains_name_ignore_case(
         &self,
         name: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::A>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
 }
 
 pub trait CommodityQ {
-    type C: CommodityT;
+    type Item: CommodityT;
 
-    fn all(&self) -> impl std::future::Future<Output = Result<Vec<Self::C>, Error>> + Send;
+    fn all(&self) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::C>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn namespace(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::C>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
 }
 
 pub trait PriceQ {
-    type P: PriceT;
+    type Item: PriceT;
 
-    fn all(&self) -> impl std::future::Future<Output = Result<Vec<Self::P>, Error>> + Send;
+    fn all(&self) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::P>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn commodity_guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::P>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn currency_guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::P>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn commodity_or_currency_guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::P>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
 }
 
 pub trait SplitQ {
-    type S: SplitT;
+    type Item: SplitT;
 
-    fn all(&self) -> impl std::future::Future<Output = Result<Vec<Self::S>, Error>> + Send;
+    fn all(&self) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::S>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn account_guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::S>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn tx_guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::S>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
 }
 
 pub trait TransactionQ {
-    type T: TransactionT;
+    type Item: TransactionT;
 
-    fn all(&self) -> impl std::future::Future<Output = Result<Vec<Self::T>, Error>> + Send;
+    fn all(&self) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::T>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
     fn currency_guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::T>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
 }
 
 pub trait AccountT {

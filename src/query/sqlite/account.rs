@@ -2,6 +2,7 @@
 // ref: https://wiki.gnucash.org/wiki/SQL
 
 use rusqlite::Row;
+use tokio::task::spawn_blocking;
 use tracing::instrument;
 
 use super::SQLiteQuery;
@@ -97,110 +98,172 @@ FROM accounts
 ";
 
 impl AccountQ for SQLiteQuery {
-    type A = Account;
+    type Item = Account;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::A>, Error> {
-        tracing::debug!("fetching all accounts from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(SEL)
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "accounts fetched from sqlite");
-        Ok(result)
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+
+        spawn_blocking(move || {
+            tracing::debug!("fetching all accounts from sqlite");
+
+            let conn = pool.get()?;
+
+            let mut stmt = conn
+                .prepare_cached(SEL)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "accounts fetched from sqlite");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error in spawn_blocking: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        tracing::debug!("fetching account by guid from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE guid = ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([guid])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "accounts found by guid");
-        Ok(result)
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let guid_owned = guid.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            tracing::debug!("fetching account by guid from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE guid = ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "accounts found by guid");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        tracing::debug!("fetching accounts by commodity_guid from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE commodity_guid = ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([guid])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "accounts found by commodity_guid");
-        Ok(result)
+    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let guid_owned = guid.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            tracing::debug!("fetching accounts by commodity_guid from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE commodity_guid = ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "accounts found by commodity_guid");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
-        tracing::debug!("fetching accounts by parent_guid from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE parent_guid = ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([guid])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "accounts found by parent_guid");
-        Ok(result)
+    async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let guid_owned = guid.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            tracing::debug!("fetching accounts by parent_guid from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE parent_guid = ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "accounts found by parent_guid");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn name(&self, name: &str) -> Result<Vec<Self::A>, Error> {
-        tracing::debug!("fetching accounts by name from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE name = ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([name])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "accounts found by name");
-        Ok(result)
+    async fn name(&self, name: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let name_owned = name.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            tracing::debug!("fetching accounts by name from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE name = ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([name_owned], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "accounts found by name");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::A>, Error> {
-        tracing::debug!("searching accounts with name pattern from sqlite");
-        let name = format!("%{name}%");
+    async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let pattern = format!("%{name}%");
 
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE name LIKE ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([name])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Account::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "accounts found matching name pattern");
-        Ok(result)
+        tokio::task::spawn_blocking(move || {
+            tracing::debug!("searching accounts with name pattern from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE name LIKE ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([pattern], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "accounts found matching name pattern");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 }
 

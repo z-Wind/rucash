@@ -11,7 +11,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::SystemTime;
 use tracing::instrument;
 
@@ -24,7 +24,7 @@ use split::Split;
 use transaction::Transaction;
 
 type AccountMap = Arc<HashMap<String, Arc<Account>>>;
-type AccountsnMap = Arc<HashMap<String, Vec<Arc<Account>>>>;
+type AccountsMap = Arc<HashMap<String, Vec<Arc<Account>>>>;
 
 type CommodityMap = Arc<HashMap<String, Arc<Commodity>>>;
 type CommoditiesMap = Arc<HashMap<String, Vec<Arc<Commodity>>>>;
@@ -38,29 +38,30 @@ type SplitsMap = Arc<HashMap<String, Vec<Arc<Split>>>>;
 type TransactionMap = Arc<HashMap<String, Arc<Transaction>>>;
 type TransactionsMap = Arc<HashMap<String, Vec<Arc<Transaction>>>>;
 
+#[derive(Debug, Default, Clone)]
+struct XMLCache {
+    accounts: AccountMap,
+    commodity_accounts: AccountsMap,
+    same_parent_accounts: AccountsMap,
+    name_accounts: AccountsMap,
+    commodities: CommodityMap,
+    namespace_commodities: CommoditiesMap,
+    prices: PriceMap,
+    commodity_prices: PricesMap,
+    currency_prices: PricesMap,
+    splits: SplitMap,
+    account_splits: SplitsMap,
+    transaction_splits: SplitsMap,
+    transactions: TransactionMap,
+    currency_transactions: TransactionsMap,
+}
+
 #[derive(Debug, Clone)]
 pub struct XMLQuery {
     file_path: Arc<PathBuf>,
     file_modified_time: Arc<Mutex<SystemTime>>,
 
-    accounts: Arc<Mutex<AccountMap>>,
-    commodity_accounts: Arc<Mutex<AccountsnMap>>,
-    same_parent_accounts: Arc<Mutex<AccountsnMap>>,
-    name_accounts: Arc<Mutex<AccountsnMap>>,
-
-    commodities: Arc<Mutex<CommodityMap>>,
-    namespace_commodities: Arc<Mutex<CommoditiesMap>>,
-
-    prices: Arc<Mutex<PriceMap>>,
-    commodity_prices: Arc<Mutex<PricesMap>>,
-    currency_prices: Arc<Mutex<PricesMap>>,
-
-    splits: Arc<Mutex<SplitMap>>,
-    account_splits: Arc<Mutex<SplitsMap>>,
-    transaction_splits: Arc<Mutex<SplitsMap>>,
-
-    transactions: Arc<Mutex<TransactionMap>>,
-    currency_transactions: Arc<Mutex<TransactionsMap>>,
+    cache: Arc<RwLock<XMLCache>>,
 }
 
 impl XMLQuery {
@@ -68,78 +69,49 @@ impl XMLQuery {
     #[instrument]
     pub fn new(path: &str) -> Result<Self, Error> {
         tracing::debug!("opening gnucash xml file");
-        let path = PathBuf::from_str(path)
-            .inspect_err(|e| tracing::error!("failed to parse path: {e}"))?;
+        let path_buf = PathBuf::from_str(path)?;
+        let mtime = path_buf.metadata()?.modified()?;
 
-        tracing::debug!("reading gnucash data from file");
-        let data = Self::gnucash_data(&path)
-            .inspect_err(|e| tracing::error!("failed to read gnucash data: {e}"))?;
+        let cache = Self::load_cache_from_disk(&path_buf)?;
 
-        tracing::debug!("parsing xml document");
-        let doc = Document::parse(&data)
-            .inspect_err(|e| tracing::error!("failed to parse xml document: {e}"))?;
+        Ok(Self {
+            file_path: Arc::new(path_buf),
+            file_modified_time: Arc::new(Mutex::new(mtime)),
+            cache: Arc::new(RwLock::new(cache)),
+        })
+    }
 
-        tracing::debug!("parsing accounts");
-        let (accounts, commodity_accounts, same_parent_accounts, name_accounts) =
-            Self::parse_account_map(&doc)
-                .inspect_err(|e| tracing::error!("failed to parse account map: {e}"))?;
-
-        tracing::debug!("parsing commodities");
-        let (commodities, namespace_commodities) = Self::parse_commodity_map(&doc)
-            .inspect_err(|e| tracing::error!("failed to parse commodity map: {e}"))?;
-
-        tracing::debug!("parsing prices");
-        let (prices, commodity_prices, currency_prices) = Self::parse_price_map(&doc)
-            .inspect_err(|e| tracing::error!("failed to parse price map: {e}"))?;
-
-        tracing::debug!("parsing splits");
-        let (splits, account_splits, transaction_splits) = Self::parse_split_map(&doc)
-            .inspect_err(|e| tracing::error!("failed to parse split map: {e}"))?;
-
-        tracing::debug!("parsing transactions");
-        let (transactions, currency_transactions) = Self::parse_transaction_map(&doc)
-            .inspect_err(|e| tracing::error!("failed to parse transaction map: {e}"))?;
-
-        tracing::debug!(
-            account_count = accounts.len(),
-            commodity_count = commodities.len(),
-            price_count = prices.len(),
-            split_count = splits.len(),
-            transaction_count = transactions.len(),
-            "xml data parsed successfully"
-        );
-
-        let query = Self {
-            file_modified_time: Arc::new(Mutex::new(path.metadata()?.modified()?)),
-            file_path: Arc::new(path),
-
-            accounts: Arc::new(Mutex::new(accounts)),
-            commodity_accounts: Arc::new(Mutex::new(commodity_accounts)),
-            same_parent_accounts: Arc::new(Mutex::new(same_parent_accounts)),
-            name_accounts: Arc::new(Mutex::new(name_accounts)),
-
-            commodities: Arc::new(Mutex::new(commodities)),
-            namespace_commodities: Arc::new(Mutex::new(namespace_commodities)),
-
-            prices: Arc::new(Mutex::new(prices)),
-            commodity_prices: Arc::new(Mutex::new(commodity_prices)),
-            currency_prices: Arc::new(Mutex::new(currency_prices)),
-
-            splits: Arc::new(Mutex::new(splits)),
-            account_splits: Arc::new(Mutex::new(account_splits)),
-            transaction_splits: Arc::new(Mutex::new(transaction_splits)),
-
-            transactions: Arc::new(Mutex::new(transactions)),
-            currency_transactions: Arc::new(Mutex::new(currency_transactions)),
-        };
+    fn load_cache_from_disk(path: &Path) -> Result<XMLCache, Error> {
+        let data = Self::gnucash_data(path)?;
+        let doc = Document::parse(&data)?;
 
         doc.root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
-            .ok_or_else(|| Error::NoBook(query.file_path.display().to_string()))?;
+            .ok_or_else(|| Error::NoBook(path.display().to_string()))?;
 
-        tracing::info!("xml query initialized successfully");
-        Ok(query)
+        let (acc, acc_c, acc_p, acc_n) = Self::parse_accounts_map(&doc)?;
+        let (comm, comm_n) = Self::parse_commodity_map(&doc)?;
+        let (prc, prc_c, prc_cur) = Self::parse_price_map(&doc)?;
+        let (spl, spl_a, spl_t) = Self::parse_split_map(&doc)?;
+        let (txn, txn_c) = Self::parse_transaction_map(&doc)?;
+
+        Ok(XMLCache {
+            accounts: acc,
+            commodity_accounts: acc_c,
+            same_parent_accounts: acc_p,
+            name_accounts: acc_n,
+            commodities: comm,
+            namespace_commodities: comm_n,
+            prices: prc,
+            commodity_prices: prc_c,
+            currency_prices: prc_cur,
+            splits: spl,
+            account_splits: spl_a,
+            transaction_splits: spl_t,
+            transactions: txn,
+            currency_transactions: txn_c,
+        })
     }
 
     #[instrument(skip(file_path), fields(path = %file_path.display()))]
@@ -158,10 +130,10 @@ impl XMLQuery {
         Ok(data)
     }
 
-    fn parse_account_map(
+    fn parse_accounts_map(
         doc: &Document,
-    ) -> Result<(AccountMap, AccountsnMap, AccountsnMap, AccountsnMap), Error> {
-        let mut account_map = HashMap::new();
+    ) -> Result<(AccountMap, AccountsMap, AccountsMap, AccountsMap), Error> {
+        let mut accounts_map = HashMap::new();
         let mut commodity_accounts_map: HashMap<String, Vec<Arc<Account>>> = HashMap::new();
         let mut same_parent_accounts_map: HashMap<String, Vec<Arc<Account>>> = HashMap::new();
         let mut name_accounts_map: HashMap<String, Vec<Arc<Account>>> = HashMap::new();
@@ -175,7 +147,7 @@ impl XMLQuery {
         for n in book.children().filter(|n| n.has_tag_name("account")) {
             let account = Arc::new(Account::try_from(n)?);
 
-            account_map.insert(account.guid.clone(), account.clone());
+            accounts_map.insert(account.guid.clone(), account.clone());
 
             commodity_accounts_map
                 .entry(account.commodity_guid.clone().unwrap_or_default())
@@ -194,7 +166,7 @@ impl XMLQuery {
         }
 
         Ok((
-            Arc::new(account_map),
+            Arc::new(accounts_map),
             Arc::new(commodity_accounts_map),
             Arc::new(same_parent_accounts_map),
             Arc::new(name_accounts_map),
@@ -363,17 +335,19 @@ impl XMLQuery {
     }
 
     fn is_file_unchanged(&self) -> Result<bool, Error> {
-        let meta = self.file_path.metadata()?;
-        let time = meta.modified()?;
+        let current_mtime = self.file_path.metadata()?.modified()?;
 
-        let mut record_time = self.file_modified_time.lock().unwrap();
-        let is_unchanged = time == *record_time;
+        let mut last_mtime = self
+            .file_modified_time
+            .lock()
+            .map_err(|e| Error::Internal(format!("Mtime lock poisoned: {e}")))?;
 
-        if !is_unchanged {
-            *record_time = time;
+        if current_mtime == *last_mtime {
+            Ok(true)
+        } else {
+            *last_mtime = current_mtime;
+            Ok(false)
         }
-
-        Ok(is_unchanged)
     }
 
     fn update_cache(&self) -> Result<(), Error> {
@@ -381,44 +355,16 @@ impl XMLQuery {
             return Ok(());
         }
 
-        let data = Self::gnucash_data(&self.file_path)?;
-        let doc = Document::parse(&data)?;
+        let new_cache = Self::load_cache_from_disk(&self.file_path)?;
 
-        {
-            (
-                *self.accounts.lock().unwrap(),
-                *self.commodity_accounts.lock().unwrap(),
-                *self.same_parent_accounts.lock().unwrap(),
-                *self.name_accounts.lock().unwrap(),
-            ) = Self::parse_account_map(&doc)?;
-        }
-        {
-            (
-                *self.commodities.lock().unwrap(),
-                *self.namespace_commodities.lock().unwrap(),
-            ) = Self::parse_commodity_map(&doc)?;
-        }
-        {
-            (
-                *self.prices.lock().unwrap(),
-                *self.commodity_prices.lock().unwrap(),
-                *self.currency_prices.lock().unwrap(),
-            ) = Self::parse_price_map(&doc)?;
-        }
-        {
-            (
-                *self.splits.lock().unwrap(),
-                *self.account_splits.lock().unwrap(),
-                *self.transaction_splits.lock().unwrap(),
-            ) = Self::parse_split_map(&doc)?;
-        }
-        {
-            (
-                *self.transactions.lock().unwrap(),
-                *self.currency_transactions.lock().unwrap(),
-            ) = Self::parse_transaction_map(&doc)?;
-        }
+        let mut cache_lock = self
+            .cache
+            .write()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
 
+        *cache_lock = new_cache;
+
+        tracing::info!("XML cache updated successfully");
         Ok(())
     }
 }

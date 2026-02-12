@@ -52,10 +52,10 @@ FROM transactions
 ";
 
 impl TransactionQ for PostgreSQLQuery {
-    type T = Transaction;
+    type Item = Transaction;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::T>, Error> {
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching all transactions from postgresql");
         sqlx::query_as(SEL)
             .fetch_all(&self.pool)
@@ -65,7 +65,7 @@ impl TransactionQ for PostgreSQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching transactions by guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = $1")))
             .bind(guid)
@@ -76,7 +76,7 @@ impl TransactionQ for PostgreSQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
+    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching transactions by currency_guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE currency_guid = $1")))
             .bind(guid)

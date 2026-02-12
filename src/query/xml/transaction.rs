@@ -2,6 +2,7 @@
 
 use chrono::NaiveDateTime;
 use roxmltree::Node;
+use std::sync::Arc;
 use tracing::instrument;
 
 use super::XMLQuery;
@@ -21,12 +22,24 @@ pub struct Transaction {
 impl XMLQuery {
     fn transaction_map(&self) -> Result<super::TransactionMap, Error> {
         self.update_cache()?;
-        Ok(self.transactions.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.transactions))
     }
 
     fn currency_transactions_map(&self) -> Result<super::TransactionsMap, Error> {
         self.update_cache()?;
-        Ok(self.currency_transactions.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.currency_transactions))
     }
 }
 
@@ -121,10 +134,10 @@ impl TransactionT for Transaction {
 }
 
 impl TransactionQ for XMLQuery {
-    type T = Transaction;
+    type Item = Transaction;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::T>, Error> {
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching all transactions from xml");
         let map = self
             .transaction_map()
@@ -134,7 +147,7 @@ impl TransactionQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching transactions by guid from xml");
         let map = self
             .transaction_map()
@@ -144,7 +157,7 @@ impl TransactionQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
+    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching transactions by currency_guid from xml");
         let map = self
             .currency_transactions_map()

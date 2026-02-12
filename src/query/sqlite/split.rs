@@ -5,6 +5,7 @@ use chrono::{DateTime, NaiveDateTime};
 use rusqlite::Row;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
+use tokio::task::spawn_blocking;
 use tracing::instrument;
 
 use super::SQLiteQuery;
@@ -119,74 +120,116 @@ FROM splits
 ";
 
 impl SplitQ for SQLiteQuery {
-    type S = Split;
+    type Item = Split;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::S>, Error> {
-        tracing::debug!("fetching all splits from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(SEL)
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Split::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "splits fetched from sqlite");
-        Ok(result)
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+
+        spawn_blocking(move || {
+            tracing::debug!("fetching all splits from sqlite");
+
+            let conn = pool.get()?;
+
+            let mut stmt = conn
+                .prepare_cached(SEL)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "splits fetched from sqlite");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        tracing::debug!("fetching split by guid from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE guid = ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([guid])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Split::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "splits found by guid");
-        Ok(result)
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let guid_owned = guid.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            tracing::debug!("fetching split by guid from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE guid = ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "splits found by guid");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn account_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        tracing::debug!("fetching splits by account_guid from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE account_guid = ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([guid])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Split::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "splits found by account_guid");
-        Ok(result)
+    async fn account_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let guid_owned = guid.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            tracing::debug!("fetching splits by account_guid from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE account_guid = ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+
+            let items: Vec<Split> = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "splits found by account_guid");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
-        tracing::debug!("fetching splits by tx_guid from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE tx_guid = ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([guid])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Split::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "splits found by tx_guid");
-        Ok(result)
+    async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let guid_owned = guid.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            tracing::debug!("fetching splits by tx_guid from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE tx_guid = ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "splits found by tx_guid");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 }
 

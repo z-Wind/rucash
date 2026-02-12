@@ -1,6 +1,7 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use roxmltree::Node;
+use std::sync::Arc;
 use tracing::instrument;
 
 use super::XMLQuery;
@@ -24,24 +25,48 @@ pub struct Account {
 }
 
 impl XMLQuery {
-    fn account_map(&self) -> Result<super::AccountMap, Error> {
+    fn accounts_map(&self) -> Result<super::AccountMap, Error> {
         self.update_cache()?;
-        Ok(self.accounts.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.accounts))
     }
 
-    fn commodity_accounts_map(&self) -> Result<super::AccountsnMap, Error> {
+    fn commodity_accounts_map(&self) -> Result<super::AccountsMap, Error> {
         self.update_cache()?;
-        Ok(self.commodity_accounts.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.commodity_accounts))
     }
 
-    fn same_parent_accounts_map(&self) -> Result<super::AccountsnMap, Error> {
+    fn same_parent_accounts_map(&self) -> Result<super::AccountsMap, Error> {
         self.update_cache()?;
-        Ok(self.same_parent_accounts.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.same_parent_accounts))
     }
 
-    fn name_accounts_map(&self) -> Result<super::AccountsnMap, Error> {
+    fn name_accounts_map(&self) -> Result<super::AccountsMap, Error> {
         self.update_cache()?;
-        Ok(self.name_accounts.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.name_accounts))
     }
 }
 
@@ -156,13 +181,13 @@ impl AccountT for Account {
 }
 
 impl AccountQ for XMLQuery {
-    type A = Account;
+    type Item = Account;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::A>, Error> {
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching all accounts from xml");
         let map = self
-            .account_map()
+            .accounts_map()
             .inspect_err(|e| tracing::error!("failed to get account map: {e}"))?;
 
         let result: Vec<_> = map.values().map(|x| (**x).clone()).collect();
@@ -171,10 +196,10 @@ impl AccountQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching account by guid from xml");
         let map = self
-            .account_map()
+            .accounts_map()
             .inspect_err(|e| tracing::error!("failed to get account map: {e}"))?;
 
         let result: Vec<_> = map.get(guid).into_iter().map(|x| (**x).clone()).collect();
@@ -183,7 +208,7 @@ impl AccountQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching accounts by commodity_guid from xml");
         let map = self
             .commodity_accounts_map()
@@ -198,7 +223,7 @@ impl AccountQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+    async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching accounts by parent_guid from xml");
         let map = self
             .same_parent_accounts_map()
@@ -213,7 +238,7 @@ impl AccountQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn name(&self, name: &str) -> Result<Vec<Self::A>, Error> {
+    async fn name(&self, name: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching accounts by name from xml");
         let map = self
             .name_accounts_map()
@@ -228,10 +253,10 @@ impl AccountQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::A>, Error> {
+    async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("searching accounts with name pattern from xml");
         let map = self
-            .account_map()
+            .accounts_map()
             .inspect_err(|e| tracing::error!("failed to get account map: {e}"))?;
 
         let result: Vec<_> = map

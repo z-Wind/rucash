@@ -10,6 +10,8 @@ pub enum Error {
     NameMultipleFound { model: String, name: String },
     #[error("Exchange graph not available")]
     NoExchangeGraph,
+    #[error("Internal system error: {0}")]
+    Internal(String),
 
     #[error("I/O error: {0}")]
     IO(#[from] std::io::Error),
@@ -21,6 +23,9 @@ pub enum Error {
     #[cfg(feature = "sqlite")]
     #[error("rusqlite error: {0}")]
     Rusqlite(#[from] rusqlite::Error),
+    #[cfg(feature = "sqlite")]
+    #[error("r2d2 error: {0}")]
+    R2d2(#[from] r2d2::Error),
 
     #[cfg(feature = "xml")]
     #[error("roxmltree error: {0}")]

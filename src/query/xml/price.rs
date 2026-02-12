@@ -4,6 +4,7 @@ use chrono::NaiveDateTime;
 use roxmltree::Node;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
+use std::sync::Arc;
 use tracing::instrument;
 
 use super::XMLQuery;
@@ -25,17 +26,35 @@ pub struct Price {
 impl XMLQuery {
     fn price_map(&self) -> Result<super::PriceMap, Error> {
         self.update_cache()?;
-        Ok(self.prices.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.prices))
     }
 
     fn commodity_prices_map(&self) -> Result<super::PricesMap, Error> {
         self.update_cache()?;
-        Ok(self.commodity_prices.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.commodity_prices))
     }
 
     fn currency_prices_map(&self) -> Result<super::PricesMap, Error> {
         self.update_cache()?;
-        Ok(self.currency_prices.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.currency_prices))
     }
 }
 
@@ -156,10 +175,10 @@ impl PriceT for Price {
 }
 
 impl PriceQ for XMLQuery {
-    type P = Price;
+    type Item = Price;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::P>, Error> {
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching all prices from xml");
         let map = self
             .price_map()
@@ -169,7 +188,7 @@ impl PriceQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching prices by guid from xml");
         let map = self
             .price_map()
@@ -179,7 +198,7 @@ impl PriceQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching prices by commodity_guid from xml");
         let map = self
             .commodity_prices_map()
@@ -192,7 +211,7 @@ impl PriceQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching prices by currency_guid from xml");
         let map = self
             .currency_prices_map()
@@ -205,7 +224,7 @@ impl PriceQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn commodity_or_currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+    async fn commodity_or_currency_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching prices by commodity or currency guid from xml");
         let map = self
             .commodity_prices_map()

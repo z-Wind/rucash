@@ -1,6 +1,7 @@
 // ref: https://wiki.gnucash.org/wiki/GnuCash_XML_format
 
 use roxmltree::Node;
+use std::sync::Arc;
 use tracing::instrument;
 
 use super::XMLQuery;
@@ -23,12 +24,24 @@ pub struct Commodity {
 impl XMLQuery {
     fn commodity_map(&self) -> Result<super::CommodityMap, Error> {
         self.update_cache()?;
-        Ok(self.commodities.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.commodities))
     }
 
     fn namespace_commodities_map(&self) -> Result<super::CommoditiesMap, Error> {
         self.update_cache()?;
-        Ok(self.namespace_commodities.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.namespace_commodities))
     }
 }
 
@@ -120,10 +133,10 @@ impl CommodityT for Commodity {
 }
 
 impl CommodityQ for XMLQuery {
-    type C = Commodity;
+    type Item = Commodity;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::C>, Error> {
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching all commodities from xml");
         let map = self
             .commodity_map()
@@ -133,7 +146,7 @@ impl CommodityQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::C>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching commodities by guid from xml");
         let map = self
             .commodity_map()
@@ -143,7 +156,7 @@ impl CommodityQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn namespace(&self, namespace: &str) -> Result<Vec<Self::C>, Error> {
+    async fn namespace(&self, namespace: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching commodities by namespace from xml");
         let map = self
             .namespace_commodities_map()

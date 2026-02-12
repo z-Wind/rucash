@@ -69,10 +69,10 @@ FROM prices
 ";
 
 impl PriceQ for MySQLQuery {
-    type P = Price;
+    type Item = Price;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::P>, Error> {
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching all prices from mysql");
         sqlx::query_as(SEL)
             .fetch_all(&self.pool)
@@ -81,7 +81,7 @@ impl PriceQ for MySQLQuery {
             .map_err(std::convert::Into::into)
     }
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching prices by guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = ?")))
             .bind(guid)
@@ -91,7 +91,7 @@ impl PriceQ for MySQLQuery {
             .map_err(std::convert::Into::into)
     }
     #[instrument(skip(self))]
-    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching prices by commodity_guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE commodity_guid = ?")))
             .bind(guid)
@@ -101,7 +101,7 @@ impl PriceQ for MySQLQuery {
             .map_err(std::convert::Into::into)
     }
     #[instrument(skip(self))]
-    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching prices by currency_guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE currency_guid = ?")))
             .bind(guid)
@@ -111,7 +111,7 @@ impl PriceQ for MySQLQuery {
             .map_err(std::convert::Into::into)
     }
     #[instrument(skip(self))]
-    async fn commodity_or_currency_guid(&self, guid: &str) -> Result<Vec<Self::P>, Error> {
+    async fn commodity_or_currency_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching prices by commodity or currency guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!(
             "{SEL}\nWHERE commodity_guid = ? OR currency_guid = ?"

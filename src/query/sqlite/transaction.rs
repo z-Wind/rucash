@@ -3,6 +3,7 @@
 
 use chrono::NaiveDateTime;
 use rusqlite::Row;
+use tokio::task::spawn_blocking;
 use tracing::instrument;
 
 use super::SQLiteQuery;
@@ -67,57 +68,88 @@ FROM transactions
 ";
 
 impl TransactionQ for SQLiteQuery {
-    type T = Transaction;
+    type Item = Transaction;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::T>, Error> {
-        tracing::debug!("fetching all transactions from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(SEL)
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Transaction::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "transactions fetched from sqlite");
-        Ok(result)
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+
+        spawn_blocking(move || {
+            tracing::debug!("fetching all transactions from sqlite");
+
+            let conn = pool.get()?;
+
+            let mut stmt = conn
+                .prepare_cached(SEL)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "transactions fetched from sqlite");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error in spawn_blocking: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
-        tracing::debug!("fetching transaction by guid from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE guid = ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([guid])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Transaction::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "transactions found by guid");
-        Ok(result)
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let guid_owned = guid.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            tracing::debug!("fetching transaction by guid from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE guid = ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "transactions found by guid");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::T>, Error> {
-        tracing::debug!("fetching transactions by currency_guid from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE currency_guid = ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([guid])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Transaction::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "transactions found by currency_guid");
-        Ok(result)
+    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let guid_owned = guid.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            tracing::debug!("fetching transactions by currency_guid from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE currency_guid = ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "transactions found by currency_guid");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 }
 

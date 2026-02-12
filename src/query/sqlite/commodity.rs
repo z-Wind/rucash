@@ -1,6 +1,7 @@
 // ref: https://piecash.readthedocs.io/en/master/object_model.html
 // ref: https://wiki.gnucash.org/wiki/SQL
 use rusqlite::Row;
+use tokio::task::spawn_blocking;
 use tracing::instrument;
 
 use super::SQLiteQuery;
@@ -83,57 +84,88 @@ FROM commodities
 ";
 
 impl CommodityQ for SQLiteQuery {
-    type C = Commodity;
+    type Item = Commodity;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::C>, Error> {
-        tracing::debug!("fetching all commodities from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(SEL)
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Commodity::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "commodities fetched from sqlite");
-        Ok(result)
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+
+        spawn_blocking(move || {
+            tracing::debug!("fetching all commodities from sqlite");
+
+            let conn = pool.get()?;
+
+            let mut stmt = conn
+                .prepare_cached(SEL)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "commodities fetched from sqlite");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error in spawn_blocking: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::C>, Error> {
-        tracing::debug!("fetching commodity by guid from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE guid = ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([guid])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Commodity::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "commodities found by guid");
-        Ok(result)
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let guid_owned = guid.to_string();
+
+        spawn_blocking(move || {
+            tracing::debug!("fetching commodity by guid from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE guid = ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "commodities found by guid");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error in spawn_blocking: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn namespace(&self, namespace: &str) -> Result<Vec<Self::C>, Error> {
-        tracing::debug!("fetching commodities by namespace from sqlite");
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(&format!("{SEL}\nWHERE namespace = ?"))
-            .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
-        let result = stmt
-            .query([namespace])
-            .inspect_err(|e| tracing::error!("failed to execute query: {e}"))?
-            .mapped(|row| Commodity::try_from(row))
-            .collect::<Result<Vec<_>, _>>()
-            .inspect_err(|e| tracing::error!("failed to map query results: {e}"))?;
-        tracing::debug!(count = result.len(), "commodities found by namespace");
-        Ok(result)
+    async fn namespace(&self, namespace: &str) -> Result<Vec<Self::Item>, Error> {
+        let pool = self.pool.clone();
+        let namespace_owned = namespace.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            tracing::debug!("fetching commodities by namespace from sqlite");
+
+            let conn = pool.get()?;
+
+            let sql = format!("{SEL}\nWHERE namespace = ?");
+            let mut stmt = conn
+                .prepare_cached(&sql)
+                .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
+
+            let rows = stmt.query_map([namespace_owned], |row| Self::Item::try_from(row))?;
+
+            let items = rows
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
+
+            tracing::debug!(count = items.len(), "commodities found by namespace");
+            Ok(items)
+        })
+        .await
+        .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 }
 

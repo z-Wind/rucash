@@ -152,11 +152,13 @@ where
         book: &'a Book<Q>,
     ) -> Result<crate::Num, Error> {
         tracing::debug!("calculating balance into currency");
+
         let splits = self
             .splits()
             .await
             .inspect_err(|e| tracing::error!("failed to fetch splits: {e}"))?;
         let mut net: crate::Num = splits.iter().map(|s| s.quantity).sum();
+
         tracing::debug!(
             ?net,
             split_count = splits.len(),
@@ -184,17 +186,14 @@ where
             net += child_net;
         }
 
-        let rate = commodity.sell(currency, book).await.unwrap_or_else(|| {
+        let rate = commodity.sell(currency, book).await.ok_or_else(|| {
             tracing::error!(
-                commodity = %commodity.mnemonic,
-                currency = %currency.mnemonic,
-                "no exchange rate available"
+                from = %commodity.mnemonic,
+                to = %currency.mnemonic,
+                "No exchange rate available for currency conversion"
             );
-            panic!(
-                "must have rate {} to {}",
-                commodity.mnemonic, currency.mnemonic
-            )
-        });
+            Error::NoExchangeGraph
+        })?;
 
         let result = net * rate;
         tracing::debug!(?result, ?rate, "balance calculated in currency");

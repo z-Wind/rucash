@@ -77,10 +77,10 @@ FROM accounts
 ";
 
 impl AccountQ for MySQLQuery {
-    type A = Account;
+    type Item = Account;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::A>, Error> {
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching all accounts from mysql");
         sqlx::query_as(SEL)
             .fetch_all(&self.pool)
@@ -90,7 +90,7 @@ impl AccountQ for MySQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching accounts by guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = ?")))
             .bind(guid)
@@ -101,7 +101,7 @@ impl AccountQ for MySQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching accounts by commodity_guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE commodity_guid = ?")))
             .bind(guid)
@@ -112,7 +112,7 @@ impl AccountQ for MySQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::A>, Error> {
+    async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching accounts by parent_guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE parent_guid = ?")))
             .bind(guid)
@@ -122,7 +122,7 @@ impl AccountQ for MySQLQuery {
             .map_err(std::convert::Into::into)
     }
 
-    async fn name(&self, name: &str) -> Result<Vec<Self::A>, Error> {
+    async fn name(&self, name: &str) -> Result<Vec<Self::Item>, Error> {
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE name = ?")))
             .bind(name)
             .fetch_all(&self.pool)
@@ -132,7 +132,7 @@ impl AccountQ for MySQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::A>, Error> {
+    async fn contains_name_ignore_case(&self, name: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("searching accounts with name pattern from mysql");
         let name = format!("%{name}%");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE name LIKE ?")))

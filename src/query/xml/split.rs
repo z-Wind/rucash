@@ -4,6 +4,7 @@ use chrono::{DateTime, NaiveDateTime};
 use roxmltree::Node;
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
+use std::sync::Arc;
 use tracing::instrument;
 
 use super::XMLQuery;
@@ -29,17 +30,35 @@ pub struct Split {
 impl XMLQuery {
     fn split_map(&self) -> Result<super::SplitMap, Error> {
         self.update_cache()?;
-        Ok(self.splits.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.splits))
     }
 
     fn account_splits_map(&self) -> Result<super::SplitsMap, Error> {
         self.update_cache()?;
-        Ok(self.account_splits.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.account_splits))
     }
 
     fn transaction_splits_map(&self) -> Result<super::SplitsMap, Error> {
         self.update_cache()?;
-        Ok(self.transaction_splits.lock().unwrap().clone())
+
+        let cache = self
+            .cache
+            .read()
+            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
+
+        Ok(Arc::clone(&cache.transaction_splits))
     }
 }
 
@@ -198,10 +217,10 @@ impl SplitT for Split {
 }
 
 impl SplitQ for XMLQuery {
-    type S = Split;
+    type Item = Split;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::S>, Error> {
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching all splits from xml");
         let map = self
             .split_map()
@@ -211,7 +230,7 @@ impl SplitQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching splits by guid from xml");
         let map = self
             .split_map()
@@ -221,7 +240,7 @@ impl SplitQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn account_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
+    async fn account_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching splits by account_guid from xml");
         let map = self
             .account_splits_map()
@@ -234,7 +253,7 @@ impl SplitQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
+    async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching splits by tx_guid from xml");
         let map = self
             .transaction_splits_map()

@@ -4,8 +4,9 @@ pub(crate) mod price;
 pub(crate) mod split;
 pub(crate) mod transaction;
 
+use r2d2::ManageConnection;
 use rusqlite::{Connection, OpenFlags};
-use std::sync::{Arc, Mutex};
+use std::path::PathBuf;
 use tracing::instrument;
 
 use super::Query;
@@ -13,7 +14,7 @@ use crate::error::Error;
 
 #[derive(Debug, Clone)]
 pub struct SQLiteQuery {
-    conn: Arc<Mutex<Connection>>,
+    pool: r2d2::Pool<SqliteManager>,
 }
 
 impl SQLiteQuery {
@@ -27,22 +28,52 @@ impl SQLiteQuery {
     /// `file:/path-to-db/data.db` | Open the file `data.db` |
     #[instrument]
     pub fn new(uri: &str) -> Result<Self, Error> {
-        tracing::debug!("opening sqlite database");
-        let conn = Connection::open_with_flags(
-            uri,
-            OpenFlags::SQLITE_OPEN_READ_ONLY
-                | OpenFlags::SQLITE_OPEN_URI
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
-        .inspect_err(|e| tracing::error!("failed to open sqlite connection: {e}"))?;
-        let conn = Arc::new(Mutex::new(conn));
+        tracing::debug!("initializing sqlite connection pool");
 
-        tracing::info!("sqlite connection established");
-        Ok(Self { conn })
+        let manager = SqliteManager::new(uri);
+
+        let pool = r2d2::Pool::builder()
+            .max_size(10)
+            .connection_timeout(std::time::Duration::from_secs(5))
+            .build(manager)?;
+
+        tracing::info!("sqlite connection pool established");
+        Ok(Self { pool })
     }
 }
 
 impl Query for SQLiteQuery {}
+
+#[derive(Debug)]
+struct SqliteManager {
+    path: PathBuf,
+}
+
+impl SqliteManager {
+    fn new<P: Into<PathBuf>>(path: P) -> Self {
+        Self { path: path.into() }
+    }
+}
+
+impl ManageConnection for SqliteManager {
+    type Connection = Connection;
+    type Error = rusqlite::Error;
+
+    fn connect(&self) -> Result<Self::Connection, Self::Error> {
+        Connection::open_with_flags(
+            &self.path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
+        )
+    }
+
+    fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {
+        conn.execute_batch("")
+    }
+
+    fn has_broken(&self, _conn: &mut Self::Connection) -> bool {
+        false
+    }
+}
 
 #[cfg(test)]
 mod tests {

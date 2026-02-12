@@ -66,10 +66,10 @@ FROM commodities
 ";
 
 impl CommodityQ for PostgreSQLQuery {
-    type C = Commodity;
+    type Item = Commodity;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::C>, Error> {
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching all commodities from postgresql");
         sqlx::query_as(SEL)
             .fetch_all(&self.pool)
@@ -79,7 +79,7 @@ impl CommodityQ for PostgreSQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::C>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching commodities by guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = $1")))
             .bind(guid)
@@ -90,7 +90,7 @@ impl CommodityQ for PostgreSQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn namespace(&self, namespace: &str) -> Result<Vec<Self::C>, Error> {
+    async fn namespace(&self, namespace: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching commodities by namespace from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE namespace = $1")))
             .bind(namespace)

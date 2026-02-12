@@ -23,6 +23,7 @@ where
     #[instrument(skip(query))]
     pub async fn new(query: Q) -> Result<Self, Error> {
         tracing::debug!("creating new book instance");
+
         let query = Arc::new(query);
         let mut book = Self {
             query,
@@ -32,6 +33,7 @@ where
         book.update_exchange_graph()
             .await
             .inspect_err(|e| tracing::error!("failed to update exchange graph: {e}"))?;
+
         tracing::info!("book created successfully");
         Ok(book)
     }
@@ -39,15 +41,18 @@ where
     #[instrument(skip(self))]
     pub async fn accounts(&self) -> Result<Vec<Account<Q>>, Error> {
         tracing::debug!("fetching all accounts");
+
         let accounts = self
             .query
             .accounts()
             .await
             .inspect_err(|e| tracing::error!("failed to fetch accounts: {e}"))?;
+
         let result: Vec<_> = accounts
             .into_iter()
             .map(|x| Account::from_with_query(&x, self.query.clone()))
             .collect();
+
         tracing::debug!(count = result.len(), "accounts fetched successfully");
         Ok(result)
     }
@@ -58,15 +63,18 @@ where
         name: &str,
     ) -> Result<Vec<Account<Q>>, Error> {
         tracing::debug!("searching accounts containing name: {name}");
+
         let accounts = self
             .query
             .accounts_contains_name_ignore_case(name)
             .await
             .inspect_err(|e| tracing::error!("failed to search accounts: {e}"))?;
+
         let result: Vec<_> = accounts
             .into_iter()
             .map(|x| Account::from_with_query(&x, self.query.clone()))
             .collect();
+
         tracing::debug!(count = result.len(), "found accounts matching name pattern");
         Ok(result)
     }
@@ -99,15 +107,18 @@ where
     #[instrument(skip(self))]
     pub async fn splits(&self) -> Result<Vec<Split<Q>>, Error> {
         tracing::debug!("fetching all splits");
+
         let splits = self
             .query
             .splits()
             .await
             .inspect_err(|e| tracing::error!("failed to fetch splits: {e}"))?;
+
         let result: Vec<_> = splits
             .into_iter()
             .map(|x| Split::from_with_query(&x, self.query.clone()))
             .collect();
+
         tracing::debug!(count = result.len(), "splits fetched successfully");
         Ok(result)
     }
@@ -115,15 +126,18 @@ where
     #[instrument(skip(self))]
     pub async fn transactions(&self) -> Result<Vec<Transaction<Q>>, Error> {
         tracing::debug!("fetching all transactions");
+
         let transactions = self
             .query
             .transactions()
             .await
             .inspect_err(|e| tracing::error!("failed to fetch transactions: {e}"))?;
+
         let result: Vec<_> = transactions
             .into_iter()
             .map(|x| Transaction::from_with_query(&x, self.query.clone()))
             .collect();
+
         tracing::debug!(count = result.len(), "transactions fetched successfully");
         Ok(result)
     }
@@ -131,15 +145,18 @@ where
     #[instrument(skip(self))]
     pub async fn prices(&self) -> Result<Vec<Price<Q>>, Error> {
         tracing::debug!("fetching all prices");
+
         let prices = self
             .query
             .prices()
             .await
             .inspect_err(|e| tracing::error!("failed to fetch prices: {e}"))?;
+
         let result: Vec<_> = prices
             .into_iter()
             .map(|x| Price::from_with_query(&x, self.query.clone()))
             .collect();
+
         tracing::debug!(count = result.len(), "prices fetched successfully");
         Ok(result)
     }
@@ -147,15 +164,18 @@ where
     #[instrument(skip(self))]
     pub async fn commodities(&self) -> Result<Vec<Commodity<Q>>, Error> {
         tracing::debug!("fetching all commodities");
+
         let commodities = self
             .query
             .commodities()
             .await
             .inspect_err(|e| tracing::error!("failed to fetch commodities: {e}"))?;
+
         let result: Vec<_> = commodities
             .into_iter()
             .map(|x| Commodity::from_with_query(&x, self.query.clone()))
             .collect();
+
         tracing::debug!(count = result.len(), "commodities fetched successfully");
         Ok(result)
     }
@@ -163,15 +183,18 @@ where
     #[instrument(skip(self))]
     pub async fn currencies(&self) -> Result<Vec<Commodity<Q>>, Error> {
         tracing::debug!("fetching all currencies");
+
         let currencies = self
             .query
             .currencies()
             .await
             .inspect_err(|e| tracing::error!("failed to fetch currencies: {e}"))?;
+
         let result: Vec<_> = currencies
             .into_iter()
             .map(|x| Commodity::from_with_query(&x, self.query.clone()))
             .collect();
+
         tracing::debug!(count = result.len(), "currencies fetched successfully");
         Ok(result)
     }
@@ -186,8 +209,11 @@ where
         currency: &Commodity<Q>,
     ) -> Option<crate::Num> {
         tracing::debug!("calculating exchange rate");
+
         let graph = self.exchange_graph.as_ref()?;
+
         let result = graph.lock().await.cal(commodity, currency);
+
         if let Some(rate) = result {
             tracing::debug!(?rate, "exchange rate calculated");
             Some(rate)
@@ -270,10 +296,12 @@ mod tests {
 
         #[test(tokio::test)]
         async fn test_new_fail() {
-            assert!(matches!(
-                SQLiteQuery::new("tests/sample/no.gnucash"),
-                Err(crate::Error::Rusqlite(_))
-            ));
+            let res = SQLiteQuery::new("tests/sample/no.gnucash");
+
+            assert!(
+                matches!(res, Err(crate::Error::R2d2(_))),
+                "Expected R2d2 error when file is missing, but got: {res:?}"
+            );
         }
 
         #[test(tokio::test)]

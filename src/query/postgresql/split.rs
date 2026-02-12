@@ -98,10 +98,10 @@ FROM splits
 ";
 
 impl SplitQ for PostgreSQLQuery {
-    type S = Split;
+    type Item = Split;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::S>, Error> {
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching all splits from postgresql");
         sqlx::query_as(SEL)
             .fetch_all(&self.pool)
@@ -111,7 +111,7 @@ impl SplitQ for PostgreSQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching splits by guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = $1")))
             .bind(guid)
@@ -122,7 +122,7 @@ impl SplitQ for PostgreSQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn account_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
+    async fn account_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching splits by account_guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE account_guid = $1")))
             .bind(guid)
@@ -133,7 +133,7 @@ impl SplitQ for PostgreSQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::S>, Error> {
+    async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching splits by tx_guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE tx_guid = $1")))
             .bind(guid)

@@ -66,10 +66,10 @@ FROM commodities
 ";
 
 impl CommodityQ for MySQLQuery {
-    type C = Commodity;
+    type Item = Commodity;
 
     #[instrument(skip(self))]
-    async fn all(&self) -> Result<Vec<Self::C>, Error> {
+    async fn all(&self) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching all commodities from mysql");
         sqlx::query_as(SEL)
             .fetch_all(&self.pool)
@@ -79,7 +79,7 @@ impl CommodityQ for MySQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::C>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching commodities by guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = ?")))
             .bind(guid)
@@ -90,7 +90,7 @@ impl CommodityQ for MySQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn namespace(&self, namespace: &str) -> Result<Vec<Self::C>, Error> {
+    async fn namespace(&self, namespace: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching commodities by namespace from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE namespace = ?")))
             .bind(namespace)
