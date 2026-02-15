@@ -39,7 +39,4 @@ pub enum Error {
     #[cfg(feature = "xml")]
     #[error("Chrono parse error: {0}")]
     ChronoParse(#[from] chrono::ParseError),
-    #[cfg(feature = "xml")]
-    #[error("PathBuf error: {0}")]
-    PathBuf(#[from] core::convert::Infallible),
 }

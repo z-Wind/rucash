@@ -202,41 +202,8 @@ where
 
     #[instrument(skip(self, book), fields(account_guid = %self.guid, account_name = %self.name))]
     pub async fn balance(&self, book: &Book<Q>) -> Result<crate::Num, Error> {
-        tracing::debug!("calculating account balance");
-        let splits = self
-            .splits()
-            .await
-            .inspect_err(|e| tracing::error!("failed to fetch splits: {e}"))?;
-        let mut net: crate::Num = splits.iter().map(|s| s.quantity).sum();
-        tracing::debug!(
-            ?net,
-            split_count = splits.len(),
-            "calculated net from splits"
-        );
-
-        let commodity = self
-            .commodity()
-            .await
-            .inspect_err(|e| tracing::error!("failed to fetch commodity: {e}"))?;
-
-        let children = self
-            .children()
-            .await
-            .inspect_err(|e| tracing::error!("failed to fetch children: {e}"))?;
-        tracing::debug!(
-            children_count = children.len(),
-            "processing children balances"
-        );
-
-        for child in children {
-            let child_net = child.balance_into_currency(&commodity, book)
-                .await
-                .inspect_err(|e| tracing::error!(child_account = %child.name, "failed to calculate child balance: {e}"))?;
-            net += child_net;
-        }
-
-        tracing::debug!(?net, "account balance calculated");
-        Ok(net)
+        let commodity = self.commodity().await?;
+        self.balance_into_currency(&commodity, book).await
     }
 }
 

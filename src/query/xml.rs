@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::SystemTime;
 use tracing::instrument;
@@ -69,7 +68,7 @@ impl XMLQuery {
     #[instrument]
     pub fn new(path: &str) -> Result<Self, Error> {
         tracing::debug!("opening gnucash xml file");
-        let path_buf = PathBuf::from_str(path)?;
+        let path_buf = PathBuf::from(path);
         let mtime = path_buf.metadata()?.modified()?;
 
         let cache = Self::load_cache_from_disk(&path_buf)?;
@@ -85,16 +84,17 @@ impl XMLQuery {
         let data = Self::gnucash_data(path)?;
         let doc = Document::parse(&data)?;
 
-        doc.root_element()
+        let book = doc
+            .root_element()
             .children()
             .find(|n| n.has_tag_name("book"))
             .ok_or_else(|| Error::NoBook(path.display().to_string()))?;
 
-        let (acc, acc_c, acc_p, acc_n) = Self::parse_accounts_map(&doc)?;
-        let (comm, comm_n) = Self::parse_commodity_map(&doc)?;
-        let (prc, prc_c, prc_cur) = Self::parse_price_map(&doc)?;
-        let (spl, spl_a, spl_t) = Self::parse_split_map(&doc)?;
-        let (txn, txn_c) = Self::parse_transaction_map(&doc)?;
+        let (acc, acc_c, acc_p, acc_n) = Self::parse_accounts_map(book)?;
+        let (comm, comm_n) = Self::parse_commodity_map(book)?;
+        let (prc, prc_c, prc_cur) = Self::parse_price_map(book)?;
+        let (spl, spl_a, spl_t) = Self::parse_split_map(book)?;
+        let (txn, txn_c) = Self::parse_transaction_map(book)?;
 
         Ok(XMLCache {
             accounts: acc,
@@ -131,18 +131,12 @@ impl XMLQuery {
     }
 
     fn parse_accounts_map(
-        doc: &Document,
+        book: roxmltree::Node,
     ) -> Result<(AccountMap, AccountsMap, AccountsMap, AccountsMap), Error> {
         let mut accounts_map = HashMap::new();
         let mut commodity_accounts_map: HashMap<String, Vec<Arc<Account>>> = HashMap::new();
         let mut same_parent_accounts_map: HashMap<String, Vec<Arc<Account>>> = HashMap::new();
         let mut name_accounts_map: HashMap<String, Vec<Arc<Account>>> = HashMap::new();
-
-        let book = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .ok_or_else(|| Error::NoBook("Could not find <book> in document".to_string()))?;
 
         for n in book.children().filter(|n| n.has_tag_name("account")) {
             let account = Arc::new(Account::try_from(n)?);
@@ -173,13 +167,7 @@ impl XMLQuery {
         ))
     }
 
-    fn parse_commodity_map(doc: &Document) -> Result<(CommodityMap, CommoditiesMap), Error> {
-        let book = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .ok_or_else(|| Error::NoBook("Could not find <book> in document".to_string()))?;
-
+    fn parse_commodity_map(book: roxmltree::Node) -> Result<(CommodityMap, CommoditiesMap), Error> {
         let mut commodity_map = HashMap::new();
         let mut namespace_commodities: HashMap<String, Vec<Arc<Commodity>>> = HashMap::new();
 
@@ -191,18 +179,15 @@ impl XMLQuery {
 
         if let Some(pricedb) = book.children().find(|n| n.has_tag_name("pricedb")) {
             for price in pricedb.children().filter(|n| n.has_tag_name("price")) {
-                for child in price.children() {
-                    match child.tag_name().name() {
-                        "commodity" | "currency" => {
-                            let commodity = Arc::new(Commodity::try_from(child)?);
+                for child in price
+                    .children()
+                    .filter(|n| matches!(n.tag_name().name(), "commodity" | "currency"))
+                {
+                    let commodity = Arc::new(Commodity::try_from(child)?);
 
-                            commodity_map
-                                .entry(commodity.guid.clone())
-                                .or_insert(commodity.clone());
-                        }
-
-                        _ => {}
-                    }
+                    commodity_map
+                        .entry(commodity.guid.clone())
+                        .or_insert(commodity.clone());
                 }
             }
         }
@@ -217,16 +202,10 @@ impl XMLQuery {
         Ok((Arc::new(commodity_map), Arc::new(namespace_commodities)))
     }
 
-    fn parse_price_map(doc: &Document) -> Result<(PriceMap, PricesMap, PricesMap), Error> {
+    fn parse_price_map(book: roxmltree::Node) -> Result<(PriceMap, PricesMap, PricesMap), Error> {
         let mut price_map = HashMap::new();
         let mut commodity_prices: HashMap<String, Vec<Arc<Price>>> = HashMap::new();
         let mut currency_prices: HashMap<String, Vec<Arc<Price>>> = HashMap::new();
-
-        let book = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .ok_or_else(|| Error::NoBook("Could not find <book> in document".to_string()))?;
 
         if let Some(n) = book.children().find(|n| n.has_tag_name("pricedb")) {
             for price in n.children().filter(|n| n.has_tag_name("price")) {
@@ -253,16 +232,10 @@ impl XMLQuery {
         ))
     }
 
-    fn parse_split_map(doc: &Document) -> Result<(SplitMap, SplitsMap, SplitsMap), Error> {
+    fn parse_split_map(book: roxmltree::Node) -> Result<(SplitMap, SplitsMap, SplitsMap), Error> {
         let mut split_map = HashMap::new();
         let mut account_splits_map: HashMap<String, Vec<Arc<Split>>> = HashMap::new();
-        let mut transactiont_splits_map: HashMap<String, Vec<Arc<Split>>> = HashMap::new();
-
-        let book = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .ok_or_else(|| Error::NoBook("Could not find <book> in document".to_string()))?;
+        let mut transaction_splits_map: HashMap<String, Vec<Arc<Split>>> = HashMap::new();
 
         for transaction in book.children().filter(|n| n.has_tag_name("transaction")) {
             let tx_guid = transaction
@@ -271,7 +244,7 @@ impl XMLQuery {
                 .and_then(|n| n.text())
                 .map(std::string::ToString::to_string)
                 .ok_or_else(|| Error::XMLMissingField {
-                    model: "Split".to_string(),
+                    model: "Transaction".to_string(),
                     field: "tx_guid".to_string(),
                 })?;
 
@@ -279,7 +252,7 @@ impl XMLQuery {
                 .children()
                 .find(|n| n.has_tag_name("splits"))
                 .ok_or_else(|| Error::XMLMissingField {
-                    model: "Split".to_string(),
+                    model: "Transaction".to_string(),
                     field: "splits".to_string(),
                 })?
                 .children()
@@ -293,7 +266,7 @@ impl XMLQuery {
                     .or_default()
                     .push(split.clone());
 
-                transactiont_splits_map
+                transaction_splits_map
                     .entry(tx_guid.clone())
                     .or_default()
                     .push(split);
@@ -303,19 +276,15 @@ impl XMLQuery {
         Ok((
             Arc::new(split_map),
             Arc::new(account_splits_map),
-            Arc::new(transactiont_splits_map),
+            Arc::new(transaction_splits_map),
         ))
     }
 
-    fn parse_transaction_map(doc: &Document) -> Result<(TransactionMap, TransactionsMap), Error> {
+    fn parse_transaction_map(
+        book: roxmltree::Node,
+    ) -> Result<(TransactionMap, TransactionsMap), Error> {
         let mut transaction_map = HashMap::new();
         let mut currency_transactions_map: HashMap<String, Vec<Arc<Transaction>>> = HashMap::new();
-
-        let book = doc
-            .root_element()
-            .children()
-            .find(|n| n.has_tag_name("book"))
-            .ok_or_else(|| Error::NoBook("Could not find <book> in document".to_string()))?;
 
         for n in book.children().filter(|n| n.has_tag_name("transaction")) {
             let transaction = Arc::new(Transaction::try_from(n)?);
@@ -334,8 +303,21 @@ impl XMLQuery {
         ))
     }
 
-    fn is_file_unchanged(&self) -> Result<bool, Error> {
+    fn update_cache(&self) -> Result<(), Error> {
         let current_mtime = self.file_path.metadata()?.modified()?;
+
+        {
+            let last_mtime = self
+                .file_modified_time
+                .lock()
+                .map_err(|e| Error::Internal(format!("Mtime lock poisoned: {e}")))?;
+
+            if current_mtime == *last_mtime {
+                return Ok(());
+            }
+        }
+
+        let new_cache = Self::load_cache_from_disk(&self.file_path)?;
 
         let mut last_mtime = self
             .file_modified_time
@@ -343,19 +325,8 @@ impl XMLQuery {
             .map_err(|e| Error::Internal(format!("Mtime lock poisoned: {e}")))?;
 
         if current_mtime == *last_mtime {
-            Ok(true)
-        } else {
-            *last_mtime = current_mtime;
-            Ok(false)
-        }
-    }
-
-    fn update_cache(&self) -> Result<(), Error> {
-        if self.is_file_unchanged()? {
             return Ok(());
         }
-
-        let new_cache = Self::load_cache_from_disk(&self.file_path)?;
 
         let mut cache_lock = self
             .cache
@@ -363,6 +334,8 @@ impl XMLQuery {
             .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
 
         *cache_lock = new_cache;
+
+        *last_mtime = current_mtime;
 
         tracing::info!("XML cache updated successfully");
         Ok(())
@@ -386,18 +359,5 @@ mod tests {
 
         tracing::debug!("work_dir: {:?}", std::env::current_dir());
         XMLQuery::new(path).unwrap();
-    }
-
-    #[test(tokio::test)]
-    async fn test_is_file_unchanged() {
-        let path: &str = &format!(
-            "{}/tests/db/xml/complex_sample.gnucash",
-            env!("CARGO_MANIFEST_DIR")
-        );
-
-        tracing::debug!("work_dir: {:?}", std::env::current_dir());
-        let query = XMLQuery::new(path).unwrap();
-
-        assert!(query.is_file_unchanged().unwrap());
     }
 }

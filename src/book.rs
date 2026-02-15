@@ -13,7 +13,7 @@ where
     Q: Query,
 {
     pub(crate) query: Arc<Q>,
-    pub(crate) exchange_graph: Option<Arc<Mutex<Exchange>>>,
+    pub(crate) exchange_graph: Arc<Mutex<Exchange>>,
 }
 
 impl<Q> Book<Q>
@@ -25,9 +25,14 @@ where
         tracing::debug!("creating new book instance");
 
         let query = Arc::new(query);
+        let exchange_graph = Exchange::new(query.clone())
+            .await
+            .inspect_err(|e| tracing::error!("failed to rebuild exchange graph: {e}"))?;
+        let exchange_graph = Arc::new(Mutex::new(exchange_graph));
+
         let mut book = Self {
             query,
-            exchange_graph: None,
+            exchange_graph,
         };
 
         book.update_exchange_graph()
@@ -210,9 +215,11 @@ where
     ) -> Option<crate::Num> {
         tracing::debug!("calculating exchange rate");
 
-        let graph = self.exchange_graph.as_ref()?;
-
-        let result = graph.lock().await.cal(commodity, currency);
+        let result = self
+            .exchange_graph
+            .lock()
+            .await
+            .calculate(commodity, currency);
 
         if let Some(rate) = result {
             tracing::debug!(?rate, "exchange rate calculated");
@@ -225,28 +232,15 @@ where
 
     #[instrument(skip(self))]
     pub async fn update_exchange_graph(&mut self) -> Result<(), Error> {
-        match &self.exchange_graph {
-            None => {
-                tracing::debug!("initializing exchange graph");
-                let exchange_graph = Exchange::new(self.query.clone())
-                    .await
-                    .inspect_err(|e| tracing::error!("failed to create exchange graph: {e}"))?;
-                self.exchange_graph = Some(Arc::new(Mutex::new(exchange_graph)));
-                tracing::info!("exchange graph initialized");
-                Ok(())
-            }
-            Some(graph) => {
-                tracing::debug!("updating existing exchange graph");
-                graph
-                    .lock()
-                    .await
-                    .update(self.query.clone())
-                    .await
-                    .inspect_err(|e| tracing::error!("failed to update exchange graph: {e}"))?;
-                tracing::info!("exchange graph updated");
-                Ok(())
-            }
-        }
+        tracing::debug!("updating existing exchange graph");
+        self.exchange_graph
+            .lock()
+            .await
+            .update(self.query.clone())
+            .await
+            .inspect_err(|e| tracing::error!("failed to update exchange graph: {e}"))?;
+        tracing::info!("exchange graph updated");
+        Ok(())
     }
 }
 

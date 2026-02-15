@@ -9,7 +9,11 @@ use tracing::instrument;
 use super::Query;
 use crate::error::Error;
 
-const MAX_CONNECTIONS: u32 = 10;
+const MAX_CONNECTIONS: u32 = 5;
+const MIN_CONNECTIONS: u32 = 1;
+const ACQUIRE_TIMEOUT_SECS: u64 = 5;
+const IDLE_TIMEOUT_SECS: u64 = 600;
+const MAX_LIFETIME_SECS: u64 = 1800;
 
 #[derive(Debug, Clone)]
 pub struct PostgreSQLQuery {
@@ -58,6 +62,10 @@ impl PostgreSQLQuery {
         tracing::debug!("connecting to postgresql database");
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(MAX_CONNECTIONS)
+            .min_connections(MIN_CONNECTIONS)
+            .acquire_timeout(std::time::Duration::from_secs(ACQUIRE_TIMEOUT_SECS))
+            .idle_timeout(std::time::Duration::from_secs(IDLE_TIMEOUT_SECS))
+            .max_lifetime(std::time::Duration::from_secs(MAX_LIFETIME_SECS))
             .connect(uri)
             .await
             .inspect_err(|e| tracing::error!("failed to connect to postgresql: {e}"))?;

@@ -6,7 +6,6 @@ pub(crate) mod transaction;
 
 use r2d2::ManageConnection;
 use rusqlite::{Connection, OpenFlags};
-use std::path::PathBuf;
 use tracing::instrument;
 
 use super::Query;
@@ -33,7 +32,7 @@ impl SQLiteQuery {
         let manager = SqliteManager::new(uri);
 
         let pool = r2d2::Pool::builder()
-            .max_size(10)
+            .max_size(5)
             .connection_timeout(std::time::Duration::from_secs(5))
             .build(manager)?;
 
@@ -46,12 +45,12 @@ impl Query for SQLiteQuery {}
 
 #[derive(Debug)]
 struct SqliteManager {
-    path: PathBuf,
+    uri: String,
 }
 
 impl SqliteManager {
-    fn new<P: Into<PathBuf>>(path: P) -> Self {
-        Self { path: path.into() }
+    fn new(uri: impl Into<String>) -> Self {
+        Self { uri: uri.into() }
     }
 }
 
@@ -60,18 +59,30 @@ impl ManageConnection for SqliteManager {
     type Error = rusqlite::Error;
 
     fn connect(&self) -> Result<Self::Connection, Self::Error> {
-        Connection::open_with_flags(
-            &self.path,
+        let conn = Connection::open_with_flags(
+            &self.uri,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
-        )
+        )?;
+
+        // GnuCash 特定優化
+        conn.execute_batch(
+            "
+                PRAGMA query_only = ON;
+                PRAGMA cache_size = -8000;
+                PRAGMA temp_store = MEMORY;
+                PRAGMA mmap_size = 134217728;
+                ",
+        )?;
+
+        Ok(conn)
     }
 
     fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {
-        conn.execute_batch("")
+        conn.execute_batch("SELECT 1")
     }
 
-    fn has_broken(&self, _conn: &mut Self::Connection) -> bool {
-        false
+    fn has_broken(&self, conn: &mut Self::Connection) -> bool {
+        conn.execute_batch("SELECT 1").is_err()
     }
 }
 
