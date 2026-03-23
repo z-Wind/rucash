@@ -29,12 +29,12 @@ where
         Self {
             query,
 
-            guid: item.guid(),
-            currency_guid: item.currency_guid(),
-            num: item.num(),
+            guid: item.guid().to_string(),
+            currency_guid: item.currency_guid().to_string(),
+            num: item.num().to_string(),
             post_datetime: item.post_datetime(),
             enter_datetime: item.enter_datetime(),
-            description: item.description(),
+            description: item.description().to_string(),
         }
     }
 
@@ -49,36 +49,26 @@ where
         }
 
         tracing::debug!("fetching currency for transaction");
-        let mut currencies = CommodityQ::guid(&*self.query, &self.currency_guid)
+        let currency = CommodityQ::guid(&*self.query, &self.currency_guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch currency: {e}"))?;
 
-        match currencies.pop() {
-            None => {
-                tracing::error!("currency not found");
-                Err(Error::GuidNotFound {
-                    model: "Commodity".to_string(),
-                    guid: self.currency_guid.clone(),
-                })
-            }
-            Some(x) if currencies.is_empty() => {
-                tracing::debug!("currency found for transaction");
-                Ok(Commodity::from_with_query(&x, self.query.clone()))
-            }
-            _ => {
-                tracing::error!("multiple currencies found for guid");
-                Err(Error::GuidMultipleFound {
-                    model: "Commodity".to_string(),
-                    guid: self.currency_guid.clone(),
-                })
-            }
+        if let Some(c) = currency {
+            tracing::debug!("currency found for transaction");
+            Ok(Commodity::from_with_query(&c, self.query.clone()))
+        } else {
+            tracing::error!("currency not found");
+            Err(Error::GuidNotFound {
+                model: "Commodity".to_string(),
+                guid: self.currency_guid.clone(),
+            })
         }
     }
 
     #[instrument(skip(self), fields(transaction_guid = %self.guid))]
     pub async fn splits(&self) -> Result<Vec<Split<Q>>, Error> {
         tracing::debug!("fetching splits for transaction");
-        let splits = SplitQ::tx_guid(&*self.query, &self.guid)
+        let splits = SplitQ::transaction(&*self.query, &self.guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch splits: {e}"))?;
         let result: Vec<_> = splits

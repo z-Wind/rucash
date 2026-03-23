@@ -25,17 +25,17 @@ pub struct Account {
 }
 
 impl AccountT for Account {
-    fn guid(&self) -> String {
-        self.guid.clone()
+    fn guid(&self) -> &str {
+        &self.guid
     }
-    fn name(&self) -> String {
-        self.name.clone()
+    fn name(&self) -> &str {
+        &self.name
     }
-    fn account_type(&self) -> String {
-        self.account_type.clone()
+    fn account_type(&self) -> &str {
+        &self.account_type
     }
-    fn commodity_guid(&self) -> String {
-        self.commodity_guid.clone().unwrap_or_default()
+    fn commodity_guid(&self) -> &str {
+        self.commodity_guid.as_deref().unwrap_or_default()
     }
     fn commodity_scu(&self) -> i64 {
         self.commodity_scu
@@ -43,14 +43,14 @@ impl AccountT for Account {
     fn non_std_scu(&self) -> bool {
         self.non_std_scu != 0
     }
-    fn parent_guid(&self) -> String {
-        self.parent_guid.clone().unwrap_or_default()
+    fn parent_guid(&self) -> &str {
+        self.parent_guid.as_deref().unwrap_or_default()
     }
-    fn code(&self) -> String {
-        self.code.clone().unwrap_or_default()
+    fn code(&self) -> &str {
+        self.code.as_deref().unwrap_or_default()
     }
-    fn description(&self) -> String {
-        self.description.clone().unwrap_or_default()
+    fn description(&self) -> &str {
+        self.description.as_deref().unwrap_or_default()
     }
     fn hidden(&self) -> bool {
         self.hidden.is_some_and(|x| x != 0)
@@ -90,18 +90,18 @@ impl AccountQ for MySQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
-        tracing::debug!("fetching accounts by guid from mysql");
+    async fn guid(&self, guid: &str) -> Result<Option<Self::Item>, Error> {
+        tracing::debug!("fetching account by guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = ?")))
             .bind(guid)
-            .fetch_all(&self.pool)
+            .fetch_optional(&self.pool)
             .await
             .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
 
     #[instrument(skip(self))]
-    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn commodity(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching accounts by commodity_guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE commodity_guid = ?")))
             .bind(guid)
@@ -112,7 +112,7 @@ impl AccountQ for MySQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn parent(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching accounts by parent_guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE parent_guid = ?")))
             .bind(guid)
@@ -194,9 +194,9 @@ mod tests {
         let result = query
             .guid("fcd795021c976ba75621ec39e75f6214")
             .await
+            .unwrap()
             .unwrap();
 
-        let result = &result[0];
         assert_eq!(result.guid(), "fcd795021c976ba75621ec39e75f6214");
         assert_eq!(result.name(), "Asset");
         assert_eq!(result.account_type(), "ASSET");
@@ -223,16 +223,17 @@ mod tests {
         let result = query
             .guid("fcd795021c976ba75621ec39e75f6214")
             .await
+            .unwrap()
             .unwrap();
 
-        assert_eq!(result[0].name, "Asset");
+        assert_eq!(result.name, "Asset");
     }
 
     #[test(tokio::test)]
     async fn test_commodity_guid() {
         let query = setup().await;
         let result = query
-            .commodity_guid("346629655191dcf59a7e2c2a85b70f69")
+            .commodity("346629655191dcf59a7e2c2a85b70f69")
             .await
             .unwrap();
         assert_eq!(result.len(), 14);
@@ -242,7 +243,7 @@ mod tests {
     async fn test_parent_guid() {
         let query = setup().await;
         let result = query
-            .parent_guid("fcd795021c976ba75621ec39e75f6214")
+            .parent("fcd795021c976ba75621ec39e75f6214")
             .await
             .unwrap();
         assert_eq!(result.len(), 3);

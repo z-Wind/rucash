@@ -145,17 +145,17 @@ impl TryFrom<Node<'_, '_>> for Account {
 }
 
 impl AccountT for Account {
-    fn guid(&self) -> String {
-        self.guid.clone()
+    fn guid(&self) -> &str {
+        &self.guid
     }
-    fn name(&self) -> String {
-        self.name.clone()
+    fn name(&self) -> &str {
+        &self.name
     }
-    fn account_type(&self) -> String {
-        self.account_type.clone()
+    fn account_type(&self) -> &str {
+        &self.account_type
     }
-    fn commodity_guid(&self) -> String {
-        self.commodity_guid.clone().unwrap_or_default()
+    fn commodity_guid(&self) -> &str {
+        self.commodity_guid.as_deref().unwrap_or_default()
     }
     fn commodity_scu(&self) -> i64 {
         self.commodity_scu
@@ -163,14 +163,14 @@ impl AccountT for Account {
     fn non_std_scu(&self) -> bool {
         self.non_std_scu != 0
     }
-    fn parent_guid(&self) -> String {
-        self.parent_guid.clone().unwrap_or_default()
+    fn parent_guid(&self) -> &str {
+        self.parent_guid.as_deref().unwrap_or_default()
     }
-    fn code(&self) -> String {
-        self.code.clone().unwrap_or_default()
+    fn code(&self) -> &str {
+        self.code.as_deref().unwrap_or_default()
     }
-    fn description(&self) -> String {
-        self.description.clone().unwrap_or_default()
+    fn description(&self) -> &str {
+        self.description.as_deref().unwrap_or_default()
     }
     fn hidden(&self) -> bool {
         self.hidden
@@ -196,19 +196,17 @@ impl AccountQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Option<Self::Item>, Error> {
         tracing::debug!("fetching account by guid from xml");
         let map = self
             .accounts_map()
             .inspect_err(|e| tracing::error!("failed to get account map: {e}"))?;
 
-        let result: Vec<_> = map.get(guid).into_iter().map(|x| (**x).clone()).collect();
-        tracing::debug!(count = result.len(), "accounts found by guid");
-        Ok(result)
+        Ok(map.get(guid).map(|x| (**x).clone()))
     }
 
     #[instrument(skip(self))]
-    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn commodity(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching accounts by commodity_guid from xml");
         let map = self
             .commodity_accounts_map()
@@ -223,7 +221,7 @@ impl AccountQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn parent(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching accounts by parent_guid from xml");
         let map = self
             .same_parent_accounts_map()
@@ -375,9 +373,9 @@ mod tests {
         let result = query
             .guid("fcd795021c976ba75621ec39e75f6214")
             .await
+            .unwrap()
             .unwrap();
 
-        let result = &result[0];
         assert_eq!(result.guid(), "fcd795021c976ba75621ec39e75f6214");
         assert_eq!(result.name(), "Asset");
         assert_eq!(result.account_type(), "ASSET");
@@ -404,15 +402,16 @@ mod tests {
         let result = query
             .guid("fcd795021c976ba75621ec39e75f6214")
             .await
+            .unwrap()
             .unwrap();
 
-        assert_eq!(result[0].name, "Asset");
+        assert_eq!(result.name, "Asset");
     }
 
     #[test(tokio::test)]
     async fn test_commodity_guid() {
         let query = setup().await;
-        let result = query.commodity_guid("EUR").await.unwrap();
+        let result = query.commodity("EUR").await.unwrap();
         assert_eq!(result.len(), 14);
     }
 
@@ -420,7 +419,7 @@ mod tests {
     async fn test_parent_guid() {
         let query = setup().await;
         let result = query
-            .parent_guid("fcd795021c976ba75621ec39e75f6214")
+            .parent("fcd795021c976ba75621ec39e75f6214")
             .await
             .unwrap();
         assert_eq!(result.len(), 3);

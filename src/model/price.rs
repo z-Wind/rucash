@@ -30,12 +30,12 @@ where
         Self {
             query,
 
-            guid: item.guid(),
-            commodity_guid: item.commodity_guid(),
-            currency_guid: item.currency_guid(),
+            guid: item.guid().to_string(),
+            commodity_guid: item.commodity_guid().to_string(),
+            currency_guid: item.currency_guid().to_string(),
             datetime: item.datetime(),
-            source: item.source(),
-            r#type: item.r#type(),
+            source: item.source().to_string(),
+            r#type: item.r#type().to_string(),
             value: item.value(),
         }
     }
@@ -51,28 +51,18 @@ where
         }
 
         tracing::debug!("fetching commodity for price");
-        let mut commodities = CommodityQ::guid(&*self.query, &self.commodity_guid)
+        let commodity = CommodityQ::guid(&*self.query, &self.commodity_guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch commodity: {e}"))?;
-        match commodities.pop() {
-            None => {
-                tracing::error!("commodity not found");
-                Err(Error::GuidNotFound {
-                    model: "Commodity".to_string(),
-                    guid: self.commodity_guid.clone(),
-                })
-            }
-            Some(x) if commodities.is_empty() => {
-                tracing::debug!("commodity found for price");
-                Ok(Commodity::from_with_query(&x, self.query.clone()))
-            }
-            _ => {
-                tracing::error!("multiple commodities found for guid");
-                Err(Error::GuidMultipleFound {
-                    model: "Commodity".to_string(),
-                    guid: self.commodity_guid.clone(),
-                })
-            }
+        if let Some(c) = commodity {
+            tracing::debug!("commodity found for price");
+            Ok(Commodity::from_with_query(&c, self.query.clone()))
+        } else {
+            tracing::warn!("commodity not found");
+            Err(Error::GuidNotFound {
+                model: "Commodity".to_string(),
+                guid: self.commodity_guid.clone(),
+            })
         }
     }
 
@@ -87,29 +77,19 @@ where
         }
 
         tracing::debug!("fetching currency for price");
-        let mut currencies = CommodityQ::guid(&*self.query, &self.currency_guid)
+        let currency = CommodityQ::guid(&*self.query, &self.currency_guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch currency: {e}"))?;
 
-        match currencies.pop() {
-            None => {
-                tracing::error!("currency not found");
-                Err(Error::GuidNotFound {
-                    model: "Commodity".to_string(),
-                    guid: self.currency_guid.clone(),
-                })
-            }
-            Some(x) if currencies.is_empty() => {
-                tracing::debug!("currency found for price");
-                Ok(Commodity::from_with_query(&x, self.query.clone()))
-            }
-            _ => {
-                tracing::error!("multiple currencies found for guid");
-                Err(Error::GuidMultipleFound {
-                    model: "Commodity".to_string(),
-                    guid: self.currency_guid.clone(),
-                })
-            }
+        if let Some(c) = currency {
+            tracing::debug!("currency found for price");
+            Ok(Commodity::from_with_query(&c, self.query.clone()))
+        } else {
+            tracing::error!("currency not found");
+            Err(Error::GuidNotFound {
+                model: "Commodity".to_string(),
+                guid: self.currency_guid.clone(),
+            })
         }
     }
 }

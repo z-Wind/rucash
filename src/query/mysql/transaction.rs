@@ -20,14 +20,14 @@ pub struct Transaction {
 }
 
 impl TransactionT for Transaction {
-    fn guid(&self) -> String {
-        self.guid.clone()
+    fn guid(&self) -> &str {
+        &self.guid
     }
-    fn currency_guid(&self) -> String {
-        self.currency_guid.clone()
+    fn currency_guid(&self) -> &str {
+        &self.currency_guid
     }
-    fn num(&self) -> String {
-        self.num.clone()
+    fn num(&self) -> &str {
+        &self.num
     }
     fn post_datetime(&self) -> NaiveDateTime {
         self.post_date
@@ -35,8 +35,8 @@ impl TransactionT for Transaction {
     fn enter_datetime(&self) -> NaiveDateTime {
         self.enter_date
     }
-    fn description(&self) -> String {
-        self.description.clone().unwrap_or_default()
+    fn description(&self) -> &str {
+        self.description.as_deref().unwrap_or_default()
     }
 }
 
@@ -65,18 +65,18 @@ impl TransactionQ for MySQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
-        tracing::debug!("fetching transactions by guid from mysql");
+    async fn guid(&self, guid: &str) -> Result<Option<Self::Item>, Error> {
+        tracing::debug!("fetching transaction by guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = ?")))
             .bind(guid)
-            .fetch_all(&self.pool)
+            .fetch_optional(&self.pool)
             .await
             .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
     }
 
     #[instrument(skip(self))]
-    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn currency(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching transactions by currency_guid from mysql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE currency_guid = ?")))
             .bind(guid)
@@ -131,9 +131,9 @@ mod tests {
         let result = query
             .guid("6c8876003c4a6026e38e3afb67d6f2b1")
             .await
+            .unwrap()
             .unwrap();
 
-        let result = &result[0];
         assert_eq!(result.guid(), "6c8876003c4a6026e38e3afb67d6f2b1");
         assert_eq!(result.currency_guid(), "346629655191dcf59a7e2c2a85b70f69");
         assert_eq!(result.num(), "");
@@ -161,15 +161,16 @@ mod tests {
         let result = query
             .guid("6c8876003c4a6026e38e3afb67d6f2b1")
             .await
+            .unwrap()
             .unwrap();
 
         assert_eq!(
-            result[0].post_date,
+            result.post_date,
             NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S").unwrap()
         );
 
         assert_eq!(
-            result[0].enter_date,
+            result.enter_date,
             NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S").unwrap()
         );
     }
@@ -178,7 +179,7 @@ mod tests {
     async fn test_currency_guid() {
         let query = setup().await;
         let result = query
-            .currency_guid("346629655191dcf59a7e2c2a85b70f69")
+            .currency("346629655191dcf59a7e2c2a85b70f69")
             .await
             .unwrap();
 

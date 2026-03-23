@@ -40,20 +40,20 @@ impl<'a> TryFrom<&'a Row<'a>> for Commodity {
 }
 
 impl CommodityT for Commodity {
-    fn guid(&self) -> String {
-        self.guid.clone()
+    fn guid(&self) -> &str {
+        &self.guid
     }
-    fn namespace(&self) -> String {
-        self.namespace.clone()
+    fn namespace(&self) -> &str {
+        &self.namespace
     }
-    fn mnemonic(&self) -> String {
-        self.mnemonic.clone()
+    fn mnemonic(&self) -> &str {
+        &self.mnemonic
     }
-    fn fullname(&self) -> String {
-        self.fullname.clone().unwrap_or_default()
+    fn fullname(&self) -> &str {
+        self.fullname.as_deref().unwrap_or_default()
     }
-    fn cusip(&self) -> String {
-        self.cusip.clone().unwrap_or_default()
+    fn cusip(&self) -> &str {
+        self.cusip.as_deref().unwrap_or_default()
     }
     fn fraction(&self) -> i64 {
         self.fraction
@@ -61,11 +61,11 @@ impl CommodityT for Commodity {
     fn quote_flag(&self) -> bool {
         self.quote_flag != 0
     }
-    fn quote_source(&self) -> String {
-        self.quote_source.clone().unwrap_or_default()
+    fn quote_source(&self) -> &str {
+        self.quote_source.as_deref().unwrap_or_default()
     }
-    fn quote_tz(&self) -> String {
-        self.quote_tz.clone().unwrap_or_default()
+    fn quote_tz(&self) -> &str {
+        self.quote_tz.as_deref().unwrap_or_default()
     }
 }
 
@@ -113,7 +113,7 @@ impl CommodityQ for SQLiteQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Option<Self::Item>, Error> {
         let pool = self.pool.clone();
         let guid_owned = guid.to_string();
 
@@ -127,14 +127,16 @@ impl CommodityQ for SQLiteQuery {
                 .prepare_cached(&sql)
                 .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
 
-            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+            let result = stmt.query_row([guid_owned], |row| Self::Item::try_from(row));
 
-            let items = rows
-                .collect::<Result<Vec<_>, _>>()
-                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
-
-            tracing::debug!(count = items.len(), "commodities found by guid");
-            Ok(items)
+            match result {
+                Ok(item) => Ok(Some(item)),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                Err(e) => {
+                    tracing::error!("failed to fetch row: {e}");
+                    Err(Error::from(e))
+                }
+            }
         })
         .await
         .map_err(|e| Error::Internal(format!("Join error in spawn_blocking: {e}")))?
@@ -219,9 +221,9 @@ mod tests {
         let result = query
             .guid("346629655191dcf59a7e2c2a85b70f69")
             .await
+            .unwrap()
             .unwrap();
 
-        let result = &result[0];
         assert_eq!(result.guid(), "346629655191dcf59a7e2c2a85b70f69");
         assert_eq!(result.namespace(), "CURRENCY");
         assert_eq!(result.mnemonic(), "EUR");
@@ -246,8 +248,9 @@ mod tests {
         let result = query
             .guid("346629655191dcf59a7e2c2a85b70f69")
             .await
+            .unwrap()
             .unwrap();
-        assert_eq!(result[0].fullname.as_ref().unwrap(), "Euro");
+        assert_eq!(result.fullname.as_ref().unwrap(), "Euro");
     }
 
     #[test(tokio::test)]

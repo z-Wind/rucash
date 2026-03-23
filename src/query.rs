@@ -64,12 +64,12 @@ pub trait AccountQ {
     fn guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
-    fn commodity_guid(
+    ) -> impl std::future::Future<Output = Result<Option<Self::Item>, Error>> + Send;
+    fn commodity(
         &self,
         guid: &str,
     ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
-    fn parent_guid(
+    fn parent(
         &self,
         guid: &str,
     ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
@@ -90,7 +90,7 @@ pub trait CommodityQ {
     fn guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Option<Self::Item>, Error>> + Send;
     fn namespace(
         &self,
         guid: &str,
@@ -104,16 +104,16 @@ pub trait PriceQ {
     fn guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
-    fn commodity_guid(
+    ) -> impl std::future::Future<Output = Result<Option<Self::Item>, Error>> + Send;
+    fn commodity(
         &self,
         guid: &str,
     ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
-    fn currency_guid(
+    fn currency(
         &self,
         guid: &str,
     ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
-    fn commodity_or_currency_guid(
+    fn commodity_or_currency(
         &self,
         guid: &str,
     ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
@@ -126,12 +126,12 @@ pub trait SplitQ {
     fn guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
-    fn account_guid(
+    ) -> impl std::future::Future<Output = Result<Option<Self::Item>, Error>> + Send;
+    fn account(
         &self,
         guid: &str,
     ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
-    fn tx_guid(
+    fn transaction(
         &self,
         guid: &str,
     ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
@@ -144,65 +144,65 @@ pub trait TransactionQ {
     fn guid(
         &self,
         guid: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
-    fn currency_guid(
+    ) -> impl std::future::Future<Output = Result<Option<Self::Item>, Error>> + Send;
+    fn currency(
         &self,
         guid: &str,
     ) -> impl std::future::Future<Output = Result<Vec<Self::Item>, Error>> + Send;
 }
 
 pub trait AccountT {
-    fn guid(&self) -> String;
-    fn name(&self) -> String;
-    fn account_type(&self) -> String;
-    fn commodity_guid(&self) -> String;
+    fn guid(&self) -> &str;
+    fn name(&self) -> &str;
+    fn account_type(&self) -> &str;
+    fn commodity_guid(&self) -> &str;
     fn commodity_scu(&self) -> i64;
     fn non_std_scu(&self) -> bool;
-    fn parent_guid(&self) -> String;
-    fn code(&self) -> String;
-    fn description(&self) -> String;
+    fn parent_guid(&self) -> &str;
+    fn code(&self) -> &str;
+    fn description(&self) -> &str;
     fn hidden(&self) -> bool;
     fn placeholder(&self) -> bool;
 }
 pub trait CommodityT {
-    fn guid(&self) -> String;
-    fn namespace(&self) -> String;
-    fn mnemonic(&self) -> String;
-    fn fullname(&self) -> String;
-    fn cusip(&self) -> String;
+    fn guid(&self) -> &str;
+    fn namespace(&self) -> &str;
+    fn mnemonic(&self) -> &str;
+    fn fullname(&self) -> &str;
+    fn cusip(&self) -> &str;
     fn fraction(&self) -> i64;
     fn quote_flag(&self) -> bool;
-    fn quote_source(&self) -> String;
-    fn quote_tz(&self) -> String;
+    fn quote_source(&self) -> &str;
+    fn quote_tz(&self) -> &str;
 }
 pub trait PriceT {
-    fn guid(&self) -> String;
-    fn commodity_guid(&self) -> String;
-    fn currency_guid(&self) -> String;
+    fn guid(&self) -> &str;
+    fn commodity_guid(&self) -> &str;
+    fn currency_guid(&self) -> &str;
     fn datetime(&self) -> NaiveDateTime;
-    fn source(&self) -> String;
-    fn r#type(&self) -> String;
+    fn source(&self) -> &str;
+    fn r#type(&self) -> &str;
     fn value(&self) -> crate::Num;
 }
 pub trait SplitT {
-    fn guid(&self) -> String;
-    fn tx_guid(&self) -> String;
-    fn account_guid(&self) -> String;
-    fn memo(&self) -> String;
-    fn action(&self) -> String;
+    fn guid(&self) -> &str;
+    fn tx_guid(&self) -> &str;
+    fn account_guid(&self) -> &str;
+    fn memo(&self) -> &str;
+    fn action(&self) -> &str;
     fn reconcile_state(&self) -> bool;
     fn reconcile_datetime(&self) -> Option<NaiveDateTime>;
-    fn lot_guid(&self) -> String;
+    fn lot_guid(&self) -> &str;
     fn value(&self) -> crate::Num;
     fn quantity(&self) -> crate::Num;
 }
 pub trait TransactionT {
-    fn guid(&self) -> String;
-    fn currency_guid(&self) -> String;
-    fn num(&self) -> String;
+    fn guid(&self) -> &str;
+    fn currency_guid(&self) -> &str;
+    fn num(&self) -> &str;
     fn post_datetime(&self) -> NaiveDateTime;
     fn enter_datetime(&self) -> NaiveDateTime;
-    fn description(&self) -> String;
+    fn description(&self) -> &str;
 }
 
 #[cfg(test)]
@@ -310,14 +310,15 @@ mod tests {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
+                    .unwrap()
                     .unwrap();
-                assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
+                assert_eq!(result.guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
             #[test(tokio::test)]
             async fn test_commodity_guid() {
                 let query = setup().await;
-                let result = AccountQ::commodity_guid(query, "346629655191dcf59a7e2c2a85b70f69")
+                let result = AccountQ::commodity(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
                     .unwrap();
                 assert!(
@@ -332,7 +333,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_parent_guid() {
                 let query = setup().await;
-                let result = AccountQ::parent_guid(query, "fcd795021c976ba75621ec39e75f6214")
+                let result = AccountQ::parent(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
                     .unwrap();
                 assert_eq!(result[0].guid, "3bc319753945b6dba3e1928abed49e35");
@@ -371,8 +372,9 @@ mod tests {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
+                    .unwrap()
                     .unwrap();
-                assert_eq!(result[0].fullname.as_ref().unwrap(), "Euro");
+                assert_eq!(result.fullname.as_ref().unwrap(), "Euro");
             }
 
             #[test(tokio::test)]
@@ -399,18 +401,19 @@ mod tests {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 #[cfg(not(feature = "decimal"))]
-                assert_approx_eq!(f64, result[0].value(), 1.5);
+                assert_approx_eq!(f64, result.value(), 1.5);
                 #[cfg(feature = "decimal")]
-                assert_eq!(result[0].value(), Decimal::new(15, 1));
+                assert_eq!(result.value(), Decimal::new(15, 1));
             }
 
             #[test(tokio::test)]
-            async fn commodity_guid() {
+            async fn test_commodity_guid() {
                 let query = setup().await;
-                let result = PriceQ::commodity_guid(query, "d821d6776fde9f7c2d01b67876406fd3")
+                let result = PriceQ::commodity(query, "d821d6776fde9f7c2d01b67876406fd3")
                     .await
                     .unwrap();
 
@@ -421,9 +424,9 @@ mod tests {
             }
 
             #[test(tokio::test)]
-            async fn currency_guid() {
+            async fn test_currency_guid() {
                 let query = setup().await;
-                let result = PriceQ::currency_guid(query, "5f586908098232e67edb1371408bfaa8")
+                let result = PriceQ::currency(query, "5f586908098232e67edb1371408bfaa8")
                     .await
                     .unwrap();
 
@@ -434,10 +437,10 @@ mod tests {
             }
 
             #[test(tokio::test)]
-            async fn commodity_or_currency_guid() {
+            async fn test_commodity_or_currency_guid() {
                 let query = setup().await;
                 let result =
-                    PriceQ::commodity_or_currency_guid(query, "5f586908098232e67edb1371408bfaa8")
+                    PriceQ::commodity_or_currency(query, "5f586908098232e67edb1371408bfaa8")
                         .await
                         .unwrap();
                 assert_eq!(result.len(), 4);
@@ -460,18 +463,19 @@ mod tests {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 #[cfg(not(feature = "decimal"))]
-                assert_approx_eq!(f64, result[0].value(), 150.0);
+                assert_approx_eq!(f64, result.value(), 150.0);
                 #[cfg(feature = "decimal")]
-                assert_eq!(result[0].value(), Decimal::new(150, 0));
+                assert_eq!(result.value(), Decimal::new(150, 0));
             }
 
             #[test(tokio::test)]
             async fn test_account_guid() {
                 let query = setup().await;
-                let result = SplitQ::account_guid(query, "93fc043c3062aaa1297b30e543d2cd0d")
+                let result = SplitQ::account(query, "93fc043c3062aaa1297b30e543d2cd0d")
                     .await
                     .unwrap();
                 assert_eq!(result.len(), 3);
@@ -480,7 +484,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_tx_guid() {
                 let query = setup().await;
-                let result = SplitQ::tx_guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
+                let result = SplitQ::transaction(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
                     .unwrap();
                 assert_eq!(result.len(), 2);
@@ -503,16 +507,17 @@ mod tests {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 assert_eq!(
-                    result[0].post_date,
+                    result.post_date,
                     NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
 
                 assert_eq!(
-                    result[0].enter_date,
+                    result.enter_date,
                     NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
@@ -521,7 +526,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_currency_guid() {
                 let query = setup().await;
-                let result = TransactionQ::currency_guid(query, "346629655191dcf59a7e2c2a85b70f69")
+                let result = TransactionQ::currency(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
                     .unwrap();
 
@@ -538,9 +543,9 @@ mod tests {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "fcd795021c976ba75621ec39e75f6214");
                 assert_eq!(result.name(), "Asset");
                 assert_eq!(result.account_type(), "ASSET");
@@ -564,9 +569,9 @@ mod tests {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "346629655191dcf59a7e2c2a85b70f69");
                 assert_eq!(result.namespace(), "CURRENCY");
                 assert_eq!(result.mnemonic(), "EUR");
@@ -588,9 +593,9 @@ mod tests {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "0d6684f44fb018e882de76094ed9c433");
                 assert_eq!(result.commodity_guid(), "d821d6776fde9f7c2d01b67876406fd3");
                 assert_eq!(result.currency_guid(), "5f586908098232e67edb1371408bfaa8");
@@ -617,9 +622,9 @@ mod tests {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "de832fe97e37811a7fff7e28b3a43425");
                 assert_eq!(result.tx_guid(), "6c8876003c4a6026e38e3afb67d6f2b1");
                 assert_eq!(result.account_guid(), "93fc043c3062aaa1297b30e543d2cd0d");
@@ -648,9 +653,9 @@ mod tests {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "6c8876003c4a6026e38e3afb67d6f2b1");
                 assert_eq!(result.currency_guid(), "346629655191dcf59a7e2c2a85b70f69");
                 assert_eq!(result.num(), "");
@@ -759,14 +764,15 @@ mod tests {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
+                    .unwrap()
                     .unwrap();
-                assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
+                assert_eq!(result.guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
             #[test(tokio::test)]
             async fn test_commodity_guid() {
                 let query = setup().await;
-                let result = AccountQ::commodity_guid(query, "346629655191dcf59a7e2c2a85b70f69")
+                let result = AccountQ::commodity(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
                     .unwrap();
                 assert!(
@@ -781,7 +787,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_parent_guid() {
                 let query = setup().await;
-                let result = AccountQ::parent_guid(query, "fcd795021c976ba75621ec39e75f6214")
+                let result = AccountQ::parent(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
                     .unwrap();
                 assert!(
@@ -826,8 +832,9 @@ mod tests {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
+                    .unwrap()
                     .unwrap();
-                assert_eq!(result[0].fullname.as_ref().unwrap(), "Euro");
+                assert_eq!(result.fullname.as_ref().unwrap(), "Euro");
             }
 
             #[test(tokio::test)]
@@ -854,18 +861,19 @@ mod tests {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 #[cfg(not(feature = "decimal"))]
-                assert_approx_eq!(f64, result[0].value(), 1.5);
+                assert_approx_eq!(f64, result.value(), 1.5);
                 #[cfg(feature = "decimal")]
-                assert_eq!(result[0].value(), Decimal::new(15, 1));
+                assert_eq!(result.value(), Decimal::new(15, 1));
             }
 
             #[test(tokio::test)]
-            async fn commodity_guid() {
+            async fn test_commodity_guid() {
                 let query = setup().await;
-                let result = PriceQ::commodity_guid(query, "d821d6776fde9f7c2d01b67876406fd3")
+                let result = PriceQ::commodity(query, "d821d6776fde9f7c2d01b67876406fd3")
                     .await
                     .unwrap();
 
@@ -876,9 +884,9 @@ mod tests {
             }
 
             #[test(tokio::test)]
-            async fn currency_guid() {
+            async fn test_currency_guid() {
                 let query = setup().await;
-                let result = PriceQ::currency_guid(query, "5f586908098232e67edb1371408bfaa8")
+                let result = PriceQ::currency(query, "5f586908098232e67edb1371408bfaa8")
                     .await
                     .unwrap();
 
@@ -889,10 +897,10 @@ mod tests {
             }
 
             #[test(tokio::test)]
-            async fn commodity_or_currency_guid() {
+            async fn test_commodity_or_currency_guid() {
                 let query = setup().await;
                 let result =
-                    PriceQ::commodity_or_currency_guid(query, "5f586908098232e67edb1371408bfaa8")
+                    PriceQ::commodity_or_currency(query, "5f586908098232e67edb1371408bfaa8")
                         .await
                         .unwrap();
                 assert_eq!(result.len(), 4);
@@ -915,18 +923,19 @@ mod tests {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 #[cfg(not(feature = "decimal"))]
-                assert_approx_eq!(f64, result[0].value(), 150.0);
+                assert_approx_eq!(f64, result.value(), 150.0);
                 #[cfg(feature = "decimal")]
-                assert_eq!(result[0].value(), Decimal::new(150, 0));
+                assert_eq!(result.value(), Decimal::new(150, 0));
             }
 
             #[test(tokio::test)]
             async fn test_account_guid() {
                 let query = setup().await;
-                let result = SplitQ::account_guid(query, "93fc043c3062aaa1297b30e543d2cd0d")
+                let result = SplitQ::account(query, "93fc043c3062aaa1297b30e543d2cd0d")
                     .await
                     .unwrap();
                 assert_eq!(result.len(), 3);
@@ -935,7 +944,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_tx_guid() {
                 let query = setup().await;
-                let result = SplitQ::tx_guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
+                let result = SplitQ::transaction(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
                     .unwrap();
                 assert_eq!(result.len(), 2);
@@ -958,16 +967,17 @@ mod tests {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 assert_eq!(
-                    result[0].post_date,
+                    result.post_date,
                     NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
 
                 assert_eq!(
-                    result[0].enter_date,
+                    result.enter_date,
                     NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
@@ -976,7 +986,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_currency_guid() {
                 let query = setup().await;
-                let result = TransactionQ::currency_guid(query, "346629655191dcf59a7e2c2a85b70f69")
+                let result = TransactionQ::currency(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
                     .unwrap();
 
@@ -993,9 +1003,9 @@ mod tests {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "fcd795021c976ba75621ec39e75f6214");
                 assert_eq!(result.name(), "Asset");
                 assert_eq!(result.account_type(), "ASSET");
@@ -1019,9 +1029,9 @@ mod tests {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "346629655191dcf59a7e2c2a85b70f69");
                 assert_eq!(result.namespace(), "CURRENCY");
                 assert_eq!(result.mnemonic(), "EUR");
@@ -1043,9 +1053,9 @@ mod tests {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "0d6684f44fb018e882de76094ed9c433");
                 assert_eq!(result.commodity_guid(), "d821d6776fde9f7c2d01b67876406fd3");
                 assert_eq!(result.currency_guid(), "5f586908098232e67edb1371408bfaa8");
@@ -1072,9 +1082,9 @@ mod tests {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "de832fe97e37811a7fff7e28b3a43425");
                 assert_eq!(result.tx_guid(), "6c8876003c4a6026e38e3afb67d6f2b1");
                 assert_eq!(result.account_guid(), "93fc043c3062aaa1297b30e543d2cd0d");
@@ -1103,9 +1113,9 @@ mod tests {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "6c8876003c4a6026e38e3afb67d6f2b1");
                 assert_eq!(result.currency_guid(), "346629655191dcf59a7e2c2a85b70f69");
                 assert_eq!(result.num(), "");
@@ -1214,14 +1224,15 @@ mod tests {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
+                    .unwrap()
                     .unwrap();
-                assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
+                assert_eq!(result.guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
             #[test(tokio::test)]
             async fn test_commodity_guid() {
                 let query = setup().await;
-                let result = AccountQ::commodity_guid(query, "346629655191dcf59a7e2c2a85b70f69")
+                let result = AccountQ::commodity(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
                     .unwrap();
                 assert!(
@@ -1236,7 +1247,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_parent_guid() {
                 let query = setup().await;
-                let result = AccountQ::parent_guid(query, "fcd795021c976ba75621ec39e75f6214")
+                let result = AccountQ::parent(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
                     .unwrap();
                 assert!(
@@ -1281,8 +1292,9 @@ mod tests {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
+                    .unwrap()
                     .unwrap();
-                assert_eq!(result[0].fullname.as_ref().unwrap(), "Euro");
+                assert_eq!(result.fullname.as_ref().unwrap(), "Euro");
             }
 
             #[test(tokio::test)]
@@ -1309,18 +1321,19 @@ mod tests {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 #[cfg(not(feature = "decimal"))]
-                assert_approx_eq!(f64, result[0].value(), 1.5);
+                assert_approx_eq!(f64, result.value(), 1.5);
                 #[cfg(feature = "decimal")]
-                assert_eq!(result[0].value(), Decimal::new(15, 1));
+                assert_eq!(result.value(), Decimal::new(15, 1));
             }
 
             #[test(tokio::test)]
-            async fn commodity_guid() {
+            async fn test_commodity_guid() {
                 let query = setup().await;
-                let result = PriceQ::commodity_guid(query, "d821d6776fde9f7c2d01b67876406fd3")
+                let result = PriceQ::commodity(query, "d821d6776fde9f7c2d01b67876406fd3")
                     .await
                     .unwrap();
 
@@ -1331,9 +1344,9 @@ mod tests {
             }
 
             #[test(tokio::test)]
-            async fn currency_guid() {
+            async fn test_currency_guid() {
                 let query = setup().await;
-                let result = PriceQ::currency_guid(query, "5f586908098232e67edb1371408bfaa8")
+                let result = PriceQ::currency(query, "5f586908098232e67edb1371408bfaa8")
                     .await
                     .unwrap();
 
@@ -1344,10 +1357,10 @@ mod tests {
             }
 
             #[test(tokio::test)]
-            async fn commodity_or_currency_guid() {
+            async fn test_commodity_or_currency_guid() {
                 let query = setup().await;
                 let result =
-                    PriceQ::commodity_or_currency_guid(query, "5f586908098232e67edb1371408bfaa8")
+                    PriceQ::commodity_or_currency(query, "5f586908098232e67edb1371408bfaa8")
                         .await
                         .unwrap();
                 assert_eq!(result.len(), 4);
@@ -1370,18 +1383,19 @@ mod tests {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 #[cfg(not(feature = "decimal"))]
-                assert_approx_eq!(f64, result[0].value(), 150.0);
+                assert_approx_eq!(f64, result.value(), 150.0);
                 #[cfg(feature = "decimal")]
-                assert_eq!(result[0].value(), Decimal::new(150, 0));
+                assert_eq!(result.value(), Decimal::new(150, 0));
             }
 
             #[test(tokio::test)]
             async fn test_account_guid() {
                 let query = setup().await;
-                let result = SplitQ::account_guid(query, "93fc043c3062aaa1297b30e543d2cd0d")
+                let result = SplitQ::account(query, "93fc043c3062aaa1297b30e543d2cd0d")
                     .await
                     .unwrap();
                 assert_eq!(result.len(), 3);
@@ -1390,7 +1404,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_tx_guid() {
                 let query = setup().await;
-                let result = SplitQ::tx_guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
+                let result = SplitQ::transaction(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
                     .unwrap();
                 assert_eq!(result.len(), 2);
@@ -1413,16 +1427,17 @@ mod tests {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 assert_eq!(
-                    result[0].post_date,
+                    result.post_date,
                     NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
 
                 assert_eq!(
-                    result[0].enter_date,
+                    result.enter_date,
                     NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
@@ -1431,7 +1446,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_currency_guid() {
                 let query = setup().await;
-                let result = TransactionQ::currency_guid(query, "346629655191dcf59a7e2c2a85b70f69")
+                let result = TransactionQ::currency(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
                     .unwrap();
 
@@ -1448,9 +1463,9 @@ mod tests {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "fcd795021c976ba75621ec39e75f6214");
                 assert_eq!(result.name(), "Asset");
                 assert_eq!(result.account_type(), "ASSET");
@@ -1474,9 +1489,9 @@ mod tests {
                 let query = setup().await;
                 let result = CommodityQ::guid(query, "346629655191dcf59a7e2c2a85b70f69")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "346629655191dcf59a7e2c2a85b70f69");
                 assert_eq!(result.namespace(), "CURRENCY");
                 assert_eq!(result.mnemonic(), "EUR");
@@ -1498,9 +1513,9 @@ mod tests {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "0d6684f44fb018e882de76094ed9c433");
                 assert_eq!(result.commodity_guid(), "d821d6776fde9f7c2d01b67876406fd3");
                 assert_eq!(result.currency_guid(), "5f586908098232e67edb1371408bfaa8");
@@ -1527,9 +1542,9 @@ mod tests {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "de832fe97e37811a7fff7e28b3a43425");
                 assert_eq!(result.tx_guid(), "6c8876003c4a6026e38e3afb67d6f2b1");
                 assert_eq!(result.account_guid(), "93fc043c3062aaa1297b30e543d2cd0d");
@@ -1558,9 +1573,9 @@ mod tests {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "6c8876003c4a6026e38e3afb67d6f2b1");
                 assert_eq!(result.currency_guid(), "346629655191dcf59a7e2c2a85b70f69");
                 assert_eq!(result.num(), "");
@@ -1674,14 +1689,15 @@ mod tests {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
+                    .unwrap()
                     .unwrap();
-                assert_eq!(result[0].guid, "fcd795021c976ba75621ec39e75f6214");
+                assert_eq!(result.guid, "fcd795021c976ba75621ec39e75f6214");
             }
 
             #[test(tokio::test)]
             async fn test_commodity_guid() {
                 let query = setup().await;
-                let result = AccountQ::commodity_guid(query, "EUR").await.unwrap();
+                let result = AccountQ::commodity(query, "EUR").await.unwrap();
                 assert!(
                     result
                         .iter()
@@ -1694,7 +1710,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_parent_guid() {
                 let query = setup().await;
-                let result = AccountQ::parent_guid(query, "fcd795021c976ba75621ec39e75f6214")
+                let result = AccountQ::parent(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
                     .unwrap();
                 assert!(
@@ -1737,8 +1753,8 @@ mod tests {
             #[test(tokio::test)]
             async fn test_guid() {
                 let query = setup().await;
-                let result = CommodityQ::guid(query, "FOO").await.unwrap();
-                assert_eq!(result[0].fullname.as_ref().unwrap(), "Foo Inc");
+                let result = CommodityQ::guid(query, "FOO").await.unwrap().unwrap();
+                assert_eq!(result.fullname.as_ref().unwrap(), "Foo Inc");
             }
 
             #[test(tokio::test)]
@@ -1765,18 +1781,19 @@ mod tests {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 #[cfg(not(feature = "decimal"))]
-                assert_approx_eq!(f64, result[0].value(), 1.5);
+                assert_approx_eq!(f64, result.value(), 1.5);
                 #[cfg(feature = "decimal")]
-                assert_eq!(result[0].value(), Decimal::new(15, 1));
+                assert_eq!(result.value(), Decimal::new(15, 1));
             }
 
             #[test(tokio::test)]
-            async fn commodity_guid() {
+            async fn test_commodity_guid() {
                 let query = setup().await;
-                let result = PriceQ::commodity_guid(query, "ADF").await.unwrap();
+                let result = PriceQ::commodity(query, "ADF").await.unwrap();
 
                 #[cfg(not(feature = "decimal"))]
                 assert_approx_eq!(f64, result[0].value(), 1.5);
@@ -1785,9 +1802,9 @@ mod tests {
             }
 
             #[test(tokio::test)]
-            async fn currency_guid() {
+            async fn test_currency_guid() {
                 let query = setup().await;
-                let result: Vec<_> = PriceQ::currency_guid(query, "AED")
+                let result: Vec<_> = PriceQ::currency(query, "AED")
                     .await
                     .unwrap()
                     .into_iter()
@@ -1801,11 +1818,9 @@ mod tests {
             }
 
             #[test(tokio::test)]
-            async fn commodity_or_currency_guid() {
+            async fn test_commodity_or_currency_guid() {
                 let query = setup().await;
-                let result = PriceQ::commodity_or_currency_guid(query, "AED")
-                    .await
-                    .unwrap();
+                let result = PriceQ::commodity_or_currency(query, "AED").await.unwrap();
                 assert_eq!(result.len(), 4);
             }
         }
@@ -1826,18 +1841,19 @@ mod tests {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 #[cfg(not(feature = "decimal"))]
-                assert_approx_eq!(f64, result[0].value(), 150.0);
+                assert_approx_eq!(f64, result.value(), 150.0);
                 #[cfg(feature = "decimal")]
-                assert_eq!(result[0].value(), Decimal::new(150, 0));
+                assert_eq!(result.value(), Decimal::new(150, 0));
             }
 
             #[test(tokio::test)]
             async fn test_account_guid() {
                 let query = setup().await;
-                let result = SplitQ::account_guid(query, "93fc043c3062aaa1297b30e543d2cd0d")
+                let result = SplitQ::account(query, "93fc043c3062aaa1297b30e543d2cd0d")
                     .await
                     .unwrap();
                 assert_eq!(result.len(), 3);
@@ -1846,7 +1862,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_tx_guid() {
                 let query = setup().await;
-                let result = SplitQ::tx_guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
+                let result = SplitQ::transaction(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
                     .unwrap();
                 assert_eq!(result.len(), 2);
@@ -1869,16 +1885,17 @@ mod tests {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
+                    .unwrap()
                     .unwrap();
 
                 assert_eq!(
-                    result[0].post_date,
+                    result.post_date,
                     NaiveDateTime::parse_from_str("2014-12-24 10:59:00", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
 
                 assert_eq!(
-                    result[0].enter_date,
+                    result.enter_date,
                     NaiveDateTime::parse_from_str("2014-12-25 10:08:15", "%Y-%m-%d %H:%M:%S")
                         .unwrap()
                 );
@@ -1887,7 +1904,7 @@ mod tests {
             #[test(tokio::test)]
             async fn test_currency_guid() {
                 let query = setup().await;
-                let result = TransactionQ::currency_guid(query, "EUR").await.unwrap();
+                let result = TransactionQ::currency(query, "EUR").await.unwrap();
 
                 assert_eq!(result.len(), 11);
             }
@@ -1902,9 +1919,9 @@ mod tests {
                 let query = setup().await;
                 let result = AccountQ::guid(query, "fcd795021c976ba75621ec39e75f6214")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "fcd795021c976ba75621ec39e75f6214");
                 assert_eq!(result.name(), "Asset");
                 assert_eq!(result.account_type(), "ASSET");
@@ -1926,9 +1943,8 @@ mod tests {
             #[test(tokio::test)]
             async fn test_trait_fn() {
                 let query = setup().await;
-                let result = CommodityQ::guid(query, "EUR").await.unwrap();
+                let result = CommodityQ::guid(query, "EUR").await.unwrap().unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "EUR");
                 assert_eq!(result.namespace(), "CURRENCY");
                 assert_eq!(result.mnemonic(), "EUR");
@@ -1950,9 +1966,9 @@ mod tests {
                 let query = setup().await;
                 let result = PriceQ::guid(query, "0d6684f44fb018e882de76094ed9c433")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "0d6684f44fb018e882de76094ed9c433");
                 assert_eq!(result.commodity_guid(), "ADF");
                 assert_eq!(result.currency_guid(), "AED");
@@ -1979,9 +1995,9 @@ mod tests {
                 let query = setup().await;
                 let result = SplitQ::guid(query, "de832fe97e37811a7fff7e28b3a43425")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "de832fe97e37811a7fff7e28b3a43425");
                 assert_eq!(result.tx_guid(), "6c8876003c4a6026e38e3afb67d6f2b1");
                 assert_eq!(result.account_guid(), "93fc043c3062aaa1297b30e543d2cd0d");
@@ -2010,9 +2026,9 @@ mod tests {
                 let query = setup().await;
                 let result = TransactionQ::guid(query, "6c8876003c4a6026e38e3afb67d6f2b1")
                     .await
+                    .unwrap()
                     .unwrap();
 
-                let result = &result[0];
                 assert_eq!(result.guid(), "6c8876003c4a6026e38e3afb67d6f2b1");
                 assert_eq!(result.currency_guid(), "EUR");
                 assert_eq!(result.num(), "");

@@ -101,22 +101,22 @@ impl TryFrom<Node<'_, '_>> for Commodity {
 }
 
 impl CommodityT for Commodity {
-    fn guid(&self) -> String {
-        self.guid.clone()
+    fn guid(&self) -> &str {
+        &self.guid
     }
-    fn namespace(&self) -> String {
-        self.namespace.clone()
+    fn namespace(&self) -> &str {
+        &self.namespace
     }
-    fn mnemonic(&self) -> String {
-        self.mnemonic.clone()
-    }
-    // not support in xml
-    fn fullname(&self) -> String {
-        self.fullname.clone().unwrap_or_default()
+    fn mnemonic(&self) -> &str {
+        &self.mnemonic
     }
     // not support in xml
-    fn cusip(&self) -> String {
-        self.cusip.clone().unwrap_or_default()
+    fn fullname(&self) -> &str {
+        self.fullname.as_deref().unwrap_or_default()
+    }
+    // not support in xml
+    fn cusip(&self) -> &str {
+        self.cusip.as_deref().unwrap_or_default()
     }
     fn fraction(&self) -> i64 {
         self.fraction
@@ -124,11 +124,11 @@ impl CommodityT for Commodity {
     fn quote_flag(&self) -> bool {
         self.quote_flag
     }
-    fn quote_source(&self) -> String {
-        self.quote_source.clone().unwrap_or_default()
+    fn quote_source(&self) -> &str {
+        self.quote_source.as_deref().unwrap_or_default()
     }
-    fn quote_tz(&self) -> String {
-        self.quote_tz.clone().unwrap_or_default()
+    fn quote_tz(&self) -> &str {
+        self.quote_tz.as_deref().unwrap_or_default()
     }
 }
 
@@ -146,13 +146,13 @@ impl CommodityQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
-        tracing::debug!("fetching commodities by guid from xml");
+    async fn guid(&self, guid: &str) -> Result<Option<Self::Item>, Error> {
+        tracing::debug!("fetching commodity by guid from xml");
         let map = self
             .commodity_map()
             .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
-        Ok(map.get(guid).map(|x| (**x).clone()).into_iter().collect())
+        Ok(map.get(guid).map(|x| (**x).clone()))
     }
 
     #[instrument(skip(self))]
@@ -257,9 +257,8 @@ mod tests {
     #[test(tokio::test)]
     async fn test_commodity() {
         let query = setup().await;
-        let result = query.guid("EUR").await.unwrap();
+        let result = query.guid("EUR").await.unwrap().unwrap();
 
-        let result = &result[0];
         assert_eq!(result.guid(), "EUR");
         assert_eq!(result.namespace(), "CURRENCY");
         assert_eq!(result.mnemonic(), "EUR");
@@ -281,8 +280,8 @@ mod tests {
     #[test(tokio::test)]
     async fn test_guid() {
         let query = setup().await;
-        let result = query.guid("EUR").await.unwrap();
-        assert_eq!(result[0].guid, "EUR");
+        let result = query.guid("EUR").await.unwrap().unwrap();
+        assert_eq!(result.guid, "EUR");
     }
 
     #[test(tokio::test)]

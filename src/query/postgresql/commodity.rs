@@ -22,20 +22,20 @@ pub struct Commodity {
 }
 
 impl CommodityT for Commodity {
-    fn guid(&self) -> String {
-        self.guid.clone()
+    fn guid(&self) -> &str {
+        &self.guid
     }
-    fn namespace(&self) -> String {
-        self.namespace.clone()
+    fn namespace(&self) -> &str {
+        &self.namespace
     }
-    fn mnemonic(&self) -> String {
-        self.mnemonic.clone()
+    fn mnemonic(&self) -> &str {
+        &self.mnemonic
     }
-    fn fullname(&self) -> String {
-        self.fullname.clone().unwrap_or_default()
+    fn fullname(&self) -> &str {
+        self.fullname.as_deref().unwrap_or_default()
     }
-    fn cusip(&self) -> String {
-        self.cusip.clone().unwrap_or_default()
+    fn cusip(&self) -> &str {
+        self.cusip.as_deref().unwrap_or_default()
     }
     fn fraction(&self) -> i64 {
         i64::from(self.fraction)
@@ -43,11 +43,11 @@ impl CommodityT for Commodity {
     fn quote_flag(&self) -> bool {
         self.quote_flag != 0
     }
-    fn quote_source(&self) -> String {
-        self.quote_source.clone().unwrap_or_default()
+    fn quote_source(&self) -> &str {
+        self.quote_source.as_deref().unwrap_or_default()
     }
-    fn quote_tz(&self) -> String {
-        self.quote_tz.clone().unwrap_or_default()
+    fn quote_tz(&self) -> &str {
+        self.quote_tz.as_deref().unwrap_or_default()
     }
 }
 
@@ -79,11 +79,11 @@ impl CommodityQ for PostgreSQLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
-        tracing::debug!("fetching commodities by guid from postgresql");
+    async fn guid(&self, guid: &str) -> Result<Option<Self::Item>, Error> {
+        tracing::debug!("fetching commoditiy by guid from postgresql");
         sqlx::query_as(AssertSqlSafe(format!("{SEL}\nWHERE guid = $1")))
             .bind(guid)
-            .fetch_all(&self.pool)
+            .fetch_optional(&self.pool)
             .await
             .inspect_err(|e| tracing::error!("failed to execute query: {e}"))
             .map_err(std::convert::Into::into)
@@ -150,9 +150,9 @@ mod tests {
         let result = query
             .guid("346629655191dcf59a7e2c2a85b70f69")
             .await
+            .unwrap()
             .unwrap();
 
-        let result = &result[0];
         assert_eq!(result.guid(), "346629655191dcf59a7e2c2a85b70f69");
         assert_eq!(result.namespace(), "CURRENCY");
         assert_eq!(result.mnemonic(), "EUR");
@@ -177,8 +177,9 @@ mod tests {
         let result = query
             .guid("346629655191dcf59a7e2c2a85b70f69")
             .await
+            .unwrap()
             .unwrap();
-        assert_eq!(result[0].fullname.as_ref().unwrap(), "Euro");
+        assert_eq!(result.fullname.as_ref().unwrap(), "Euro");
     }
 
     #[test(tokio::test)]

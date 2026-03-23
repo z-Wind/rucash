@@ -33,14 +33,14 @@ where
         Self {
             query,
 
-            guid: item.guid(),
-            tx_guid: item.tx_guid(),
-            account_guid: item.account_guid(),
-            memo: item.memo(),
-            action: item.action(),
+            guid: item.guid().to_string(),
+            tx_guid: item.tx_guid().to_string(),
+            account_guid: item.account_guid().to_string(),
+            memo: item.memo().to_string(),
+            action: item.action().to_string(),
             reconcile_state: item.reconcile_state(),
             reconcile_datetime: item.reconcile_datetime(),
-            lot_guid: item.lot_guid(),
+            lot_guid: item.lot_guid().to_string(),
             value: item.value(),
             quantity: item.quantity(),
         }
@@ -57,29 +57,19 @@ where
         }
 
         tracing::debug!("fetching transaction for split");
-        let mut transactions = TransactionQ::guid(&*self.query, &self.tx_guid)
+        let transaction = TransactionQ::guid(&*self.query, &self.tx_guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch transaction: {e}"))?;
 
-        match transactions.pop() {
-            None => {
-                tracing::error!("transaction not found");
-                Err(Error::GuidNotFound {
-                    model: "Transaction".to_string(),
-                    guid: self.tx_guid.clone(),
-                })
-            }
-            Some(x) if transactions.is_empty() => {
-                tracing::debug!("transaction found for split");
-                Ok(Transaction::from_with_query(&x, self.query.clone()))
-            }
-            _ => {
-                tracing::error!("multiple transactions found for guid");
-                Err(Error::GuidMultipleFound {
-                    model: "Transaction".to_string(),
-                    guid: self.tx_guid.clone(),
-                })
-            }
+        if let Some(t) = transaction {
+            tracing::debug!("transaction found for split");
+            Ok(Transaction::from_with_query(&t, self.query.clone()))
+        } else {
+            tracing::error!("transaction not found");
+            Err(Error::GuidNotFound {
+                model: "Transaction".to_string(),
+                guid: self.tx_guid.clone(),
+            })
         }
     }
 
@@ -94,29 +84,19 @@ where
         }
 
         tracing::debug!("fetching account for split");
-        let mut accounts = AccountQ::guid(&*self.query, &self.account_guid)
+        let account = AccountQ::guid(&*self.query, &self.account_guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch account: {e}"))?;
 
-        match accounts.pop() {
-            None => {
-                tracing::error!("account not found");
-                Err(Error::GuidNotFound {
-                    model: "Account".to_string(),
-                    guid: self.account_guid.clone(),
-                })
-            }
-            Some(x) if accounts.is_empty() => {
-                tracing::debug!("account found for split");
-                Ok(Account::from_with_query(&x, self.query.clone()))
-            }
-            _ => {
-                tracing::error!("multiple accounts found for guid");
-                Err(Error::GuidMultipleFound {
-                    model: "Account".to_string(),
-                    guid: self.account_guid.clone(),
-                })
-            }
+        if let Some(a) = account {
+            tracing::debug!("account found for split");
+            Ok(Account::from_with_query(&a, self.query.clone()))
+        } else {
+            tracing::error!("account not found");
+            Err(Error::GuidNotFound {
+                model: "Account".to_string(),
+                guid: self.account_guid.clone(),
+            })
         }
     }
 }

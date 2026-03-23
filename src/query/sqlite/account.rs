@@ -46,17 +46,17 @@ impl<'a> TryFrom<&'a Row<'a>> for Account {
 }
 
 impl AccountT for Account {
-    fn guid(&self) -> String {
-        self.guid.clone()
+    fn guid(&self) -> &str {
+        &self.guid
     }
-    fn name(&self) -> String {
-        self.name.clone()
+    fn name(&self) -> &str {
+        &self.name
     }
-    fn account_type(&self) -> String {
-        self.account_type.clone()
+    fn account_type(&self) -> &str {
+        &self.account_type
     }
-    fn commodity_guid(&self) -> String {
-        self.commodity_guid.clone().unwrap_or_default()
+    fn commodity_guid(&self) -> &str {
+        self.commodity_guid.as_deref().unwrap_or_default()
     }
     fn commodity_scu(&self) -> i64 {
         self.commodity_scu
@@ -64,14 +64,14 @@ impl AccountT for Account {
     fn non_std_scu(&self) -> bool {
         self.non_std_scu != 0
     }
-    fn parent_guid(&self) -> String {
-        self.parent_guid.clone().unwrap_or_default()
+    fn parent_guid(&self) -> &str {
+        self.parent_guid.as_deref().unwrap_or_default()
     }
-    fn code(&self) -> String {
-        self.code.clone().unwrap_or_default()
+    fn code(&self) -> &str {
+        self.code.as_deref().unwrap_or_default()
     }
-    fn description(&self) -> String {
-        self.description.clone().unwrap_or_default()
+    fn description(&self) -> &str {
+        self.description.as_deref().unwrap_or_default()
     }
     fn hidden(&self) -> bool {
         self.hidden.is_some_and(|x| x != 0)
@@ -127,7 +127,7 @@ impl AccountQ for SQLiteQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Option<Self::Item>, Error> {
         let pool = self.pool.clone();
         let guid_owned = guid.to_string();
 
@@ -141,21 +141,23 @@ impl AccountQ for SQLiteQuery {
                 .prepare_cached(&sql)
                 .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
 
-            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+            let result = stmt.query_row([guid_owned], |row| Self::Item::try_from(row));
 
-            let items = rows
-                .collect::<Result<Vec<_>, _>>()
-                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
-
-            tracing::debug!(count = items.len(), "accounts found by guid");
-            Ok(items)
+            match result {
+                Ok(item) => Ok(Some(item)),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                Err(e) => {
+                    tracing::error!("failed to fetch row: {e}");
+                    Err(Error::from(e))
+                }
+            }
         })
         .await
         .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn commodity(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         let pool = self.pool.clone();
         let guid_owned = guid.to_string();
 
@@ -183,7 +185,7 @@ impl AccountQ for SQLiteQuery {
     }
 
     #[instrument(skip(self))]
-    async fn parent_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn parent(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         let pool = self.pool.clone();
         let guid_owned = guid.to_string();
 
@@ -319,9 +321,9 @@ mod tests {
         let result = query
             .guid("fcd795021c976ba75621ec39e75f6214")
             .await
+            .unwrap()
             .unwrap();
 
-        let result = &result[0];
         assert_eq!(result.guid(), "fcd795021c976ba75621ec39e75f6214");
         assert_eq!(result.name(), "Asset");
         assert_eq!(result.account_type(), "ASSET");
@@ -348,16 +350,17 @@ mod tests {
         let result = query
             .guid("fcd795021c976ba75621ec39e75f6214")
             .await
+            .unwrap()
             .unwrap();
 
-        assert_eq!(result[0].name, "Asset");
+        assert_eq!(result.name, "Asset");
     }
 
     #[test(tokio::test)]
     async fn test_commodity_guid() {
         let query = setup().await;
         let result = query
-            .commodity_guid("346629655191dcf59a7e2c2a85b70f69")
+            .commodity("346629655191dcf59a7e2c2a85b70f69")
             .await
             .unwrap();
         assert_eq!(result.len(), 14);
@@ -367,7 +370,7 @@ mod tests {
     async fn test_parent_guid() {
         let query = setup().await;
         let result = query
-            .parent_guid("fcd795021c976ba75621ec39e75f6214")
+            .parent("fcd795021c976ba75621ec39e75f6214")
             .await
             .unwrap();
         assert_eq!(result.len(), 3);

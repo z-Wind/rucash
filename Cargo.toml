@@ -1,6 +1,6 @@
 [package]
 name = "rucash"
-version = "0.7.0"
+version = "0.8.0"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/z-Wind/rucash"
@@ -23,7 +23,7 @@ chrono = "0.4"
 rust_decimal = { version = "1.40", optional = true }
 roxmltree = { version = "0.21", optional = true }
 flate2 = "1.1"
-tokio = { version = "1.49", features = ["sync"] }
+tokio = { version = "1.50", features = ["sync"] }
 num-traits = "0.2"
 thiserror = "2.0"
 # Pin rusqlite to 0.37 for SQLx compatibility
@@ -42,7 +42,7 @@ crate-type = ["cdylib", "rlib"]
 criterion = { version = "0.8", features = ["async_tokio"] }
 float-cmp = "0.10"
 pretty_assertions = "1.4"
-tokio = { version = "1.49", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.50", features = ["rt-multi-thread", "macros"] }
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 

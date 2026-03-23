@@ -35,15 +35,15 @@ where
         Self {
             query,
 
-            guid: item.guid(),
-            name: item.name(),
-            r#type: item.account_type(),
-            commodity_guid: item.commodity_guid(),
+            guid: item.guid().to_string(),
+            name: item.name().to_string(),
+            r#type: item.account_type().to_string(),
+            commodity_guid: item.commodity_guid().to_string(),
             commodity_scu: item.commodity_scu(),
             non_std_scu: item.non_std_scu(),
-            parent_guid: item.parent_guid(),
-            code: item.code(),
-            description: item.description(),
+            parent_guid: item.parent_guid().to_string(),
+            code: item.code().to_string(),
+            description: item.description().to_string(),
             hidden: item.hidden(),
             placeholder: item.placeholder(),
         }
@@ -52,7 +52,7 @@ where
     #[instrument(skip(self), fields(account_guid = %self.guid, account_name = %self.name))]
     pub async fn splits(&self) -> Result<Vec<Split<Q>>, Error> {
         tracing::debug!("fetching splits for account");
-        let splits = SplitQ::account_guid(&*self.query, &self.guid)
+        let splits = SplitQ::account(&*self.query, &self.guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch splits: {e}"))?;
         let result: Vec<_> = splits
@@ -71,33 +71,23 @@ where
         }
 
         tracing::debug!("fetching parent account");
-        let mut accounts = AccountQ::guid(&*self.query, &self.parent_guid)
+        let account = AccountQ::guid(&*self.query, &self.parent_guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch parent account: {e}"))?;
 
-        match accounts.pop() {
-            None => {
-                tracing::warn!("parent account not found");
-                Ok(None)
-            }
-            Some(x) if accounts.is_empty() => {
-                tracing::debug!("parent account found");
-                Ok(Some(Account::from_with_query(&x, self.query.clone())))
-            }
-            _ => {
-                tracing::error!("multiple parent accounts found for guid");
-                Err(Error::GuidMultipleFound {
-                    model: "Account".to_string(),
-                    guid: self.parent_guid.clone(),
-                })
-            }
+        if let Some(a) = account {
+            tracing::debug!("parent account found");
+            Ok(Some(Account::from_with_query(&a, self.query.clone())))
+        } else {
+            tracing::warn!("parent account not found");
+            Ok(None)
         }
     }
 
     #[instrument(skip(self), fields(account_guid = %self.guid))]
     pub async fn children(&self) -> Result<Vec<Account<Q>>, Error> {
         tracing::debug!("fetching children accounts");
-        let accounts = AccountQ::parent_guid(&*self.query, &self.guid)
+        let accounts = AccountQ::parent(&*self.query, &self.guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch children accounts: {e}"))?;
         let result: Vec<_> = accounts
@@ -119,25 +109,18 @@ where
         }
 
         tracing::debug!("fetching commodity for account");
-        let mut commodities = CommodityQ::guid(&*self.query, &self.commodity_guid)
+        let commodity = CommodityQ::guid(&*self.query, &self.commodity_guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch commodity: {e}"))?;
-        match commodities.pop() {
-            None => {
-                tracing::error!("commodity not found");
-                Err(Error::GuidNotFound {
-                    model: "Commodity".to_string(),
-                    guid: self.commodity_guid.clone(),
-                })
-            }
-            Some(x) if commodities.is_empty() => {
-                tracing::debug!("commodity found for account");
-                Ok(Commodity::from_with_query(&x, self.query.clone()))
-            }
-            _ => Err(Error::GuidMultipleFound {
+        if let Some(c) = commodity {
+            tracing::debug!("commodity found");
+            Ok(Commodity::from_with_query(&c, self.query.clone()))
+        } else {
+            tracing::warn!("commodity not found");
+            Err(Error::GuidNotFound {
                 model: "Commodity".to_string(),
                 guid: self.commodity_guid.clone(),
-            }),
+            })
         }
     }
 

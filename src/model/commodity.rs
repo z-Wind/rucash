@@ -33,22 +33,22 @@ where
         Self {
             query,
 
-            guid: item.guid(),
-            namespace: item.namespace(),
-            mnemonic: item.mnemonic(),
-            fullname: item.fullname(),
-            cusip: item.cusip(),
+            guid: item.guid().to_string(),
+            namespace: item.namespace().to_string(),
+            mnemonic: item.mnemonic().to_string(),
+            fullname: item.fullname().to_string(),
+            cusip: item.cusip().to_string(),
             fraction: item.fraction(),
             quote_flag: item.quote_flag(),
-            quote_source: item.quote_source(),
-            quote_tz: item.quote_tz(),
+            quote_source: item.quote_source().to_string(),
+            quote_tz: item.quote_tz().to_string(),
         }
     }
 
     #[instrument(skip(self), fields(commodity_guid = %self.guid, commodity_mnemonic = %self.mnemonic))]
     pub async fn accounts(&self) -> Result<Vec<Account<Q>>, Error> {
         tracing::debug!("fetching accounts for commodity");
-        let accounts = AccountQ::commodity_guid(&*self.query, &self.guid)
+        let accounts = AccountQ::commodity(&*self.query, &self.guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch accounts: {e}"))?;
         let result: Vec<_> = accounts
@@ -62,7 +62,7 @@ where
     #[instrument(skip(self), fields(commodity_guid = %self.guid, commodity_mnemonic = %self.mnemonic))]
     pub async fn transactions(&self) -> Result<Vec<Transaction<Q>>, Error> {
         tracing::debug!("fetching transactions for commodity");
-        let transactions = TransactionQ::currency_guid(&*self.query, &self.guid)
+        let transactions = TransactionQ::currency(&*self.query, &self.guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch transactions: {e}"))?;
         let result: Vec<_> = transactions
@@ -76,7 +76,7 @@ where
     #[instrument(skip(self), fields(commodity_guid = %self.guid))]
     pub async fn as_commodity_prices(&self) -> Result<Vec<Price<Q>>, Error> {
         tracing::debug!("fetching prices where this is the commodity");
-        let prices = PriceQ::commodity_guid(&*self.query, &self.guid)
+        let prices = PriceQ::commodity(&*self.query, &self.guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch prices: {e}"))?;
         let result: Vec<_> = prices
@@ -90,7 +90,7 @@ where
     #[instrument(skip(self), fields(commodity_guid = %self.guid))]
     pub async fn as_currency_prices(&self) -> Result<Vec<Price<Q>>, Error> {
         tracing::debug!("fetching prices where this is the currency");
-        let prices = PriceQ::currency_guid(&*self.query, &self.guid)
+        let prices = PriceQ::currency(&*self.query, &self.guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch prices: {e}"))?;
         let result: Vec<_> = prices
@@ -104,7 +104,7 @@ where
     #[instrument(skip(self), fields(commodity_guid = %self.guid))]
     pub async fn as_commodity_or_currency_prices(&self) -> Result<Vec<Price<Q>>, Error> {
         tracing::debug!("fetching prices where this is commodity or currency");
-        let prices = PriceQ::commodity_or_currency_guid(&*self.query, &self.guid)
+        let prices = PriceQ::commodity_or_currency(&*self.query, &self.guid)
             .await
             .inspect_err(|e| tracing::error!("failed to fetch prices: {e}"))?;
         let result: Vec<_> = prices

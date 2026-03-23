@@ -30,7 +30,7 @@ where
             .inspect_err(|e| tracing::error!("failed to rebuild exchange graph: {e}"))?;
         let exchange_graph = Arc::new(Mutex::new(exchange_graph));
 
-        let mut book = Self {
+        let book = Self {
             query,
             exchange_graph,
         };
@@ -231,7 +231,7 @@ where
     }
 
     #[instrument(skip(self))]
-    pub async fn update_exchange_graph(&mut self) -> Result<(), Error> {
+    pub async fn update_exchange_graph(&self) -> Result<(), Error> {
         tracing::debug!("updating existing exchange graph");
         self.exchange_graph
             .lock()

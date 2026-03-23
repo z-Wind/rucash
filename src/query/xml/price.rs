@@ -143,23 +143,23 @@ impl TryFrom<Node<'_, '_>> for Price {
 }
 
 impl PriceT for Price {
-    fn guid(&self) -> String {
-        self.guid.clone()
+    fn guid(&self) -> &str {
+        &self.guid
     }
-    fn commodity_guid(&self) -> String {
-        self.commodity_guid.clone()
+    fn commodity_guid(&self) -> &str {
+        &self.commodity_guid
     }
-    fn currency_guid(&self) -> String {
-        self.currency_guid.clone()
+    fn currency_guid(&self) -> &str {
+        &self.currency_guid
     }
     fn datetime(&self) -> NaiveDateTime {
         self.date
     }
-    fn source(&self) -> String {
-        self.source.clone().unwrap_or_default()
+    fn source(&self) -> &str {
+        self.source.as_deref().unwrap_or_default()
     }
-    fn r#type(&self) -> String {
-        self.r#type.clone().unwrap_or_default()
+    fn r#type(&self) -> &str {
+        self.r#type.as_deref().unwrap_or_default()
     }
 
     #[cfg(not(feature = "decimal"))]
@@ -188,17 +188,17 @@ impl PriceQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
-        tracing::debug!("fetching prices by guid from xml");
+    async fn guid(&self, guid: &str) -> Result<Option<Self::Item>, Error> {
+        tracing::debug!("fetching price by guid from xml");
         let map = self
             .price_map()
             .inspect_err(|e| tracing::error!("failed to get map: {e}"))?;
 
-        Ok(map.get(guid).map(|x| (**x).clone()).into_iter().collect())
+        Ok(map.get(guid).map(|p| (**p).clone()))
     }
 
     #[instrument(skip(self))]
-    async fn commodity_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn commodity(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching prices by commodity_guid from xml");
         let map = self
             .commodity_prices_map()
@@ -211,7 +211,7 @@ impl PriceQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn currency_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn currency(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching prices by currency_guid from xml");
         let map = self
             .currency_prices_map()
@@ -224,7 +224,7 @@ impl PriceQ for XMLQuery {
     }
 
     #[instrument(skip(self))]
-    async fn commodity_or_currency_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn commodity_or_currency(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         tracing::debug!("fetching prices by commodity or currency guid from xml");
         let map = self
             .commodity_prices_map()
@@ -356,9 +356,9 @@ mod tests {
         let result = query
             .guid("0d6684f44fb018e882de76094ed9c433")
             .await
+            .unwrap()
             .unwrap();
 
-        let result = &result[0];
         assert_eq!(result.guid(), "0d6684f44fb018e882de76094ed9c433");
         assert_eq!(result.commodity_guid(), "ADF");
         assert_eq!(result.currency_guid(), "AED");
@@ -387,18 +387,19 @@ mod tests {
         let result = query
             .guid("0d6684f44fb018e882de76094ed9c433")
             .await
+            .unwrap()
             .unwrap();
 
         #[cfg(not(feature = "decimal"))]
-        assert_approx_eq!(f64, result[0].value(), 1.5);
+        assert_approx_eq!(f64, result.value(), 1.5);
         #[cfg(feature = "decimal")]
-        assert_eq!(result[0].value(), Decimal::new(15, 1));
+        assert_eq!(result.value(), Decimal::new(15, 1));
     }
 
     #[test(tokio::test)]
-    async fn commodity_guid() {
+    async fn test_commodity_guid() {
         let query = setup().await;
-        let result = query.commodity_guid("ADF").await.unwrap();
+        let result = query.commodity("ADF").await.unwrap();
 
         #[cfg(not(feature = "decimal"))]
         assert_approx_eq!(f64, result[0].value(), 1.5);
@@ -407,10 +408,10 @@ mod tests {
     }
 
     #[test(tokio::test)]
-    async fn currency_guid() {
+    async fn test_currency_guid() {
         let query = setup().await;
         let result: Vec<_> = query
-            .currency_guid("AED")
+            .currency("AED")
             .await
             .unwrap()
             .into_iter()
@@ -424,9 +425,9 @@ mod tests {
     }
 
     #[test(tokio::test)]
-    async fn commodity_or_currency_guid() {
+    async fn test_commodity_or_currency_guid() {
         let query = setup().await;
-        let result = query.commodity_or_currency_guid("AED").await.unwrap();
+        let result = query.commodity_or_currency("AED").await.unwrap();
         assert_eq!(result.len(), 4);
     }
 }

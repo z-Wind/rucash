@@ -50,20 +50,20 @@ impl<'a> TryFrom<&'a Row<'a>> for Split {
 }
 
 impl SplitT for Split {
-    fn guid(&self) -> String {
-        self.guid.clone()
+    fn guid(&self) -> &str {
+        &self.guid
     }
-    fn tx_guid(&self) -> String {
-        self.tx_guid.clone()
+    fn tx_guid(&self) -> &str {
+        &self.tx_guid
     }
-    fn account_guid(&self) -> String {
-        self.account_guid.clone()
+    fn account_guid(&self) -> &str {
+        &self.account_guid
     }
-    fn memo(&self) -> String {
-        self.memo.clone()
+    fn memo(&self) -> &str {
+        &self.memo
     }
-    fn action(&self) -> String {
-        self.action.clone()
+    fn action(&self) -> &str {
+        &self.action
     }
     fn reconcile_state(&self) -> bool {
         self.reconcile_state == "y" || self.reconcile_state == "Y"
@@ -75,8 +75,8 @@ impl SplitT for Split {
         }
         Some(datetime)
     }
-    fn lot_guid(&self) -> String {
-        self.lot_guid.clone().unwrap_or_default()
+    fn lot_guid(&self) -> &str {
+        self.lot_guid.as_deref().unwrap_or_default()
     }
 
     #[cfg(not(feature = "decimal"))]
@@ -149,7 +149,7 @@ impl SplitQ for SQLiteQuery {
     }
 
     #[instrument(skip(self))]
-    async fn guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn guid(&self, guid: &str) -> Result<Option<Self::Item>, Error> {
         let pool = self.pool.clone();
         let guid_owned = guid.to_string();
 
@@ -163,21 +163,23 @@ impl SplitQ for SQLiteQuery {
                 .prepare_cached(&sql)
                 .inspect_err(|e| tracing::error!("failed to prepare statement: {e}"))?;
 
-            let rows = stmt.query_map([guid_owned], |row| Self::Item::try_from(row))?;
+            let result = stmt.query_row([guid_owned], |row| Self::Item::try_from(row));
 
-            let items = rows
-                .collect::<Result<Vec<_>, _>>()
-                .inspect_err(|e| tracing::error!("failed to collect rows: {e}"))?;
-
-            tracing::debug!(count = items.len(), "splits found by guid");
-            Ok(items)
+            match result {
+                Ok(item) => Ok(Some(item)),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                Err(e) => {
+                    tracing::error!("failed to fetch row: {e}");
+                    Err(Error::from(e))
+                }
+            }
         })
         .await
         .map_err(|e| Error::Internal(format!("Join error: {e}")))?
     }
 
     #[instrument(skip(self))]
-    async fn account_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn account(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         let pool = self.pool.clone();
         let guid_owned = guid.to_string();
 
@@ -205,7 +207,7 @@ impl SplitQ for SQLiteQuery {
     }
 
     #[instrument(skip(self))]
-    async fn tx_guid(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
+    async fn transaction(&self, guid: &str) -> Result<Vec<Self::Item>, Error> {
         let pool = self.pool.clone();
         let guid_owned = guid.to_string();
 
@@ -288,9 +290,9 @@ mod tests {
         let result = query
             .guid("de832fe97e37811a7fff7e28b3a43425")
             .await
+            .unwrap()
             .unwrap();
 
-        let result = &result[0];
         assert_eq!(result.guid(), "de832fe97e37811a7fff7e28b3a43425");
         assert_eq!(result.tx_guid(), "6c8876003c4a6026e38e3afb67d6f2b1");
         assert_eq!(result.account_guid(), "93fc043c3062aaa1297b30e543d2cd0d");
@@ -322,19 +324,20 @@ mod tests {
         let result = query
             .guid("de832fe97e37811a7fff7e28b3a43425")
             .await
+            .unwrap()
             .unwrap();
 
         #[cfg(not(feature = "decimal"))]
-        assert_approx_eq!(f64, result[0].value(), 150.0);
+        assert_approx_eq!(f64, result.value(), 150.0);
         #[cfg(feature = "decimal")]
-        assert_eq!(result[0].value(), Decimal::new(150, 0));
+        assert_eq!(result.value(), Decimal::new(150, 0));
     }
 
     #[test(tokio::test)]
     async fn test_account_guid() {
         let query = setup().await;
         let result = query
-            .account_guid("93fc043c3062aaa1297b30e543d2cd0d")
+            .account("93fc043c3062aaa1297b30e543d2cd0d")
             .await
             .unwrap();
         assert_eq!(result.len(), 3);
@@ -344,7 +347,7 @@ mod tests {
     async fn test_tx_guid() {
         let query = setup().await;
         let result = query
-            .tx_guid("6c8876003c4a6026e38e3afb67d6f2b1")
+            .transaction("6c8876003c4a6026e38e3afb67d6f2b1")
             .await
             .unwrap();
         assert_eq!(result.len(), 2);
