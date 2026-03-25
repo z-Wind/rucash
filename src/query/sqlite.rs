@@ -64,7 +64,7 @@ impl ManageConnection for SqliteManager {
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
         )?;
 
-        // GnuCash 特定優化
+        // GnuCash-specific optimization
         conn.execute_batch(
             "
                 PRAGMA query_only = ON;

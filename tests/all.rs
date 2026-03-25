@@ -134,7 +134,7 @@ mod consistency {
             b: &rucash::model::Transaction<QB>,
         ) -> bool {
             assert_eq!(a.guid, b.guid);
-            // xml guid 會是 USD 之類的
+            // The GUID in the XML will be set to "USD" or similar
             // assert_eq!(a.currency_guid, b.currency_guid);
             assert_eq!(a.num, b.num);
             assert_eq!(a.post_datetime, b.post_datetime);
@@ -171,9 +171,8 @@ mod consistency {
             b: &rucash::model::Price<QB>,
         ) -> bool {
             assert_eq!(a.guid, b.guid);
-            // xml guid 會是 USD 之類的
+            // The GUID in the XML will be set to "USD" or similar
             // assert_eq!(a.commodity_guid, b.commodity_guid);
-            // xml guid 會是 USD 之類的
             // assert_eq!(a.currency_guid, b.currency_guid);
             assert_eq!(a.datetime, b.datetime);
             assert_eq!(a.source, b.source);
@@ -210,17 +209,17 @@ mod consistency {
             b: &rucash::model::Commodity<QB>,
         ) -> bool {
             tracing::info!("a:{}\nb:{}\n\n", a.guid, b.guid);
-            // xml guid 會是 USD 之類的
+            // The GUID in the XML will be set to "USD" or similar
             // assert_eq!(a.guid, b.guid);
             assert_eq!(a.namespace, b.namespace);
             assert_eq!(a.mnemonic, b.mnemonic);
-            // xml 無 fullname
+            // XML missing fullname field
             // assert_eq!(a.fullname, b.fullname);
-            // xml 無 cusip
+            // XML missing cusip field
             // assert_eq!(a.cusip, b.cusip);
             assert_eq!(a.fraction, b.fraction);
             assert_eq!(a.quote_flag, b.quote_flag);
-            // xml 的 price 會沒有 quote_source
+            // The XML price is missing the quote source
             // assert_eq!(a.quote_source, b.quote_source);
             assert_eq!(a.quote_tz, b.quote_tz);
 
