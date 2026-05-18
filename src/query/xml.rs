@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
 use tracing::instrument;
 
@@ -37,8 +37,10 @@ type SplitsMap = Arc<HashMap<String, Vec<Arc<Split>>>>;
 type TransactionMap = Arc<HashMap<String, Arc<Transaction>>>;
 type TransactionsMap = Arc<HashMap<String, Vec<Arc<Transaction>>>>;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 struct XMLCache {
+    file_modified_time: SystemTime,
+
     accounts: AccountMap,
     commodity_accounts: AccountsMap,
     same_parent_accounts: AccountsMap,
@@ -58,7 +60,6 @@ struct XMLCache {
 #[derive(Debug, Clone)]
 pub struct XMLQuery {
     file_path: Arc<PathBuf>,
-    file_modified_time: Arc<Mutex<SystemTime>>,
 
     cache: Arc<RwLock<XMLCache>>,
 }
@@ -69,18 +70,17 @@ impl XMLQuery {
     pub fn new(path: &str) -> Result<Self, Error> {
         tracing::debug!("opening gnucash xml file");
         let path_buf = PathBuf::from(path);
-        let mtime = path_buf.metadata()?.modified()?;
 
         let cache = Self::load_cache_from_disk(&path_buf)?;
 
         Ok(Self {
             file_path: Arc::new(path_buf),
-            file_modified_time: Arc::new(Mutex::new(mtime)),
             cache: Arc::new(RwLock::new(cache)),
         })
     }
 
     fn load_cache_from_disk(path: &Path) -> Result<XMLCache, Error> {
+        let mtime = path.metadata()?.modified()?;
         let data = Self::gnucash_data(path)?;
         let doc = Document::parse(&data)?;
 
@@ -97,6 +97,7 @@ impl XMLQuery {
         let (txn, txn_c) = Self::parse_transaction_map(book)?;
 
         Ok(XMLCache {
+            file_modified_time: mtime,
             accounts: acc,
             commodity_accounts: acc_c,
             same_parent_accounts: acc_p,
@@ -307,35 +308,30 @@ impl XMLQuery {
         let current_mtime = self.file_path.metadata()?.modified()?;
 
         {
-            let last_mtime = self
-                .file_modified_time
-                .lock()
-                .map_err(|e| Error::Internal(format!("Mtime lock poisoned: {e}")))?;
+            let cache_lock = self
+                .cache
+                .read()
+                .map_err(|e| Error::Internal(format!("Cache read lock poisoned: {e}")))?;
 
-            if current_mtime == *last_mtime {
+            if current_mtime == cache_lock.file_modified_time {
                 return Ok(());
             }
         }
 
         let new_cache = Self::load_cache_from_disk(&self.file_path)?;
 
-        let mut last_mtime = self
-            .file_modified_time
-            .lock()
-            .map_err(|e| Error::Internal(format!("Mtime lock poisoned: {e}")))?;
+        {
+            let mut cache_lock = self
+                .cache
+                .write()
+                .map_err(|e| Error::Internal(format!("Cache write lock poisoned: {e}")))?;
 
-        if current_mtime == *last_mtime {
-            return Ok(());
+            if new_cache.file_modified_time <= cache_lock.file_modified_time {
+                return Ok(());
+            }
+
+            *cache_lock = new_cache;
         }
-
-        let mut cache_lock = self
-            .cache
-            .write()
-            .map_err(|e| Error::Internal(format!("Cache lock poisoned: {e}")))?;
-
-        *cache_lock = new_cache;
-
-        *last_mtime = current_mtime;
 
         tracing::info!("XML cache updated successfully");
         Ok(())

@@ -228,20 +228,6 @@ impl Exchange {
         tracing::warn!("no exchange path found between commodities");
         None
     }
-
-    /// Rebuilds the exchange graph with the latest data.
-    #[instrument(skip(self, query))]
-    pub(crate) async fn update<Q>(&mut self, query: Arc<Q>) -> Result<(), Error>
-    where
-        Q: Query,
-    {
-        tracing::debug!("updating exchange graph");
-        self.graph = Self::new_graph(query)
-            .await
-            .inspect_err(|e| tracing::error!("failed to rebuild exchange graph: {e}"))?;
-        tracing::info!("exchange graph updated successfully");
-        Ok(())
-    }
 }
 
 /// Represents a potential conversion path in the priority queue.
@@ -321,8 +307,7 @@ mod tests {
             let query = setup().await;
             let book = Book::new(query.clone()).await.unwrap();
             let query = Arc::new(query);
-            let mut exchange = Exchange::new(query.clone()).await.unwrap();
-            exchange.update(query).await.expect("ok");
+            let exchange = Exchange::new(query.clone()).await.unwrap();
 
             let from = book
                 .commodities()
@@ -516,8 +501,7 @@ mod tests {
             let query = setup().await;
             let book = Book::new(query.clone()).await.unwrap();
             let query = Arc::new(query);
-            let mut exchange = Exchange::new(query.clone()).await.unwrap();
-            exchange.update(query).await.expect("ok");
+            let exchange = Exchange::new(query.clone()).await.unwrap();
 
             let from = book
                 .commodities()
@@ -711,8 +695,7 @@ mod tests {
             let query = setup().await;
             let book = Book::new(query.clone()).await.unwrap();
             let query = Arc::new(query);
-            let mut exchange = Exchange::new(query.clone()).await.unwrap();
-            exchange.update(query).await.expect("ok");
+            let exchange = Exchange::new(query.clone()).await.unwrap();
 
             let from = book
                 .commodities()
@@ -909,8 +892,7 @@ mod tests {
             let query = setup();
             let book = Book::new(query.clone()).await.unwrap();
             let query = Arc::new(query);
-            let mut exchange = Exchange::new(query.clone()).await.unwrap();
-            exchange.update(query).await.expect("ok");
+            let exchange = Exchange::new(query.clone()).await.unwrap();
 
             let from = book
                 .commodities()

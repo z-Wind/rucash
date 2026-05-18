@@ -215,11 +215,12 @@ where
     ) -> Option<crate::Num> {
         tracing::debug!("calculating exchange rate");
 
-        let result = self
-            .exchange_graph
-            .lock()
-            .await
-            .calculate(commodity, currency);
+        let result = {
+            self.exchange_graph
+                .lock()
+                .await
+                .calculate(commodity, currency)
+        };
 
         if let Some(rate) = result {
             tracing::debug!(?rate, "exchange rate calculated");
@@ -233,12 +234,14 @@ where
     #[instrument(skip(self))]
     pub async fn update_exchange_graph(&self) -> Result<(), Error> {
         tracing::debug!("updating existing exchange graph");
-        self.exchange_graph
-            .lock()
-            .await
-            .update(self.query.clone())
-            .await
-            .inspect_err(|e| tracing::error!("failed to update exchange graph: {e}"))?;
+
+        let new_exchange = Exchange::new(self.query.clone()).await?;
+
+        {
+            let mut graph_lock = self.exchange_graph.lock().await;
+            *graph_lock = new_exchange;
+        }
+
         tracing::info!("exchange graph updated");
         Ok(())
     }
