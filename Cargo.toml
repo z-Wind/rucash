@@ -17,17 +17,23 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-sqlx = { version = "0.9.0-alpha.1", optional = true }
+sqlx = { version = "0.9", optional = true }
 # sqlx = { git = "https://github.com/launchbadge/sqlx.git", optional = true }
 chrono = "0.4"
-rust_decimal = { version = "1.40", optional = true }
+rust_decimal = { version = "1.42", optional = true }
 roxmltree = { version = "0.21", optional = true }
 flate2 = "1.1"
-tokio = { version = "1.50", features = ["sync"] }
+tokio = { version = "1.53", features = ["sync"] }
 num-traits = "0.2"
 thiserror = "2.0"
-# Pin rusqlite to 0.37 for SQLx compatibility
-rusqlite = { version = "0.37", features = [
+# rusqlite is capped at 0.39 (not the newest 0.40.x) because sqlx-sqlite 0.9.0
+# still requires `libsqlite3-sys >=0.30.1, <0.38.0`, while rusqlite 0.40.x
+# requires `libsqlite3-sys ^0.38.1`. 0.39.0 is the newest rusqlite whose
+# libsqlite3-sys requirement (^0.37.0) still overlaps sqlx's range, so Cargo
+# can unify on a single libsqlite3-sys (0.37.x) instead of erroring or
+# linking two copies of bundled SQLite into the same binary.
+# Re-check this cap next time sqlx-sqlite raises its libsqlite3-sys ceiling.
+rusqlite = { version = "0.39", features = [
     "bundled",
     "chrono",
 ], optional = true }
@@ -42,7 +48,7 @@ crate-type = ["cdylib", "rlib"]
 criterion = { version = "0.8", features = ["async_tokio"] }
 float-cmp = "0.10"
 pretty_assertions = "1.4"
-tokio = { version = "1.50", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros"] }
 test-log = { version = "0.2", default-features = false, features = ["trace"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
