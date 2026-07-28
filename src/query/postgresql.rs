@@ -4,6 +4,7 @@ pub(crate) mod price;
 pub(crate) mod split;
 pub(crate) mod transaction;
 
+use sqlx::Executor;
 use tracing::instrument;
 
 use super::Query;
@@ -66,6 +67,13 @@ impl PostgreSQLQuery {
             .acquire_timeout(std::time::Duration::from_secs(ACQUIRE_TIMEOUT_SECS))
             .idle_timeout(std::time::Duration::from_secs(IDLE_TIMEOUT_SECS))
             .max_lifetime(std::time::Duration::from_secs(MAX_LIFETIME_SECS))
+            .after_connect(|conn, _meta| {
+                Box::pin(async move {
+                    conn.execute("SET default_transaction_read_only = ON;")
+                        .await?;
+                    Ok(())
+                })
+            })
             .connect(uri)
             .await
             .inspect_err(|e| tracing::error!("failed to connect to postgresql: {e}"))?;
@@ -89,5 +97,25 @@ mod tests {
 
         tracing::debug!("work_dir: {:?}", std::env::current_dir());
         PostgreSQLQuery::new(uri).await.unwrap();
+    }
+
+    /// Confirms the `after_connect` session guard actually rejects writes,
+    /// not just that the `Query` trait happens not to expose any.
+    #[test(tokio::test)]
+    async fn test_write_is_rejected() {
+        let uri: &str = "postgresql://user:secret@localhost:5432/complex_sample.gnucash";
+        let query = PostgreSQLQuery::new(uri).await.unwrap();
+
+        let result = sqlx::query(
+            "INSERT INTO accounts (guid, name, account_type, commodity_scu, non_std_scu)
+             VALUES ('rucash_readonly_guard_test0000', 'readonly-guard-test', 'ASSET', 100, 0)",
+        )
+        .execute(&query.pool)
+        .await;
+
+        assert!(
+            result.is_err(),
+            "write should be rejected by the read-only session guard, got: {result:?}"
+        );
     }
 }

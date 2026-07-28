@@ -102,4 +102,28 @@ mod tests {
         tracing::debug!("work_dir: {:?}", std::env::current_dir());
         SQLiteQuery::new(uri).unwrap();
     }
+
+    /// Confirms the `SQLITE_OPEN_READ_ONLY` flag + `PRAGMA query_only` guard
+    /// actually rejects writes, not just that the `Query` trait happens not
+    /// to expose any.
+    #[test]
+    fn test_write_is_rejected() {
+        let uri: &str = &format!(
+            "{}/tests/db/sqlite/complex_sample.gnucash",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let query = SQLiteQuery::new(uri).unwrap();
+        let conn = query.pool.get().unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO accounts (guid, name, account_type, commodity_scu, non_std_scu)
+             VALUES ('rucash_readonly_guard_test0000', 'readonly-guard-test', 'ASSET', 100, 0)",
+            [],
+        );
+
+        assert!(
+            result.is_err(),
+            "write should be rejected by the read-only session guard, got: {result:?}"
+        );
+    }
 }
