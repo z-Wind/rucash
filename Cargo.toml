@@ -26,13 +26,22 @@ flate2 = "1.1"
 tokio = { version = "1.53", features = ["sync"] }
 num-traits = "0.2"
 thiserror = "2.0"
-# rusqlite is capped at 0.39 (not the newest 0.40.x) because sqlx-sqlite 0.9.0
-# still requires `libsqlite3-sys >=0.30.1, <0.38.0`, while rusqlite 0.40.x
-# requires `libsqlite3-sys ^0.38.1`. 0.39.0 is the newest rusqlite whose
-# libsqlite3-sys requirement (^0.37.0) still overlaps sqlx's range, so Cargo
-# can unify on a single libsqlite3-sys (0.37.x) instead of erroring or
-# linking two copies of bundled SQLite into the same binary.
-# Re-check this cap next time sqlx-sqlite raises its libsqlite3-sys ceiling.
+# rusqlite is capped below 0.40 on purpose. This is NOT about whether our
+# own `schema`/`sqlite` features ever turn on `sqlx/sqlite` — Cargo's
+# resolver builds its dependency graph "as if all features were enabled"
+# purely to compute a valid Cargo.lock (see
+# https://doc.rust-lang.org/cargo/reference/resolver.html#links), so the
+# mere fact that `sqlx` (used for mysql/postgres) *could* pull in
+# `sqlx-sqlite` under some feature combination is enough to trigger a
+# `links = "sqlite3"` conflict with rusqlite's own bundled libsqlite3-sys,
+# regardless of which features we actually select. Known, still-open Cargo
+# limitation: https://github.com/rust-lang/cargo/issues/14494
+#
+# sqlx-sqlite 0.9.0 requires `libsqlite3-sys >=0.30.1, <0.38.0`. rusqlite
+# 0.39.0 is the newest release whose own requirement (`^0.37.0`) still
+# falls inside that range, so Cargo can settle on one shared
+# libsqlite3-sys (0.37.x) instead of erroring. Re-check this cap next time
+# sqlx-sqlite raises its libsqlite3-sys ceiling.
 rusqlite = { version = "0.39", features = [
     "bundled",
     "chrono",
@@ -54,7 +63,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [features]
 default = []
-schema = ["sqlx_common", "sqlx/sqlite"]
+schema = ["sqlx_common"]
 sqlx_common = ["sqlx/any", "sqlx/runtime-tokio", "sqlx/macros", "sqlx/chrono"]
 sqlite = ["rusqlite"]
 postgresql = ["sqlx_common", "sqlx/postgres"]

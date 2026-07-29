@@ -246,27 +246,33 @@ mod tests {
     use super::*;
 
     #[cfg(feature = "schema")]
-    // test schemas on compile time
-    #[allow(dead_code)]
-    fn test_split_schemas() {
-        let _ = sqlx::query_as!(
-            Split,
-            r#"
-				SELECT 	
-				guid,
-				tx_guid,
-				account_guid,
-				memo,
-				action,
-				reconcile_state,
-				reconcile_date as "reconcile_date: NaiveDateTime",
-				value_num,
-				value_denom,
-				quantity_num,
-				quantity_denom,
-				lot_guid
-				FROM splits
-				"#,
+    #[test]
+    fn test_split_schema() {
+        let uri = format!(
+            "{}/tests/db/sqlite/complex_sample.gnucash",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let conn =
+            rusqlite::Connection::open_with_flags(uri, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .unwrap();
+        let stmt = conn.prepare(SEL).unwrap();
+
+        assert_eq!(
+            stmt.column_names(),
+            vec![
+                "guid",
+                "tx_guid",
+                "account_guid",
+                "memo",
+                "action",
+                "reconcile_state",
+                "reconcile_date",
+                "value_num",
+                "value_denom",
+                "quantity_num",
+                "quantity_denom",
+                "lot_guid",
+            ]
         );
     }
 

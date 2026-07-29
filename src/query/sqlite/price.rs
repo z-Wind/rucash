@@ -243,23 +243,29 @@ mod tests {
     use super::*;
 
     #[cfg(feature = "schema")]
-    // test schemas on compile time
-    #[allow(dead_code)]
-    fn test_price_schemas() {
-        let _ = sqlx::query_as!(
-            Price,
-            r#"
-				SELECT
-				guid,
-				commodity_guid,
-				currency_guid,
-				date as "date: NaiveDateTime",
-				source,
-				type,
-				value_num,
-				value_denom
-				FROM prices
-				"#,
+    #[test]
+    fn test_price_schema() {
+        let uri = format!(
+            "{}/tests/db/sqlite/complex_sample.gnucash",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let conn =
+            rusqlite::Connection::open_with_flags(uri, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .unwrap();
+        let stmt = conn.prepare(SEL).unwrap();
+
+        assert_eq!(
+            stmt.column_names(),
+            vec![
+                "guid",
+                "commodity_guid",
+                "currency_guid",
+                "date",
+                "source",
+                "type",
+                "value_num",
+                "value_denom",
+            ]
         );
     }
 

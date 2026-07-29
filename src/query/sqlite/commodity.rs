@@ -180,24 +180,30 @@ mod tests {
     use super::*;
 
     #[cfg(feature = "schema")]
-    // test schemas on compile time
-    #[allow(dead_code)]
-    fn test_commodity_schemas() {
-        let _ = sqlx::query_as!(
-            Commodity,
-            r"
-				SELECT
-				guid,
-				namespace,
-				mnemonic,
-				fullname,
-				cusip,
-				fraction,
-				quote_flag,
-				quote_source,
-				quote_tz
-				FROM commodities
-				",
+    #[test]
+    fn test_commodity_schema() {
+        let uri = format!(
+            "{}/tests/db/sqlite/complex_sample.gnucash",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let conn =
+            rusqlite::Connection::open_with_flags(uri, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .unwrap();
+        let stmt = conn.prepare(SEL).unwrap();
+
+        assert_eq!(
+            stmt.column_names(),
+            vec![
+                "guid",
+                "namespace",
+                "mnemonic",
+                "fullname",
+                "cusip",
+                "fraction",
+                "quote_flag",
+                "quote_source",
+                "quote_tz",
+            ]
         );
     }
 
