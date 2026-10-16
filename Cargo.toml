@@ -17,32 +17,16 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-sqlx = { version = "0.9", optional = true }
-# sqlx = { git = "https://github.com/launchbadge/sqlx.git", optional = true }
+# sqlx = { version = "0.9", optional = true }
+sqlx = { git = "https://github.com/launchbadge/sqlx.git", optional = true } # for rusqlite 0.40
 chrono = "0.4"
-rust_decimal = { version = "1.42", optional = true }
+rust_decimal = { version = "1.43", optional = true }
 roxmltree = { version = "0.21", optional = true }
 flate2 = "1.1"
 tokio = { version = "1.53", features = ["sync"] }
 num-traits = "0.2"
 thiserror = "2.0"
-# rusqlite is capped below 0.40 on purpose. This is NOT about whether our
-# own `schema`/`sqlite` features ever turn on `sqlx/sqlite` — Cargo's
-# resolver builds its dependency graph "as if all features were enabled"
-# purely to compute a valid Cargo.lock (see
-# https://doc.rust-lang.org/cargo/reference/resolver.html#links), so the
-# mere fact that `sqlx` (used for mysql/postgres) *could* pull in
-# `sqlx-sqlite` under some feature combination is enough to trigger a
-# `links = "sqlite3"` conflict with rusqlite's own bundled libsqlite3-sys,
-# regardless of which features we actually select. Known, still-open Cargo
-# limitation: https://github.com/rust-lang/cargo/issues/14494
-#
-# sqlx-sqlite 0.9.0 requires `libsqlite3-sys >=0.30.1, <0.38.0`. rusqlite
-# 0.39.0 is the newest release whose own requirement (`^0.37.0`) still
-# falls inside that range, so Cargo can settle on one shared
-# libsqlite3-sys (0.37.x) instead of erroring. Re-check this cap next time
-# sqlx-sqlite raises its libsqlite3-sys ceiling.
-rusqlite = { version = "0.39", features = [
+rusqlite = { version = "0.40", features = [
     "bundled",
     "chrono",
 ], optional = true }
